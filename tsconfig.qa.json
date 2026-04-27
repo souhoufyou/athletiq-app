@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "noEmit": false,
+    "outDir": ".qa-dist/personalization",
+    "target": "ES2020"
+  },
+  "include": [
+    "qa-personalization-test.ts",
+    "qa-advanced-analysis-test.ts",
+    "data/seed.ts",
+    "lib/analytics.ts",
+    "lib/coachAiPayload.ts",
+    "lib/personalization.ts",
+    "types/training.ts"
+  ]
+}

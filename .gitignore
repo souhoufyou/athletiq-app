@@ -1,0 +1,43 @@
+# dependencies
+node_modules/
+package/
+
+# next.js
+.next/
+out/
+dist/
+build/
+
+# environment
+.env
+.env.*
+!.env.example
+
+# logs
+*.log
+dev-*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# caches and generated QA output
+.npm-cache/
+.qa-dist/
+.chrome-*/
+*.tsbuildinfo
+qa-*.png
+athletiq-*.png
+
+# archives and local packages
+npm.tgz
+*.tgz
+*.zip
+*.tar
+*.tar.gz
+
+# system/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
