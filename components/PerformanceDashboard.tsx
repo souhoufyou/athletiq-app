@@ -1,15 +1,8 @@
-﻿"use client";
+"use client";
 
 import { useMemo } from "react";
-import { MainGoalsSection } from "@/components/performance/MainGoalsSection";
-import { PerformanceCard as PerformanceCardView } from "@/components/performance/PerformanceCard";
-import {
-  NextTargetsSection,
-  TopProgressionsSection,
-  WatchListSection
-} from "@/components/performance/SignalSections";
 import { useCoachStorage } from "@/lib/storage";
-import type { CompletedSession, Exercise, ExerciseLog, PlannedSession } from "@/types/training";
+import type { CalibrationEvent, CompletedSession, Exercise, ExerciseLog, PlannedSession } from "@/types/training";
 
 type PerformanceKind = "cardio" | "strength";
 
@@ -32,7 +25,7 @@ type PerformanceEntry = {
   cardio: CardioMetrics;
 };
 
-export type CardioMetrics = {
+type CardioMetrics = {
   distanceKm?: number;
   durationMin?: number;
   incline?: number;
@@ -40,7 +33,7 @@ export type CardioMetrics = {
   speedKmh?: number;
 };
 
-export type ExercisePerformance = {
+type ExercisePerformance = {
   best: string;
   bestBadge?: string;
   cardioBest?: CardioMetrics;
@@ -49,32 +42,32 @@ export type ExercisePerformance = {
   nextTarget: string;
   progression: string;
   recentDelta: number;
-  trend: "douleur" | "pas assez de donnÃ©es" | "progresse" | "rÃ©gresse" | "stable";
+  trend: "douleur" | "pas assez de données" | "progresse" | "régresse" | "stable";
   volume?: number;
 };
 
 const performanceDefinitions: PerformanceDefinition[] = [
   {
     key: "bench",
-    label: "DÃ©veloppÃ© couchÃ©",
+    label: "Développé couché",
     kind: "strength",
-    match: /d[Ã©e]velopp[Ã©e] couch|developpe couche|bench/i,
+    match: /d[ée]velopp[ée] couch|developpe couche|bench/i,
     referenceBest: "127 kg x 1"
   },
-  { key: "leg-press", label: "Presse Ã  cuisses", kind: "strength", match: /presse|leg press/i },
+  { key: "leg-press", label: "Presse à cuisses", kind: "strength", match: /presse|leg press/i },
   { key: "lat-pulldown", label: "Tirage vertical", kind: "strength", match: /tirage vertical|tractions? assist/i },
   { key: "rowing", label: "Rowing", kind: "strength", match: /rowing/i },
-  { key: "shoulder-press", label: "DÃ©veloppÃ© Ã©paules", kind: "strength", match: /d[Ã©e]velopp[Ã©e] [Ã©e]paules|shoulder press/i },
+  { key: "shoulder-press", label: "Développé épaules", kind: "strength", match: /d[ée]velopp[ée] [ée]paules|shoulder press/i },
   {
     key: "hinge",
-    label: "Hip thrust / soulevÃ© roumain",
+    label: "Hip thrust / soulevé roumain",
     kind: "strength",
-    match: /hip thrust|soulev[Ã©e] de terre roumain|roumain|rdl|deadlift/i,
+    match: /hip thrust|soulev[ée] de terre roumain|roumain|rdl|deadlift/i,
     referenceBest: "170 kg"
   },
   { key: "leg-extension", label: "Leg extension", kind: "strength", match: /leg extension/i },
   { key: "leg-curl", label: "Leg curl", kind: "strength", match: /leg curl/i },
-  { key: "incline-treadmill", label: "Tapis inclinÃ©", kind: "cardio", match: /tapis|marche|zone 2/i },
+  { key: "incline-treadmill", label: "Tapis incliné", kind: "cardio", match: /tapis|marche|zone 2/i },
   { key: "interval-cardio", label: "Rameur / intervalles", kind: "cardio", match: /rameur|intervalles|stairmaster|rounds?/i },
   { key: "grip", label: "Grip / suspension", kind: "strength", match: /farmer|suspension|grip|hang/i }
 ];
@@ -92,11 +85,11 @@ export function PerformanceDashboard() {
 
   if (history.length === 0) {
     return (
-      <section className="rounded-2xl border border-black/10 bg-white p-5 shadow-soft">
+      <section className="card-dark p-5">
         <p className="text-sm font-black uppercase text-sky">Mes performances</p>
-        <h2 className="mt-1 text-2xl font-black">Fais ta premiÃ¨re sÃ©ance pour gÃ©nÃ©rer tes performances.</h2>
-        <p className="mt-2 text-sm font-semibold text-ink/60">
-          Les records, volumes, tendances et prochaines cibles seront calculÃ©s depuis ton historique local.
+        <h2 className="mt-1 text-2xl font-black text-white">Fais ta première séance pour générer tes performances.</h2>
+        <p className="mt-2 text-sm font-semibold text-white/55">
+          Les records, volumes, tendances et prochaines cibles seront calculés depuis ton historique local.
         </p>
       </section>
     );
@@ -106,10 +99,10 @@ export function PerformanceDashboard() {
 
   return (
     <div className="space-y-4">
-      <section className="rounded-2xl bg-ink p-5 text-white shadow-soft">
-        <p className="text-sm font-black uppercase text-sky">Vue athlÃ¨te</p>
+      <section className="overflow-hidden rounded-2xl border border-white/10 premium-gradient p-5 text-white shadow-soft">
+        <p className="text-sm font-black uppercase text-sky">Vue athlète</p>
         <h2 className="mt-1 text-3xl font-black leading-tight">
-          {bench?.trend === "progresse" ? "Tu avances" : "RepÃ¨res principaux"}
+          {bench?.trend === "progresse" ? "Tu avances" : "Repères principaux"}
         </h2>
         <div className="mt-5 grid grid-cols-3 gap-2">
           <HeroMetric label="Bench" value={bench?.latest ?? "-"} />
@@ -118,30 +111,188 @@ export function PerformanceDashboard() {
         </div>
       </section>
 
-      <MainGoalsSection targetWeight={settings.targetWeightKg} />
+      <GoalsSection
+        benchOneRepMaxKg={settings.benchOneRepMaxKg}
+        judoDaysCount={settings.judoDays.length}
+        mainGoal={settings.mainGoal}
+        targetWeightKg={settings.targetWeightKg}
+      />
 
-      <WatchListSection items={dashboard.watchItems} />
-      <TopProgressionsSection items={dashboard.topProgressions} />
-      <NextTargetsSection items={dashboard.nextTargets} />
+      <SignalSection
+        empty="Aucun signal critique récent."
+        items={dashboard.watchItems}
+        title="À surveiller"
+        tone="danger"
+      />
+
+      <SignalSection
+        empty="Pas encore assez de données positives."
+        items={dashboard.topProgressions}
+        title="Top progressions"
+        tone="progress"
+      />
+
+      <SignalSection
+        empty="Aucune cible prioritaire."
+        items={dashboard.nextTargets}
+        title="Prochaines cibles"
+        tone="info"
+      />
+
+      <CalibrationJournalSection events={settings.calibrationEvents ?? []} />
 
       <section className="space-y-3">
         <div>
-          <p className="text-sm font-black uppercase text-moss">Exercices suivis</p>
-          <h2 className="mt-1 text-2xl font-black">Cartes performances</h2>
+          <p className="text-sm font-black uppercase text-white/40">Exercices suivis</p>
+          <h2 className="mt-1 text-2xl font-black text-white">Cartes performances</h2>
         </div>
         {dashboard.performances.map((performance) => (
-          <PerformanceCardView
-            formatCardioMetrics={formatCardioMetrics}
-            formatVolume={formatVolume}
-            key={performance.definition.key}
-            performance={performance}
-          />
+          <PerformanceCard key={performance.definition.key} performance={performance} />
         ))}
       </section>
     </div>
   );
 }
 
+function PerformanceCard({ performance }: { performance: ExercisePerformance }) {
+  const isCardio = performance.definition.kind === "cardio";
+
+  return (
+    <article className="card-dark p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="text-2xl font-black leading-tight text-white">{performance.definition.label}</h3>
+          <p className="mt-1 text-sm font-semibold text-white/55">Progression récente : {performance.progression}</p>
+        </div>
+        <TrendBadge trend={performance.trend} />
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <PerfTile label="Dernière perf" value={performance.latest} />
+        <PerfTile label="Meilleure perf" value={performance.best} badge={performance.bestBadge} />
+        <PerfTile label="Prochaine cible" value={performance.nextTarget} badge="prochaine cible" />
+        <PerfTile
+          label={isCardio ? "Meilleure durée/intensité" : "Volume dernière séance"}
+          value={isCardio ? formatCardioMetrics(performance.cardioBest) : formatVolume(performance.volume)}
+        />
+      </div>
+    </article>
+  );
+}
+
+function GoalsSection({
+  benchOneRepMaxKg,
+  judoDaysCount,
+  mainGoal,
+  targetWeightKg
+}: {
+  benchOneRepMaxKg: number;
+  judoDaysCount: number;
+  mainGoal: string;
+  targetWeightKg: number;
+}) {
+  const benchWorkTarget = Math.round(benchOneRepMaxKg * 0.79 / 2.5) * 2.5; // ~79% 1RM → 5x5 work weight
+  const benchNextMax = Math.round(benchOneRepMaxKg * 1.06 / 2.5) * 2.5; // +6% PR target
+
+  const goals = [
+    mainGoal,
+    `Objectif poids : ~${targetWeightKg} kg`,
+    `Développé couché travail : ${benchWorkTarget} kg × 5 × 5 propre`,
+    `Prochain record bench visé : ${benchNextMax} kg × 1`,
+    "Objectif cardio : souffle et récupération en amélioration",
+    judoDaysCount > 0
+      ? `Judo ${judoDaysCount}×/semaine : améliorer souffle, grip et récupération`
+      : "Maintenir la mobilité et la santé articulaire"
+  ].filter(Boolean);
+
+  return (
+    <section className="rounded-xl border border-sky/20 bg-sky/10 p-4 shadow-soft">
+      <h2 className="text-lg font-black text-white">Objectifs principaux</h2>
+      <div className="mt-3 space-y-2">
+        {goals.map((goal) => (
+          <p className="rounded-md bg-white/8 p-3 text-sm font-semibold leading-relaxed text-white/80" key={goal}>
+            {goal}
+          </p>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function SignalSection({
+  empty,
+  items,
+  title,
+  tone
+}: {
+  empty: string;
+  items: string[];
+  title: string;
+  tone: "danger" | "info" | "progress";
+}) {
+  const toneClass = {
+    danger: "border-coral/20 bg-coral/10",
+    info: "border-sky/20 bg-sky/10",
+    progress: "border-amber/20 bg-amber/10"
+  }[tone];
+
+  return (
+    <section className={`rounded-xl border p-4 shadow-soft ${toneClass}`}>
+      <h2 className="text-lg font-black text-white">{title}</h2>
+      <div className="mt-3 space-y-2">
+        {items.length ? (
+          items.slice(0, title === "Top progressions" ? 3 : 6).map((item) => (
+            <p className="rounded-md bg-white/8 p-3 text-sm font-semibold leading-relaxed text-white/80" key={item}>
+              {item}
+            </p>
+          ))
+        ) : (
+          <p className="rounded-md bg-white/8 p-3 text-sm font-semibold text-white/50">{empty}</p>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function CalibrationJournalSection({ events }: { events: CalibrationEvent[] }) {
+  return (
+    <section className="rounded-xl border border-white/10 bg-white/5 p-4 shadow-soft">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-black uppercase text-white/40">Adaptation</p>
+          <h2 className="mt-1 text-2xl font-black text-white">Journal de recalibrage</h2>
+        </div>
+        <span className="rounded-md bg-white/8 px-2 py-1 text-xs font-black text-white/55">
+          {events.length}
+        </span>
+      </div>
+
+      <div className="mt-4 space-y-2">
+        {events.length > 0 ? (
+          events.slice(0, 8).map((event) => (
+            <div className="rounded-lg border border-white/8 bg-white/5 p-3" key={event.id}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <JournalToneBadge tone={event.tone} />
+                    <p className="text-sm font-black text-white">{event.title}</p>
+                  </div>
+                  <p className="mt-2 font-black text-white/85">{event.subject}</p>
+                  <p className="mt-1 text-sm font-semibold leading-relaxed text-white/60">{event.detail}</p>
+                </div>
+                <p className="shrink-0 text-xs font-bold text-white/40">{formatJournalDate(event.createdAt)}</p>
+              </div>
+            </div>
+          ))
+        ) : (
+          <p className="rounded-md bg-white/8 p-3 text-sm font-semibold text-white/50">
+            Les ajustements de charge, reperes appris et verrouillages apparaitront ici.
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}
 
 function HeroMetric({ label, value }: { label: string; value: string }) {
   return (
@@ -152,6 +303,45 @@ function HeroMetric({ label, value }: { label: string; value: string }) {
   );
 }
 
+function JournalToneBadge({ tone }: { tone: CalibrationEvent["tone"] }) {
+  const toneClass = {
+    info: "bg-sky/10 text-sky",
+    progress: "bg-sea/10 text-sea",
+    warn: "bg-amber/10 text-amber"
+  }[tone];
+
+  const label = {
+    info: "valide",
+    progress: "monte",
+    warn: "ajuste"
+  }[tone];
+
+  return <span className={`rounded-md px-2 py-1 text-[10px] font-black uppercase ${toneClass}`}>{label}</span>;
+}
+
+function PerfTile({ badge, label, value }: { badge?: string; label: string; value: string }) {
+  return (
+    <div className="min-h-24 rounded-lg border border-white/8 bg-white/5 p-3">
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-xs font-black uppercase text-white/45">{label}</p>
+        {badge ? <span className="rounded bg-amber/10 px-2 py-1 text-[10px] font-black uppercase text-amber">{badge}</span> : null}
+      </div>
+      <p className="mt-2 text-xl font-black leading-tight text-white">{value}</p>
+    </div>
+  );
+}
+
+function TrendBadge({ trend }: { trend: ExercisePerformance["trend"] }) {
+  const classes = {
+    douleur: "bg-red-500/10 text-red-600",
+    "pas assez de données": "bg-white/10 text-white/50",
+    progresse: "bg-sea/10 text-sea",
+    régresse: "bg-coral/10 text-coral",
+    stable: "bg-sky/10 text-sky"
+  }[trend];
+
+  return <span className={`shrink-0 rounded-md px-3 py-2 text-xs font-black uppercase ${classes}`}>{trend}</span>;
+}
 
 function buildPerformanceDashboard(history: CompletedSession[], program: PlannedSession[]) {
   const performances = performanceDefinitions.map((definition) => buildExercisePerformance(definition, history, program));
@@ -164,7 +354,7 @@ function buildPerformanceDashboard(history: CompletedSession[], program: Planned
 
   return {
     nextTargets: performances
-      .filter((performance) => performance.nextTarget !== "Ã€ dÃ©finir")
+      .filter((performance) => performance.nextTarget !== "À définir")
       .slice(0, 5)
       .map((performance) => `${performance.definition.label} : ${performance.nextTarget}`),
     performances,
@@ -187,15 +377,15 @@ function buildExercisePerformance(
   const progression = formatRecentProgression(recentDelta, definition.kind);
   const bestCardio = definition.kind === "cardio" ? getBestCardio(entries) : undefined;
   const bestStrength = definition.kind === "strength" ? getBestStrength(entries, definition.referenceBest) : undefined;
-  const bestLabel = bestCardio?.label ?? bestStrength?.label ?? "Aucune donnÃ©e";
+  const bestLabel = bestCardio?.label ?? bestStrength?.label ?? "Aucune donnée";
 
   return {
     best: bestLabel,
     bestBadge: bestStrength?.isReference || entries.length ? "record" : undefined,
     cardioBest: bestCardio?.cardio,
     definition,
-    latest: latest ? formatEntry(latest, definition.kind) : "Aucune donnÃ©e",
-    nextTarget: planned ? formatPlannedTarget(planned) : "Ã€ dÃ©finir",
+    latest: latest ? formatEntry(latest, definition.kind) : "Aucune donnée",
+    nextTarget: planned ? formatPlannedTarget(planned) : "À définir",
     progression,
     recentDelta,
     trend,
@@ -243,7 +433,7 @@ function getTrend(entries: PerformanceEntry[]): ExercisePerformance["trend"] {
   const recent = entries.slice(-4);
   const hasPain = recent.some((entry) => {
     const text = `${entry.log.comment} ${entry.log.status}`;
-    return entry.log.status === "pain" || /douleur|poignet|Ã©paule|epaule|dos|genou|oppression|vertige/i.test(text);
+    return entry.log.status === "pain" || /douleur|poignet|épaule|epaule|dos|genou|oppression|vertige/i.test(text);
   });
 
   if (hasPain) {
@@ -251,7 +441,7 @@ function getTrend(entries: PerformanceEntry[]): ExercisePerformance["trend"] {
   }
 
   if (entries.length < 2) {
-    return "pas assez de donnÃ©es";
+    return "pas assez de données";
   }
 
   const latest = entries.at(-1);
@@ -263,7 +453,7 @@ function getTrend(entries: PerformanceEntry[]): ExercisePerformance["trend"] {
   }
 
   if (delta < -0.5) {
-    return "rÃ©gresse";
+    return "régresse";
   }
 
   return "stable";
@@ -295,7 +485,7 @@ function getBestStrength(entries: PerformanceEntry[], referenceBest?: string) {
     return { isReference: true, label: referenceBest };
   }
 
-  return { isReference: false, label: bestEntry ? formatEntry(bestEntry, "strength") : referenceBest ?? "Aucune donnÃ©e" };
+  return { isReference: false, label: bestEntry ? formatEntry(bestEntry, "strength") : referenceBest ?? "Aucune donnée" };
 }
 
 function getBestCardio(entries: PerformanceEntry[]) {
@@ -304,7 +494,7 @@ function getBestCardio(entries: PerformanceEntry[]) {
   return {
     cardio: bestEntry?.cardio,
     isReference: false,
-    label: bestEntry ? formatCardioMetrics(bestEntry.cardio) : "Aucune donnÃ©e"
+    label: bestEntry ? formatCardioMetrics(bestEntry.cardio) : "Aucune donnée"
   };
 }
 
@@ -317,8 +507,8 @@ function buildWatchItems(history: CompletedSession[], performances: ExercisePerf
       const name = progression?.exerciseName ?? log.exerciseId;
       const text = `${name} ${log.comment} ${progression?.warning ?? ""} ${session.feedback?.breath ?? ""}`;
 
-      if (log.status === "pain" || /douleur|poignet|Ã©paule|epaule|dos|genou/i.test(text)) {
-        items.add(`${name} : douleur ou gÃªne signalÃ©e`);
+      if (log.status === "pain" || /douleur|poignet|épaule|epaule|dos|genou/i.test(text)) {
+        items.add(`${name} : douleur ou gêne signalée`);
       }
 
       if (log.status === "hard") {
@@ -326,7 +516,7 @@ function buildWatchItems(history: CompletedSession[], performances: ExercisePerf
       }
 
       if (/cardio|tapis|rameur|intervalles|stairmaster/i.test(name) && (log.status === "hard" || /tres-mauvais|vertige|oppression|souffle/i.test(text))) {
-        items.add(`${name} : souffle/cardio Ã  surveiller`);
+        items.add(`${name} : souffle/cardio à surveiller`);
       }
     }
   }
@@ -338,7 +528,7 @@ function buildWatchItems(history: CompletedSession[], performances: ExercisePerf
   }
 
   if ([...items].some((item) => /poignet/i.test(item))) {
-    items.add("Poignet droit : garder prises neutres et Ã©viter les hausses agressives");
+    items.add("Poignet droit : garder prises neutres et éviter les hausses agressives");
   }
 
   return [...items].slice(0, 8);
@@ -349,17 +539,17 @@ function formatEntry(entry: PerformanceEntry, kind: PerformanceKind) {
     return formatCardioMetrics(entry.cardio);
   }
 
-  return `${entry.log.usedLoad || "-"} â€” ${entry.log.completedReps || "-"}`;
+  return `${entry.log.usedLoad || "-"} — ${entry.log.completedReps || "-"}`;
 }
 
 function formatPlannedTarget(exercise: Exercise) {
-  const load = exercise.plannedLoad ? `${exercise.plannedLoad} â€” ` : "";
+  const load = exercise.plannedLoad ? `${exercise.plannedLoad} — ` : "";
   return `${load}${exercise.target}`;
 }
 
 function formatRecentProgression(delta: number, kind: PerformanceKind) {
   if (!delta) {
-    return "pas assez de donnÃ©es";
+    return "pas assez de données";
   }
 
   if (kind === "cardio") {
@@ -375,7 +565,7 @@ function formatRecentProgression(delta: number, kind: PerformanceKind) {
 
 function formatCardioMetrics(metrics?: CardioMetrics) {
   if (!metrics || !Object.values(metrics).some((value) => value !== undefined)) {
-    return "Aucune donnÃ©e";
+    return "Aucune donnée";
   }
 
   return [
@@ -386,11 +576,25 @@ function formatCardioMetrics(metrics?: CardioMetrics) {
     metrics.rounds ? `${metrics.rounds} rounds` : undefined
   ]
     .filter(Boolean)
-    .join(" â€” ");
+    .join(" — ");
 }
 
 function formatVolume(value?: number) {
   return value ? `${Math.round(value)} kg` : "Non calculable";
+}
+
+function formatJournalDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "date inconnue";
+  }
+
+  return new Intl.DateTimeFormat("fr-FR", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(date);
 }
 
 function parseReps(value: string) {

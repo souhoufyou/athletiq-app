@@ -1,61 +1,134 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react";
 import { athleteProfile, weeklyProgram } from "@/data/program";
-import { estimateCalories } from "@/lib/analytics";
 import { getDateKey } from "@/lib/date";
-import { personalizeProgram } from "@/lib/personalization";
-import { calculateProgression } from "@/lib/progression";
+import { adaptProgramAfterSession } from "@/lib/programAdaptation";
+import { adaptSettingsAfterSession } from "@/lib/profileAdaptation";
+import { buildProgram } from "@/lib/programBuilder";
+import { normalizeExerciseV2, normalizeProgramV2 } from "@/lib/programSchema";
+import { calculateProgression, type ProgressionSessionContext } from "@/lib/progression";
+import { CURRENT_SETTINGS_SCHEMA_VERSION, normalizeUserSettings } from "@/lib/settingsSchema";
 import { createEmptyLogs, defaultSessionFeedback, getNextSession, getTodaySession } from "@/lib/session";
 import type {
   ActiveSession,
   CoachAiResponse,
   CompletedSession,
-  DailyJudoChoice,
+  ExternalSport,
+  EffortStatus,
   Exercise,
+  ExerciseHistoryPoint,
   ExerciseLog,
   ExerciseProgressionLog,
+  GuardrailSummary,
+  MuscleGroup,
   PlannedSession,
+  Profile,
   SessionFeedback,
-  UserSettings
+  UserSettings,
+  Weekday
 } from "@/types/training";
 
-const ACTIVE_SESSION_KEY = "coach-adaptatif:active-session";
-const HISTORY_KEY = "coach-adaptatif:history";
-const PROGRAM_KEY = "coach-adaptatif:program";
-const SETTINGS_KEY = "coach-adaptatif:settings";
-export const STORAGE_VERSION = 1;
+const PROFILES_KEY = "coach-adaptatif:profiles";
 
-const STORAGE_VERSION_KEY = "coach-adaptatif:storage-version";
-const STORAGE_KEYS = [ACTIVE_SESSION_KEY, HISTORY_KEY, PROGRAM_KEY, SETTINGS_KEY] as const;
+type ProfilesState = {
+  profiles: Profile[];
+  activeProfileId: string;
+};
+
+const DEFAULT_PROFILE_ID = "default";
+
+function profileKey(profileId: string, suffix: string): string {
+  return `coach-adaptatif:p:${profileId}:${suffix}`;
+}
+
+function activeSessionKeyFor(profileId: string) {
+  return profileKey(profileId, "active-session");
+}
+
+function historyKeyFor(profileId: string) {
+  return profileKey(profileId, "history");
+}
+
+function programKeyFor(profileId: string) {
+  return profileKey(profileId, "program");
+}
+
+function settingsKeyFor(profileId: string) {
+  return profileKey(profileId, "settings");
+}
+
+function onboardingKeyFor(profileId: string) {
+  return profileKey(profileId, "onboarding-done");
+}
+
+const LEGACY_ACTIVE_SESSION_KEY = "coach-adaptatif:active-session";
+const LEGACY_HISTORY_KEY = "coach-adaptatif:history";
+const LEGACY_PROGRAM_KEY = "coach-adaptatif:program";
+const LEGACY_SETTINGS_KEY = "coach-adaptatif:settings";
+const LEGACY_ONBOARDING_KEY = "coach-adaptatif:onboarding-done";
+
+const allWeekdays: Weekday[] = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+const defaultExternalSports: ExternalSport[] =
+  athleteProfile.judoDays.length > 0
+    ? [
+        {
+          id: "judo",
+          name: "Judo",
+          days: athleteProfile.judoDays,
+          intensity: "high",
+          notes: "Sport externe a integrer dans la fatigue et la recuperation."
+        }
+      ]
+    : [];
 
 const defaultSettings: UserSettings = {
+  schemaVersion: CURRENT_SETTINGS_SCHEMA_VERSION,
   athleteName: athleteProfile.firstName,
-  age: athleteProfile.age,
-  heightCm: athleteProfile.heightCm,
+  sex: "prefer-not-to-say",
   loadUnit: "kg",
   currentWeightKg: athleteProfile.startingWeightKg,
   targetWeightKg: athleteProfile.targetWeightKg,
-  mainObjective: "recomposition",
-  sessionsPerWeek: 6,
-  availableDays: ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday"],
-  sports: {
-    judo: true,
-    other: ""
-  },
-  equipment: athleteProfile.preferences,
-  likedExercises: athleteProfile.preferences,
-  refusedExercises: athleteProfile.avoid,
-  painWatchList: athleteProfile.watchPoints,
-  level: "intermediate",
-  detailPreference: "simple",
-  progressionStyle: "dynamic",
-  dailyJudoChoice: "judo",
-  onboardingCompleted: false,
   benchOneRepMaxKg: 127,
   judoDays: athleteProfile.judoDays,
+  cautionLevel: "normal",
   aiEnabled: false,
-  darkMode: false
+  darkMode: false,
+  age: athleteProfile.age,
+  heightCm: athleteProfile.heightCm,
+  gym: athleteProfile.gym,
+  mainGoal: athleteProfile.mainGoal,
+  cardioLevel: athleteProfile.cardioLevel,
+  sleepQuality: athleteProfile.sleep,
+  recoveryProfile: "irregular",
+  medicalNotes: athleteProfile.medicalNotes.join("\n"),
+  watchPoints: athleteProfile.watchPoints,
+  preferences: athleteProfile.preferences,
+  avoid: athleteProfile.avoid,
+  availableDays: allWeekdays,
+  externalSports: defaultExternalSports,
+  constraints: [
+    ...athleteProfile.watchPoints.map((point, index) => ({
+      id: `seed-watch-${index}`,
+      area: point.toLowerCase().includes("poignet") ? ("wrist" as const) : ("other" as const),
+      label: point,
+      severity: "caution" as const
+    })),
+    ...athleteProfile.medicalNotes.map((note, index) => ({
+      id: `seed-medical-${index}`,
+      area: "other" as const,
+      label: note,
+      severity: "info" as const
+    }))
+  ],
+  strengthReferences: athleteProfile.strengthReferences,
+  loadBiasByPattern: {},
+  exerciseSwapPreferences: {},
+  setBiasByPattern: {},
+  repBiasByPattern: {},
+  restBiasByPattern: {},
+  calibrationEvents: [],
+  sessionDurationPreference: "standard"
 };
 
 function readJson<T>(key: string, fallback: T): T {
@@ -67,8 +140,6 @@ function readJson<T>(key: string, fallback: T): T {
     const value = window.localStorage.getItem(key);
     return value ? (JSON.parse(value) as T) : fallback;
   } catch {
-    backupLocalStorage(`invalid-json-${key}`);
-    window.localStorage.removeItem(key);
     return fallback;
   }
 }
@@ -78,439 +149,644 @@ function writeJson<T>(key: string, value: T): void {
     return;
   }
 
-  try {
-    window.localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    backupLocalStorage(`write-failed-${key}`);
+  window.localStorage.setItem(key, JSON.stringify(value));
+}
+
+function migrateLegacyDataIfNeeded(): ProfilesState {
+  if (typeof window === "undefined") {
+    return { profiles: [{ id: DEFAULT_PROFILE_ID, name: "Moi", avatar: "💪" }], activeProfileId: DEFAULT_PROFILE_ID };
+  }
+
+  const existing = readJson<ProfilesState | null>(PROFILES_KEY, null);
+  if (existing && existing.profiles.length > 0) return existing;
+
+  // Migrate legacy un-prefixed keys to default profile
+  const legacyKeys: Array<[string, string]> = [
+    [LEGACY_ACTIVE_SESSION_KEY, activeSessionKeyFor(DEFAULT_PROFILE_ID)],
+    [LEGACY_HISTORY_KEY, historyKeyFor(DEFAULT_PROFILE_ID)],
+    [LEGACY_PROGRAM_KEY, programKeyFor(DEFAULT_PROFILE_ID)],
+    [LEGACY_SETTINGS_KEY, settingsKeyFor(DEFAULT_PROFILE_ID)],
+    [LEGACY_ONBOARDING_KEY, onboardingKeyFor(DEFAULT_PROFILE_ID)]
+  ];
+
+  const legacySettings = readJson<Partial<UserSettings> | null>(LEGACY_SETTINGS_KEY, null);
+  const legacyName = legacySettings?.athleteName || "Moi";
+
+  for (const [legacy, target] of legacyKeys) {
+    const value = window.localStorage.getItem(legacy);
+    if (value !== null && window.localStorage.getItem(target) === null) {
+      window.localStorage.setItem(target, value);
+    }
+  }
+
+  const state: ProfilesState = {
+    profiles: [{ id: DEFAULT_PROFILE_ID, name: legacyName, avatar: "💪" }],
+    activeProfileId: DEFAULT_PROFILE_ID
+  };
+  writeJson(PROFILES_KEY, state);
+  return state;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Module-level shared store (singleton).
+// All hook instances subscribe to this — switching profiles, starting sessions,
+// etc. propagate to every mounted component that uses useCoachStorage.
+// ─────────────────────────────────────────────────────────────────────────────
+
+type StoreState = {
+  isReady: boolean;
+  isOnboardingDone: boolean;
+  profiles: Profile[];
+  activeProfileId: string;
+  activeSession: ActiveSession | null;
+  history: CompletedSession[];
+  currentProgram: PlannedSession[];
+  settings: UserSettings;
+};
+
+const initialStore: StoreState = {
+  isReady: false,
+  isOnboardingDone: false,
+  profiles: [],
+  activeProfileId: DEFAULT_PROFILE_ID,
+  activeSession: null,
+  history: [],
+  currentProgram: weeklyProgram,
+  settings: defaultSettings
+};
+
+let store: StoreState = initialStore;
+const listeners = new Set<() => void>();
+let storeInitialized = false;
+
+function getStoreSnapshot(): StoreState {
+  return store;
+}
+
+function getServerSnapshot(): StoreState {
+  return initialStore;
+}
+
+function subscribeStore(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+function emit() {
+  listeners.forEach((l) => l());
+}
+
+function setStore(patch: Partial<StoreState>) {
+  store = { ...store, ...patch };
+  emit();
+}
+
+function loadProfileIntoStore(profileId: string, profilesOverride?: Profile[]) {
+  const savedActiveSession = readJson<ActiveSession | null>(activeSessionKeyFor(profileId), null);
+  const history = readJson<CompletedSession[]>(historyKeyFor(profileId), []);
+  const program = normalizeProgramV2(readJson<PlannedSession[]>(programKeyFor(profileId), weeklyProgram));
+  const rawSettings = readJson<Partial<UserSettings> | null>(settingsKeyFor(profileId), null);
+  const settings = normalizeUserSettings(rawSettings, defaultSettings);
+  const hasExistingData =
+    typeof window !== "undefined" && window.localStorage.getItem(settingsKeyFor(profileId)) !== null;
+  const onboardingFlag = readJson<boolean>(onboardingKeyFor(profileId), false);
+  const shouldBootstrapSeedProfile =
+    typeof window !== "undefined" &&
+    profileId === DEFAULT_PROFILE_ID &&
+    !hasExistingData &&
+    !onboardingFlag &&
+    window.localStorage.getItem(programKeyFor(profileId)) === null &&
+    window.localStorage.getItem(historyKeyFor(profileId)) === null;
+
+  if (hasExistingData) {
+    writeJson(settingsKeyFor(profileId), settings);
+  }
+
+  if (shouldBootstrapSeedProfile) {
+    writeJson(settingsKeyFor(profileId), settings);
+    writeJson(programKeyFor(profileId), program);
+    writeJson(onboardingKeyFor(profileId), true);
+  }
+
+  setStore({
+    isReady: true,
+    isOnboardingDone: onboardingFlag || hasExistingData || shouldBootstrapSeedProfile,
+    profiles: profilesOverride ?? store.profiles,
+    activeProfileId: profileId,
+    activeSession: savedActiveSession ? normalizeActiveSession(savedActiveSession) : null,
+    history,
+    currentProgram: program,
+    settings
+  });
+
+  if (typeof document !== "undefined") {
+    document.documentElement.classList.toggle("dark", settings.darkMode);
   }
 }
 
-function prepareLocalStorageSchema(): void {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  const storedVersion = window.localStorage.getItem(STORAGE_VERSION_KEY);
-
-  if (!storedVersion) {
-    window.localStorage.setItem(STORAGE_VERSION_KEY, String(STORAGE_VERSION));
-    return;
-  }
-
-  const version = Number(storedVersion);
-
-  if (version === STORAGE_VERSION) {
-    return;
-  }
-
-  backupLocalStorage(`schema-${storedVersion}-to-${STORAGE_VERSION}`);
-  STORAGE_KEYS.forEach((key) => window.localStorage.removeItem(key));
-  window.localStorage.setItem(STORAGE_VERSION_KEY, String(STORAGE_VERSION));
+function ensureStoreInitialized() {
+  if (storeInitialized || typeof window === "undefined") return;
+  storeInitialized = true;
+  const profilesState = migrateLegacyDataIfNeeded();
+  loadProfileIntoStore(profilesState.activeProfileId, profilesState.profiles);
 }
 
-function backupLocalStorage(reason: string): void {
-  if (typeof window === "undefined") {
-    return;
-  }
+// ─────────────────────────────────────────────────────────────────────────────
+// Mutations (module-level, stable references — no useCallback needed)
+// ─────────────────────────────────────────────────────────────────────────────
 
-  const backup = {
-    createdAt: new Date().toISOString(),
-    reason,
-    storageVersion: window.localStorage.getItem(STORAGE_VERSION_KEY),
-    values: Object.fromEntries(STORAGE_KEYS.map((key) => [key, window.localStorage.getItem(key)]))
+function persistProfilesAndUpdate(nextProfiles: Profile[], nextActiveId: string) {
+  writeJson<ProfilesState>(PROFILES_KEY, { profiles: nextProfiles, activeProfileId: nextActiveId });
+  setStore({ profiles: nextProfiles });
+}
+
+function setActiveSessionStore(updater: (curr: ActiveSession | null) => ActiveSession | null) {
+  const next = updater(store.activeSession);
+  store = { ...store, activeSession: next };
+  if (next) {
+    writeJson(activeSessionKeyFor(store.activeProfileId), next);
+  } else if (typeof window !== "undefined") {
+    window.localStorage.removeItem(activeSessionKeyFor(store.activeProfileId));
+  }
+  emit();
+}
+
+function setHistoryStore(updater: (curr: CompletedSession[]) => CompletedSession[]) {
+  const next = updater(store.history);
+  store = { ...store, history: next };
+  writeJson(historyKeyFor(store.activeProfileId), next);
+  emit();
+}
+
+function setSettingsStore(next: UserSettings) {
+  const normalized = normalizeUserSettings(next, defaultSettings);
+  store = { ...store, settings: normalized };
+  writeJson(settingsKeyFor(store.activeProfileId), normalized);
+  if (typeof document !== "undefined") {
+    document.documentElement.classList.toggle("dark", normalized.darkMode);
+  }
+  emit();
+}
+
+function startSessionAction(session: PlannedSession): ActiveSession {
+  const startedAt = new Date().toISOString();
+  const next: ActiveSession = {
+    dateKey: getDateKey(),
+    sessionId: session.id,
+    startedAt,
+    logs: createEmptyLogs(session),
+    feedback: defaultSessionFeedback,
+    timer: { startedAt, isPaused: false, pausedTotalMs: 0 },
+    timing: {
+      activeExerciseId: session.exercises[0]?.id,
+      activeExerciseStartedAt: startedAt,
+      elapsedByExerciseMs: {}
+    }
+  };
+  setActiveSessionStore(() => next);
+  return next;
+}
+
+function pauseSessionTimerAction() {
+  setActiveSessionStore((current) => {
+    if (!current || getTimer(current).isPaused) return current;
+    const now = new Date().toISOString();
+    const normalized = normalizeActiveSession(current);
+    const timing = finalizeActiveExerciseTiming(normalized, now);
+    return {
+      ...normalized,
+      timer: { ...normalized.timer, isPaused: true, pausedAt: now },
+      timing: { ...timing, activeExerciseStartedAt: undefined }
+    };
+  });
+}
+
+function resumeSessionTimerAction() {
+  setActiveSessionStore((current) => {
+    if (!current || !getTimer(current).isPaused) return current;
+    const now = new Date();
+    const normalized = normalizeActiveSession(current);
+    const pausedAt = normalized.timer.pausedAt
+      ? new Date(normalized.timer.pausedAt).getTime()
+      : now.getTime();
+    return {
+      ...normalized,
+      timer: {
+        startedAt: normalized.timer.startedAt,
+        isPaused: false,
+        pausedTotalMs: normalized.timer.pausedTotalMs + Math.max(0, now.getTime() - pausedAt)
+      },
+      timing: {
+        ...normalized.timing,
+        activeExerciseStartedAt: normalized.timing.activeExerciseId ? now.toISOString() : undefined
+      }
+    };
+  });
+}
+
+function setActiveExerciseAction(exerciseId: string) {
+  setActiveSessionStore((current) => {
+    if (!current) return current;
+    const normalized = normalizeActiveSession(current);
+    if (normalized.timing.activeExerciseId === exerciseId) return normalized;
+    const now = new Date().toISOString();
+    const timing = finalizeActiveExerciseTiming(normalized, now);
+    return {
+      ...normalized,
+      timing: {
+        ...timing,
+        activeExerciseId: exerciseId,
+        activeExerciseStartedAt: normalized.timer.isPaused ? undefined : now
+      }
+    };
+  });
+}
+
+function replaceExerciseAction(exerciseId: string, replacement: Exercise) {
+  setActiveSessionStore((current) => {
+    if (!current) return current;
+    return {
+      ...current,
+      replacements: { ...current.replacements, [exerciseId]: normalizeExerciseV2(replacement) }
+    };
+  });
+}
+
+function clearReplacementAction(exerciseId: string) {
+  setActiveSessionStore((current) => {
+    if (!current?.replacements) return current;
+    const next = { ...current.replacements };
+    delete next[exerciseId];
+    return { ...current, replacements: Object.keys(next).length > 0 ? next : undefined };
+  });
+}
+
+function updateExerciseLogAction(exerciseId: string, patch: Partial<ExerciseLog>) {
+  const safePatch: Partial<ExerciseLog> = { ...patch };
+  delete safePatch.exerciseId;
+  setActiveSessionStore((current) => {
+    if (!current) return current;
+    const currentLog = current.logs[exerciseId] ?? {
+      exerciseId,
+      usedLoad: "",
+      completedReps: "",
+      comment: ""
+    };
+    return {
+      ...current,
+      logs: {
+        ...current.logs,
+        [exerciseId]: { ...currentLog, ...safePatch, exerciseId }
+      }
+    };
+  });
+}
+
+function updateSessionFeedbackAction(patch: Partial<SessionFeedback>) {
+  setActiveSessionStore((current) => {
+    if (!current) return current;
+    return { ...current, feedback: { ...current.feedback, ...patch } };
+  });
+}
+
+function completeSessionAction(session: PlannedSession): CompletedSession | undefined {
+  const activeSession = store.activeSession;
+  if (!activeSession) return undefined;
+
+  const completedAt = new Date().toISOString();
+  const normalizedActive = normalizeActiveSession(activeSession);
+  const finalTiming = finalizeActiveExerciseTiming(normalizedActive, completedAt);
+  const totalDurationMs = getSessionElapsedMs(normalizedActive, new Date(completedAt));
+  const sessionFeedback = activeSession.feedback ?? defaultSessionFeedback;
+  const completedLogs = Object.fromEntries(
+    session.exercises.map((exercise) => {
+      const log = normalizedActive.logs[exercise.id] ?? createEmptyExerciseLog(exercise.id);
+      return [exercise.id, normalizeExerciseLogForCompletion(exercise, log)];
+    })
+  ) as Record<string, ExerciseLog>;
+
+  const todayWday = getTodayWeekday();
+  const judoTonight = store.settings.judoDays.includes(todayWday);
+  const judoTomorrow = store.settings.judoDays.includes(getNextWeekday(todayWday));
+  const weeklySetsByMuscle = getWeeklySetsByMuscle(store.history, store.currentProgram);
+
+  const adaptationExplanations: Record<string, GuardrailSummary> = {};
+
+  const progressions = Object.fromEntries(
+    session.exercises.map((exercise) => {
+      const log = completedLogs[exercise.id] ?? createEmptyExerciseLog(exercise.id);
+      const sessionCtx: ProgressionSessionContext = {
+        benchOneRepMaxKg: store.settings.benchOneRepMaxKg,
+        cautionLevel: store.settings.cautionLevel,
+        experienceLevel: store.settings.experienceLevel,
+        primaryGoal: store.settings.primaryGoal,
+        recoveryProfile: store.settings.recoveryProfile,
+        weeklySetsByMuscle,
+        judoTonight,
+        judoTomorrow,
+        weeksSinceLastChange: getWeeksSinceLastChange(store.history, exercise.id),
+        recentHistory: getRecentExerciseHistory(store.history, exercise.id, 5)
+      };
+      const result = calculateProgression(
+        {
+          plannedExercise: exercise,
+          performance: log,
+          feedback: log.status ?? "skipped",
+          comment: log.comment,
+          sessionDifficulty: sessionFeedback.difficulty,
+          globalPain: sessionFeedback.globalPain,
+          energy: sessionFeedback.energy,
+          breath: sessionFeedback.breath,
+          session
+        },
+        sessionCtx
+      );
+
+      if (result.guardrailResult) {
+        const gr = result.guardrailResult;
+        adaptationExplanations[exercise.id] = {
+          allowed: gr.allowed,
+          adjustedDecision: gr.adjustedDecision,
+          adjustedLoad: gr.adjustedLoad,
+          confidence: gr.confidence,
+          explanation: gr.explanation,
+          violations: gr.violations
+        };
+      }
+
+      const { guardrailResult, ...progressionFields } = result;
+      void guardrailResult;
+      const progression: ExerciseProgressionLog = {
+        exerciseId: exercise.id,
+        exerciseName: exercise.name,
+        ...progressionFields
+      };
+      return [exercise.id, progression];
+    })
+  );
+
+  const next = getNextSession(store.currentProgram);
+  const completed: CompletedSession = {
+    ...normalizedActive,
+    logs: completedLogs,
+    timing: finalTiming,
+    feedback: sessionFeedback,
+    id: `${activeSession.dateKey}-${activeSession.sessionId}-${Date.now()}`,
+    completedAt,
+    title: session.title,
+    focus: session.focus,
+    mainExercises: session.exercises.slice(0, 4).map((exercise) => exercise.name),
+    nextSessionTitle: next.session.title,
+    nextSessionDateKey: getDateKey(next.date),
+    progressions,
+    totalDurationMs,
+    exerciseDurationsMs: finalTiming.elapsedByExerciseMs,
+    adaptationExplanations:
+      Object.keys(adaptationExplanations).length > 0 ? adaptationExplanations : undefined
   };
 
-  try {
-    window.localStorage.setItem(
-      `coach-adaptatif:backup:${Date.now()}`,
-      JSON.stringify(backup)
-    );
-  } catch {
-    // If storage quota is full, prefer a clean reset over corrupting active data.
+  // Apply all three changes in one batched store update so subscribers see consistency
+  const nextHistory = [completed, ...store.history];
+  const nextSettings = adaptSettingsAfterSession(store.settings, completed, session, nextHistory);
+  const progressedProgram = applyProgressionsToProgram(store.currentProgram, session.id, progressions);
+  const nextProgram = normalizeProgramV2(adaptProgramAfterSession(progressedProgram, completed, nextSettings, nextHistory));
+  store = {
+    ...store,
+    history: nextHistory,
+    currentProgram: nextProgram,
+    settings: nextSettings,
+    activeSession: null
+  };
+  writeJson(historyKeyFor(store.activeProfileId), nextHistory);
+  writeJson(settingsKeyFor(store.activeProfileId), nextSettings);
+  writeJson(programKeyFor(store.activeProfileId), nextProgram);
+  if (typeof window !== "undefined") {
+    window.localStorage.removeItem(activeSessionKeyFor(store.activeProfileId));
+  }
+  emit();
+
+  return completed;
+}
+
+function completeOnboardingAction(next: UserSettings) {
+  const normalizedSettings = normalizeUserSettings(next, defaultSettings);
+  // Generate a tailored program from the captured goals/equipment/frequency
+  const program = normalizeProgramV2(buildProgram(normalizedSettings));
+  writeJson(settingsKeyFor(store.activeProfileId), normalizedSettings);
+  writeJson(programKeyFor(store.activeProfileId), program);
+  writeJson(onboardingKeyFor(store.activeProfileId), true);
+  store = {
+    ...store,
+    settings: normalizedSettings,
+    currentProgram: program,
+    isOnboardingDone: true
+  };
+  if (typeof document !== "undefined") {
+    document.documentElement.classList.toggle("dark", normalizedSettings.darkMode);
+  }
+  emit();
+}
+
+/**
+ * Regenerate the active profile's program from current settings.
+ * Useful when the user changes their goal, frequency, or equipment after onboarding.
+ */
+function regenerateProgramAction() {
+  const program = normalizeProgramV2(buildProgram(store.settings));
+  writeJson(programKeyFor(store.activeProfileId), program);
+  store = { ...store, currentProgram: program };
+  emit();
+}
+
+function setCurrentProgramAction(program: PlannedSession[]) {
+  const normalized = normalizeProgramV2(program);
+  writeJson(programKeyFor(store.activeProfileId), normalized);
+  store = { ...store, currentProgram: normalized };
+  emit();
+}
+
+function attachAiCoachResponseAction(sessionId: string, aiCoach: CoachAiResponse) {
+  setHistoryStore((current) =>
+    current.map((s) => (s.id === sessionId ? { ...s, aiCoach } : s))
+  );
+}
+
+function switchProfileAction(profileId: string) {
+  const target = store.profiles.find((p) => p.id === profileId);
+  if (!target) return;
+  writeJson<ProfilesState>(PROFILES_KEY, {
+    profiles: store.profiles,
+    activeProfileId: profileId
+  });
+  loadProfileIntoStore(profileId);
+}
+
+function createProfileAction(name: string, avatar: string = "🏋️"): Profile {
+  const id = `profile-${Date.now().toString(36)}`;
+  const next: Profile = { id, name: name.trim() || "Nouveau", avatar };
+  const nextProfiles = [...store.profiles, next];
+  // Bare defaults — onboarding will replace mainGoal, primaryGoal, etc. then regenerate program.
+  const freshSettings: UserSettings = {
+    ...defaultSettings,
+    athleteName: next.name,
+    judoDays: [],
+    benchOneRepMaxKg: 0,
+    primaryGoal: undefined,
+    experienceLevel: undefined,
+    equipment: undefined,
+    weeklyFrequency: undefined
+  };
+  // Empty placeholder program until onboarding completes
+  const placeholderProgram: PlannedSession[] = [];
+
+  writeJson<ProfilesState>(PROFILES_KEY, { profiles: nextProfiles, activeProfileId: id });
+  writeJson(settingsKeyFor(id), freshSettings);
+  writeJson(programKeyFor(id), placeholderProgram);
+  writeJson(onboardingKeyFor(id), false);
+
+  store = {
+    ...store,
+    profiles: nextProfiles,
+    activeProfileId: id,
+    activeSession: null,
+    history: [],
+    currentProgram: placeholderProgram,
+    settings: freshSettings,
+    isOnboardingDone: false
+  };
+  emit();
+  return next;
+}
+
+function renameProfileAction(profileId: string, name: string, avatar?: string) {
+  const trimmed = name.trim();
+  if (!trimmed) return;
+  const nextProfiles = store.profiles.map((p) =>
+    p.id === profileId ? { ...p, name: trimmed, avatar: avatar ?? p.avatar } : p
+  );
+  persistProfilesAndUpdate(nextProfiles, store.activeProfileId);
+
+  // If renaming the active profile, sync the athleteName on settings too
+  if (profileId === store.activeProfileId && store.settings.athleteName !== trimmed) {
+    setSettingsStore({ ...store.settings, athleteName: trimmed });
   }
 }
 
+function deleteProfileAction(profileId: string) {
+  if (store.profiles.length <= 1) return;
+  const remaining = store.profiles.filter((p) => p.id !== profileId);
+  const nextActive = store.activeProfileId === profileId ? remaining[0].id : store.activeProfileId;
+
+  if (typeof window !== "undefined") {
+    window.localStorage.removeItem(activeSessionKeyFor(profileId));
+    window.localStorage.removeItem(historyKeyFor(profileId));
+    window.localStorage.removeItem(programKeyFor(profileId));
+    window.localStorage.removeItem(settingsKeyFor(profileId));
+    window.localStorage.removeItem(onboardingKeyFor(profileId));
+  }
+
+  writeJson<ProfilesState>(PROFILES_KEY, { profiles: remaining, activeProfileId: nextActive });
+
+  if (store.activeProfileId === profileId) {
+    loadProfileIntoStore(nextActive, remaining);
+  } else {
+    setStore({ profiles: remaining });
+  }
+}
+
+function resetAllAction() {
+  const profileId = store.activeProfileId;
+  if (typeof window !== "undefined") {
+    window.localStorage.removeItem(activeSessionKeyFor(profileId));
+    window.localStorage.removeItem(historyKeyFor(profileId));
+    window.localStorage.removeItem(programKeyFor(profileId));
+    window.localStorage.removeItem(settingsKeyFor(profileId));
+    window.localStorage.removeItem(onboardingKeyFor(profileId));
+  }
+  store = {
+    ...store,
+    activeSession: null,
+    history: [],
+    currentProgram: weeklyProgram,
+    settings: defaultSettings,
+    isOnboardingDone: false
+  };
+  emit();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Hook
+// ─────────────────────────────────────────────────────────────────────────────
+
 export function useCoachStorage() {
-  const [isReady, setIsReady] = useState(false);
-  const [activeSession, setActiveSession] = useState<ActiveSession | null>(null);
-  const [history, setHistory] = useState<CompletedSession[]>([]);
-  const [currentProgram, setCurrentProgram] = useState<PlannedSession[]>(weeklyProgram);
-  const [settings, setSettingsState] = useState<UserSettings>(defaultSettings);
-  const dateKey = useMemo(() => getDateKey(), []);
-  const personalizedProgram = useMemo(() => personalizeProgram(currentProgram, settings), [currentProgram, settings]);
-  const todaySession = useMemo(() => getTodaySession(personalizedProgram), [personalizedProgram]);
-  const nextSession = useMemo(() => getNextSession(personalizedProgram), [personalizedProgram]);
+  const snapshot = useSyncExternalStore(subscribeStore, getStoreSnapshot, getServerSnapshot);
 
   useEffect(() => {
-    prepareLocalStorageSchema();
-    const savedActiveSession = readJson<ActiveSession | null>(ACTIVE_SESSION_KEY, null);
-    setActiveSession(savedActiveSession ? normalizeActiveSession(savedActiveSession) : null);
-    setHistory(readJson<CompletedSession[]>(HISTORY_KEY, []));
-    setCurrentProgram(readJson<PlannedSession[]>(PROGRAM_KEY, weeklyProgram));
-    setSettingsState(normalizeSettings(readJson<Partial<UserSettings>>(SETTINGS_KEY, defaultSettings)));
-    setIsReady(true);
+    ensureStoreInitialized();
   }, []);
 
-  useEffect(() => {
-    if (!isReady) {
-      return;
-    }
+  const {
+    isReady,
+    isOnboardingDone,
+    profiles,
+    activeProfileId,
+    activeSession,
+    history,
+    currentProgram,
+    settings
+  } = snapshot;
 
-    if (activeSession) {
-      writeJson(ACTIVE_SESSION_KEY, activeSession);
-    } else {
-      window.localStorage.removeItem(ACTIVE_SESSION_KEY);
-    }
-  }, [activeSession, isReady]);
-
-  useEffect(() => {
-    if (isReady) {
-      writeJson(HISTORY_KEY, history);
-    }
-  }, [history, isReady]);
-
-  useEffect(() => {
-    if (isReady) {
-      writeJson(PROGRAM_KEY, currentProgram);
-    }
-  }, [currentProgram, isReady]);
-
-  useEffect(() => {
-    if (isReady) {
-      writeJson(SETTINGS_KEY, settings);
-    }
-  }, [settings, isReady]);
-
+  const todaySession = useMemo(() => getTodaySession(currentProgram), [currentProgram]);
+  const nextSession = useMemo(() => getNextSession(currentProgram), [currentProgram]);
+  const dateKey = useMemo(() => getDateKey(), []);
   const todaysCompletedSession = useMemo(
     () => history.find((item) => item.dateKey === dateKey && item.sessionId === todaySession.id),
     [dateKey, history, todaySession.id]
   );
 
   const startSession = useCallback(
-    (session: PlannedSession = todaySession) => {
-      const startedAt = new Date().toISOString();
-      const next: ActiveSession = {
-        dateKey,
-        sessionId: session.id,
-        startedAt,
-        logs: createEmptyLogs(session),
-        feedback: defaultSessionFeedback,
-        timer: {
-          startedAt,
-          isPaused: false,
-          pausedTotalMs: 0
-        },
-        timing: {
-          activeExerciseId: session.exercises[0]?.id,
-          activeExerciseStartedAt: startedAt,
-          elapsedByExerciseMs: {}
-        }
-      };
-
-      setActiveSession(next);
-      return next;
-    },
-    [dateKey, todaySession]
+    (session: PlannedSession = todaySession) => startSessionAction(session),
+    [todaySession]
   );
-
-  const pauseSessionTimer = useCallback(() => {
-    setActiveSession((current) => {
-      if (!current || getTimer(current).isPaused) {
-        return current;
-      }
-
-      const now = new Date().toISOString();
-      const normalized = normalizeActiveSession(current);
-      const timing = finalizeActiveExerciseTiming(normalized, now);
-
-      return {
-        ...normalized,
-        timer: {
-          ...normalized.timer,
-          isPaused: true,
-          pausedAt: now
-        },
-        timing: {
-          ...timing,
-          activeExerciseStartedAt: undefined
-        }
-      };
-    });
-  }, []);
-
-  const resumeSessionTimer = useCallback(() => {
-    setActiveSession((current) => {
-      if (!current || !getTimer(current).isPaused) {
-        return current;
-      }
-
-      const now = new Date();
-      const normalized = normalizeActiveSession(current);
-      const pausedAt = normalized.timer.pausedAt ? new Date(normalized.timer.pausedAt).getTime() : now.getTime();
-
-      return {
-        ...normalized,
-        timer: {
-          startedAt: normalized.timer.startedAt,
-          isPaused: false,
-          pausedTotalMs: normalized.timer.pausedTotalMs + Math.max(0, now.getTime() - pausedAt)
-        },
-        timing: {
-          ...normalized.timing,
-          activeExerciseStartedAt: normalized.timing.activeExerciseId ? now.toISOString() : undefined
-        }
-      };
-    });
-  }, []);
-
-  const setActiveExercise = useCallback((exerciseId: string) => {
-    setActiveSession((current) => {
-      if (!current) {
-        return current;
-      }
-
-      const normalized = normalizeActiveSession(current);
-
-      if (normalized.timing.activeExerciseId === exerciseId) {
-        return normalized;
-      }
-
-      const now = new Date().toISOString();
-      const timing = finalizeActiveExerciseTiming(normalized, now);
-
-      return {
-        ...normalized,
-        timing: {
-          ...timing,
-          activeExerciseId: exerciseId,
-          activeExerciseStartedAt: normalized.timer.isPaused ? undefined : now
-        }
-      };
-    });
-  }, []);
-
-  const updateExerciseLog = useCallback((exerciseId: string, patch: Partial<ExerciseLog>) => {
-    const safePatch: Partial<ExerciseLog> = { ...patch };
-    delete safePatch.exerciseId;
-
-    setActiveSession((current) => {
-      if (!current) {
-        return current;
-      }
-
-      const currentLog = current.logs[exerciseId] ?? {
-        exerciseId,
-        usedLoad: "",
-        completedReps: "",
-        comment: ""
-      };
-
-      return {
-        ...current,
-        logs: {
-          ...current.logs,
-          [exerciseId]: {
-            ...currentLog,
-            ...safePatch,
-            exerciseId
-          }
-        }
-      };
-    });
-  }, []);
-
-  const updateSessionFeedback = useCallback((patch: Partial<SessionFeedback>) => {
-    setActiveSession((current) => {
-      if (!current) {
-        return current;
-      }
-
-      return {
-        ...current,
-        feedback: {
-          ...current.feedback,
-          ...patch
-        }
-      };
-    });
-  }, []);
-
   const completeSession = useCallback(
-    (session: PlannedSession = todaySession) => {
-      if (!activeSession) {
-        return undefined;
-      }
-
-      const completedAt = new Date().toISOString();
-      const normalizedActive = normalizeActiveSession(activeSession);
-      const finalTiming = finalizeActiveExerciseTiming(normalizedActive, completedAt);
-      const totalDurationMs = getSessionElapsedMs(normalizedActive, new Date(completedAt));
-      const sessionFeedback = activeSession.feedback ?? defaultSessionFeedback;
-      const calorieEstimate = estimateCalories({
-        durationMs: totalDurationMs,
-        feedback: sessionFeedback,
-        session,
-        weightKg: settings.currentWeightKg
-      });
-      const completedLogs = Object.fromEntries(
-        session.exercises.map((exercise) => {
-          const log = normalizedActive.logs[exercise.id] ?? createEmptyExerciseLog(exercise.id);
-
-          return [exercise.id, normalizeExerciseLogForCompletion(exercise, log)];
-        })
-      ) as Record<string, ExerciseLog>;
-      const progressions = Object.fromEntries(
-        session.exercises.map((exercise) => {
-          const log = completedLogs[exercise.id] ?? createEmptyExerciseLog(exercise.id);
-          const result = calculateProgression({
-            plannedExercise: exercise,
-            performance: log,
-            feedback: log.status ?? "skipped",
-            comment: log.comment,
-            sessionDifficulty: sessionFeedback.difficulty,
-            globalPain: sessionFeedback.globalPain,
-            energy: sessionFeedback.energy,
-            breath: sessionFeedback.breath,
-            session,
-            progressionStyle: settings.progressionStyle,
-            programGoal: settings.mainObjective
-          });
-          const progression: ExerciseProgressionLog = {
-            exerciseId: exercise.id,
-            exerciseName: exercise.name,
-            ...result
-          };
-
-          return [exercise.id, progression];
-        })
-      );
-      const next = getNextSession(personalizedProgram);
-      const completed: CompletedSession = {
-        ...normalizedActive,
-        logs: completedLogs,
-        timing: finalTiming,
-        feedback: sessionFeedback,
-        id: `${activeSession.dateKey}-${activeSession.sessionId}-${Date.now()}`,
-        completedAt,
-        title: session.title,
-        focus: session.focus,
-        mainExercises: session.exercises.slice(0, 4).map((exercise) => exercise.name),
-        nextSessionTitle: next.session.title,
-        nextSessionDateKey: getDateKey(next.date),
-        progressions,
-        calorieEstimate,
-        totalDurationMs,
-        exerciseDurationsMs: finalTiming.elapsedByExerciseMs
-      };
-
-      setHistory((current) => [completed, ...current]);
-      setCurrentProgram((program) => applyProgressionsToProgram(program, session.id, progressions));
-      setActiveSession(null);
-      return completed;
-    },
-    [
-      activeSession,
-      personalizedProgram,
-      settings.currentWeightKg,
-      settings.mainObjective,
-      settings.progressionStyle,
-      todaySession
-    ]
+    (session: PlannedSession = todaySession) => completeSessionAction(session),
+    [todaySession]
   );
-
-  const setSettings = useCallback((next: UserSettings) => {
-    setSettingsState(normalizeSettings(next));
-  }, []);
-
-  const setDailyJudoChoice = useCallback(
-    (choice: DailyJudoChoice) => {
-      setSettingsState((current) =>
-        normalizeSettings({
-          ...current,
-          dailyJudoChoice: choice,
-          dailyJudoChoiceDateKey: dateKey
-        })
-      );
-    },
-    [dateKey]
-  );
-
-  const attachAiCoachResponse = useCallback((sessionId: string, aiCoach: CoachAiResponse) => {
-    setHistory((current) =>
-      current.map((session) => (session.id === sessionId ? { ...session, aiCoach } : session))
-    );
-  }, []);
-
-  const resetAll = useCallback(() => {
-    setActiveSession(null);
-    setHistory([]);
-    setCurrentProgram(weeklyProgram);
-    setSettingsState(defaultSettings);
-    window.localStorage.removeItem(ACTIVE_SESSION_KEY);
-    window.localStorage.removeItem(HISTORY_KEY);
-    window.localStorage.removeItem(PROGRAM_KEY);
-    window.localStorage.removeItem(SETTINGS_KEY);
-    window.localStorage.setItem(STORAGE_VERSION_KEY, String(STORAGE_VERSION));
-  }, []);
 
   return {
+    activeProfileId,
     activeSession,
-    attachAiCoachResponse,
+    attachAiCoachResponse: attachAiCoachResponseAction,
+    clearReplacement: clearReplacementAction,
+    completeOnboarding: completeOnboardingAction,
     completeSession,
-    currentProgram: personalizedProgram,
+    createProfile: createProfileAction,
+    currentProgram,
     dateKey,
+    deleteProfile: deleteProfileAction,
     history,
+    isOnboardingDone,
     isReady,
     nextSession,
-    pauseSessionTimer,
-    resetAll,
-    resumeSessionTimer,
-    setActiveExercise,
-    setDailyJudoChoice,
-    setSettings,
+    pauseSessionTimer: pauseSessionTimerAction,
+    profiles,
+    regenerateProgram: regenerateProgramAction,
+    renameProfile: renameProfileAction,
+    replaceExercise: replaceExerciseAction,
+    resetAll: resetAllAction,
+    resumeSessionTimer: resumeSessionTimerAction,
+    setActiveExercise: setActiveExerciseAction,
+    setCurrentProgram: setCurrentProgramAction,
+    setSettings: setSettingsStore,
     settings,
     startSession,
+    switchProfile: switchProfileAction,
     todaySession,
     todaysCompletedSession,
-    updateExerciseLog,
-    updateSessionFeedback
-  };
-}
-
-function normalizeSettings(value: Partial<UserSettings> & { cautionLevel?: string }): UserSettings {
-  const legacyProgressionStyle =
-    value.progressionStyle ??
-    (value.cautionLevel === "prudent"
-      ? "regular"
-      : value.cautionLevel === "agressif"
-        ? "controlled_aggressive"
-        : "dynamic");
-
-  const sessionsPerWeek = [3, 4, 5, 6].includes(Number(value.sessionsPerWeek))
-    ? (Number(value.sessionsPerWeek) as 3 | 4 | 5 | 6)
-    : defaultSettings.sessionsPerWeek;
-
-  return {
-    ...defaultSettings,
-    ...value,
-    age: Number(value.age ?? defaultSettings.age) || defaultSettings.age,
-    heightCm: Number(value.heightCm ?? defaultSettings.heightCm) || defaultSettings.heightCm,
-    currentWeightKg: Number(value.currentWeightKg ?? defaultSettings.currentWeightKg) || defaultSettings.currentWeightKg,
-    targetWeightKg: Number(value.targetWeightKg ?? defaultSettings.targetWeightKg) || defaultSettings.targetWeightKg,
-    benchOneRepMaxKg: Number(value.benchOneRepMaxKg ?? defaultSettings.benchOneRepMaxKg) || defaultSettings.benchOneRepMaxKg,
-    sessionsPerWeek,
-    availableDays: value.availableDays?.length ? value.availableDays : defaultSettings.availableDays,
-    sports: {
-      ...defaultSettings.sports,
-      ...value.sports
-    },
-    equipment: value.equipment?.length ? value.equipment : defaultSettings.equipment,
-    likedExercises: value.likedExercises ?? defaultSettings.likedExercises,
-    refusedExercises: value.refusedExercises ?? defaultSettings.refusedExercises,
-    painWatchList: value.painWatchList ?? defaultSettings.painWatchList,
-    progressionStyle: legacyProgressionStyle,
-    dailyJudoChoice: value.dailyJudoChoice ?? defaultSettings.dailyJudoChoice,
-    judoDays: value.judoDays ?? defaultSettings.judoDays
+    updateExerciseLog: updateExerciseLogAction,
+    updateSessionFeedback: updateSessionFeedbackAction
   };
 }
 
@@ -538,14 +814,14 @@ function applyProgressionToExercise(exercise: Exercise, progression?: ExercisePr
 
   const nextLoad = resolveNextLoad(exercise.plannedLoad, progression.nextLoad);
 
-  return {
+  return normalizeExerciseV2({
     ...exercise,
     target: progression.nextTarget || exercise.target,
     plannedLoad: nextLoad,
     cue: progression.replacementSuggestion
       ? `${exercise.cue} Remplacement proposé: ${progression.replacementSuggestion}`
       : exercise.cue
-  };
+  });
 }
 
 function resolveNextLoad(currentLoad: string | undefined, nextLoad: string): string | undefined {
@@ -655,4 +931,124 @@ function getSessionElapsedMs(session: ActiveSession, now = new Date()): number {
   const rawElapsed = (timer.isPaused ? pausedAt : now.getTime()) - startedAt;
 
   return Math.max(0, rawElapsed - timer.pausedTotalMs);
+}
+
+// ---------------------------------------------------------------------------
+// Guardrail context helpers
+// ---------------------------------------------------------------------------
+
+function getTodayWeekday(): Weekday {
+  const weekdays: Weekday[] = [
+    "sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"
+  ];
+  return weekdays[new Date().getDay()];
+}
+
+function getNextWeekday(day: Weekday): Weekday {
+  const weekdays: Weekday[] = [
+    "sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"
+  ];
+  return weekdays[(weekdays.indexOf(day) + 1) % 7];
+}
+
+function getWeekStart(): Date {
+  const now = new Date();
+  const dayOfWeek = now.getDay();
+  // Monday = 0 offset
+  const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() - daysSinceMonday);
+  return start;
+}
+
+function countSetsFromReps(completedReps: string): number {
+  if (!completedReps) return 0;
+  const repeatedMatch = completedReps.match(/^(\d+)\s*x\s*\d+/);
+  if (repeatedMatch) return Number(repeatedMatch[1]);
+  const slashParts = completedReps.split("/").filter(Boolean);
+  if (slashParts.length > 1) return slashParts.length;
+  return 1;
+}
+
+function getWeeklySetsByMuscle(
+  history: CompletedSession[],
+  program: PlannedSession[]
+): Partial<Record<MuscleGroup, number>> {
+  const result: Partial<Record<MuscleGroup, number>> = {};
+  const weekStart = getWeekStart();
+  const thisWeekSessions = history.filter(
+    (s) => new Date(s.completedAt) >= weekStart
+  );
+
+  const exerciseToMuscles = new Map<string, MuscleGroup[]>();
+  for (const plannedSession of program) {
+    for (const exercise of plannedSession.exercises) {
+      if (exercise.muscleGroups?.length) {
+        exerciseToMuscles.set(exercise.id, exercise.muscleGroups);
+      }
+    }
+  }
+
+  for (const session of thisWeekSessions) {
+    for (const [exerciseId, log] of Object.entries(session.logs)) {
+      if (!log.status || log.status === "skipped") continue;
+      const muscles = exerciseToMuscles.get(exerciseId) ?? [];
+      const sets = countSetsFromReps(log.completedReps);
+      for (const muscle of muscles) {
+        result[muscle] = (result[muscle] ?? 0) + sets;
+      }
+    }
+  }
+
+  return result;
+}
+
+function getWeeksSinceLastChange(history: CompletedSession[], exerciseId: string): number {
+  for (const session of history) {
+    const prog = session.progressions?.[exerciseId];
+    if (prog && (prog.decision === "augmenter" || prog.decision === "baisser")) {
+      const msPerWeek = 7 * 24 * 60 * 60 * 1000;
+      return Math.max(0, (Date.now() - new Date(session.completedAt).getTime()) / msPerWeek);
+    }
+  }
+  return Number.POSITIVE_INFINITY;
+}
+
+function feedbackToRpe(status?: EffortStatus, sessionDifficulty = 5): number {
+  switch (status) {
+    case "easy": return Math.max(1, sessionDifficulty - 2);
+    case "ok": return sessionDifficulty;
+    case "hard": return Math.min(10, sessionDifficulty + 1);
+    case "pain": return 9;
+    case "skipped": return 0;
+    default: return sessionDifficulty;
+  }
+}
+
+function getRecentExerciseHistory(
+  history: CompletedSession[],
+  exerciseId: string,
+  n: number
+): ExerciseHistoryPoint[] {
+  const results: ExerciseHistoryPoint[] = [];
+
+  for (const session of history) {
+    if (results.length >= n) break;
+    const log = session.logs[exerciseId];
+    if (!log) continue;
+
+    results.push({
+      load: log.usedLoad || undefined,
+      rpe: log.rpe ?? feedbackToRpe(log.status, session.feedback?.difficulty),
+      completedReps: log.completedReps || undefined,
+      dateKey: session.dateKey,
+      decision: session.progressions?.[exerciseId]?.decision,
+      energy: session.feedback?.energy,
+      globalPain: session.feedback?.globalPain,
+      status: log.status
+    });
+  }
+
+  return results;
 }

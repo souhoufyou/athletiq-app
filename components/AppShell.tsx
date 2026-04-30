@@ -1,21 +1,62 @@
+"use client";
+
 import type { ReactNode } from "react";
-import { BrandMark } from "@/components/BrandMark";
+import { useEffect } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
+import { useCoachStorage } from "@/lib/storage";
 
-type AppShellProps = {
-  children: ReactNode;
-};
+export function AppShell({ children }: { children: ReactNode }) {
+  const { isReady, isOnboardingDone } = useCoachStorage();
+  const router = useRouter();
 
-export function AppShell({ children }: AppShellProps) {
-  return (
-    <div className="mx-auto min-h-screen w-full max-w-[430px] px-4 pt-4 safe-bottom sm:px-5">
-      <header className="app-topbar">
-        <BrandMark />
-        <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-[10px] font-black uppercase text-white/55">
-          Coach
+  useEffect(() => {
+    if (isReady && !isOnboardingDone) {
+      router.replace("/onboarding");
+    }
+  }, [isReady, isOnboardingDone, router]);
+
+  if (!isReady) {
+    return (
+      <div className="app-shell mx-auto flex min-h-screen w-full max-w-xl items-center justify-center px-4 safe-bottom sm:px-6">
+        <div className="card-dark w-full max-w-md p-6 text-center">
+          <p className="text-sm font-black uppercase text-sky">Chargement</p>
+          <h1 className="mt-3 text-2xl font-black text-white">On remet ton espace en place</h1>
+          <p className="mt-3 text-sm font-semibold leading-relaxed text-white/65">
+            L&apos;application recharge ton profil et ton programme.
+          </p>
         </div>
-      </header>
-      <main className="mt-4 space-y-4">{children}</main>
+      </div>
+    );
+  }
+
+  if (!isOnboardingDone) {
+    return (
+      <div className="app-shell mx-auto flex min-h-screen w-full max-w-xl items-center justify-center px-4 safe-bottom sm:px-6">
+        <div className="card-dark w-full max-w-md p-6 text-center">
+          <p className="text-sm font-black uppercase text-sky">Configuration</p>
+          <h1 className="mt-3 text-2xl font-black text-white">On t&apos;emmene vers l&apos;onboarding</h1>
+          <p className="mt-3 text-sm font-semibold leading-relaxed text-white/65">
+            Ton profil n&apos;est pas encore finalise sur cette session. Si la redirection ne part pas toute seule,
+            ouvre directement la configuration initiale.
+          </p>
+          <Link
+            className="mt-5 inline-flex h-12 items-center justify-center rounded-md premium-action px-5 font-black text-white"
+            href="/onboarding"
+          >
+            Ouvrir l&apos;onboarding
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="app-shell mx-auto min-h-screen w-full max-w-xl px-4 pt-4 safe-bottom sm:px-6">
+      <AppHeader />
+      <main className="app-content">{children}</main>
       <BottomNav />
     </div>
   );

@@ -1,3 +1,40 @@
+// ---------------------------------------------------------------------------
+// Guardrail shared types (defined here to avoid circular imports with lib/guardrails)
+// ---------------------------------------------------------------------------
+
+export type MuscleGroup =
+  | "pectoraux"
+  | "dos"
+  | "epaules"
+  | "biceps"
+  | "triceps"
+  | "jambes"
+  | "abdos"
+  | "cardio"
+  | "autre";
+
+export type ExerciseClassification = "force" | "hypertrophie" | "cardio" | "mobilite" | "technique";
+
+export type AdaptationExplanation = {
+  decision: string;
+  raison: string;
+  regleAppliquee: string;
+  ceQueDevraisComprendre: string;
+  impact: string;
+};
+
+/** Subset of GuardrailResult stored in CompletedSession (avoids circular import with lib/guardrails). */
+export type GuardrailSummary = {
+  allowed: boolean;
+  adjustedDecision: ProgressionDecision;
+  adjustedLoad?: string;
+  confidence: "élevé" | "moyen" | "faible";
+  explanation: AdaptationExplanation;
+  violations: Array<{ rule: string; reason: string; severity: "block" | "warn" }>;
+};
+
+// ---------------------------------------------------------------------------
+
 export type Weekday =
   | "monday"
   | "tuesday"
@@ -19,51 +56,167 @@ export type BreathFeedback =
   | "vertige"
   | "oppression";
 
-export type ProgramGoal =
-  | "fat_loss"
-  | "muscle_gain"
-  | "strength"
+export type CautionLevel = "prudent" | "normal" | "agressif";
+
+export type UserSex = "female" | "male" | "other" | "prefer-not-to-say";
+
+export type RecoveryProfile = "poor" | "irregular" | "regular" | "good";
+
+export type SessionDurationPreference = "short" | "standard" | "long";
+
+export type ExternalSportIntensity = "low" | "moderate" | "high";
+
+export type BodyArea =
+  | "wrist"
+  | "shoulder"
+  | "back"
+  | "knee"
+  | "hip"
+  | "ankle"
+  | "elbow"
+  | "neck"
+  | "cardio"
+  | "other";
+
+export type ConstraintSeverity = "info" | "caution" | "avoid";
+
+export type PrimaryGoal =
+  | "perte-gras"
+  | "prise-masse"
   | "recomposition"
-  | "cardio_health"
-  | "judo_prep"
-  | "custom_mix";
+  | "performance"
+  | "sante";
 
-export type ProgressionStyle = "regular" | "dynamic" | "controlled_aggressive";
+export type ExperienceLevel = "debutant" | "intermediaire" | "avance";
 
-export type DetailPreference = "simple" | "detailed";
+export type Equipment = "salle-complete" | "halteres-maison" | "poids-corps";
 
-export type ExperienceLevel = "beginner" | "intermediate" | "advanced";
-
-export type DailyJudoChoice = "judo" | "no_judo" | "replace_cardio" | "strength_only";
+export type MovementPattern =
+  | "chest-compound"
+  | "chest-isolation"
+  | "back-vertical"
+  | "back-horizontal"
+  | "legs-quad"
+  | "legs-hinge"
+  | "legs-calf"
+  | "shoulders-compound"
+  | "shoulders-lateral"
+  | "shoulders-rear"
+  | "arms-biceps"
+  | "arms-triceps"
+  | "core"
+  | "cardio-steady"
+  | "cardio-hiit"
+  | "mobility"
+  | "fullbody";
 
 export type ProgressionDecision = "augmenter" | "maintenir" | "baisser" | "remplacer" | "alerte";
 
-export type ProgressionDecisionCode = "increase" | "maintain" | "decrease" | "replace" | "watch" | "deload";
+export type TrainingPhase = "accumulation" | "conditioning" | "deload" | "intensification" | "maintenance";
 
-export type ProgressionEvidenceTag =
-  | "progression_rule"
-  | "pain_rule"
-  | "fatigue_rule"
-  | "judo_rule"
-  | "cardio_rule"
-  | "volume_rule"
-  | "stagnation_rule"
-  | "guardrail_rule";
+export type LoadPrescription = {
+  display?: string;
+  kg?: number;
+  kind: "bodyweight" | "estimated" | "fixed" | "free" | "percent-1rm";
+  percent1Rm?: number;
+  source?: "declared" | "estimated" | "manual" | "parsed";
+  unit?: LoadUnit;
+};
 
-export type ProgressionConfidence = "low" | "medium" | "high";
+export type ExercisePrescription = {
+  durationMin?: number;
+  durationMinMax?: number;
+  durationSec?: number;
+  durationSecMax?: number;
+  load?: LoadPrescription;
+  repsMax?: number;
+  repsMin?: number;
+  restSec?: number;
+  restSecMax?: number;
+  rirTarget?: number;
+  sets?: number;
+  setsMax?: number;
+  targetRpe?: number;
+  work?: "amrap" | "duration" | "reps" | "rounds";
+};
 
-export type AdaptationExplanation = {
-  decisionLabel: string;
-  simpleReason: string;
-  ruleApplied: string;
-  whatUserShouldLearn: string;
-  nextSessionImpact: string;
+export type ExerciseTaxonomy = {
+  equipment?: Equipment[];
+  isCompound?: boolean;
+  jointStress?: Partial<Record<BodyArea, ConstraintSeverity>>;
+  pattern?: MovementPattern;
+  tags?: string[];
+};
+
+export type ExerciseSelectionReason = {
+  title: string;
+  detail: string;
+  tone: "calm" | "info" | "warn";
+};
+
+export type ExerciseSelectionInsight = {
+  summary: string;
+  reasons: ExerciseSelectionReason[];
 };
 
 export type StrengthReference = {
   lift: string;
   value: string;
   note?: string;
+  loadKg?: number;
+  reps?: number;
+  estimatedOneRepMaxKg?: number;
+  confidence?: "declared" | "estimated" | "measured";
+  lastTestedAt?: string;
+  origin?: "learned" | "manual" | "onboarding";
+  locked?: boolean;
+};
+
+export type LoadBiasByPattern = Partial<Record<MovementPattern, number>>;
+
+export type ExerciseSwapPreferences = Partial<Record<string, string>>;
+
+export type SetBiasByPattern = Partial<Record<MovementPattern, number>>;
+
+export type RepBiasByPattern = Partial<Record<MovementPattern, number>>;
+
+export type RestBiasByPattern = Partial<Record<MovementPattern, number>>;
+
+export type CalibrationEventKind =
+  | "load-feedback"
+  | "reference-deleted"
+  | "reference-learned"
+  | "reference-locked"
+  | "reference-unlocked";
+
+export type CalibrationEventTone = "info" | "progress" | "warn";
+
+export type CalibrationEvent = {
+  id: string;
+  createdAt: string;
+  kind: CalibrationEventKind;
+  tone: CalibrationEventTone;
+  title: string;
+  subject: string;
+  detail: string;
+};
+
+export type ExternalSport = {
+  id: string;
+  name: string;
+  days: Weekday[];
+  intensity: ExternalSportIntensity;
+  notes?: string;
+};
+
+export type TrainingConstraint = {
+  id: string;
+  area: BodyArea;
+  label: string;
+  severity: ConstraintSeverity;
+  notes?: string;
+  avoidExerciseIds?: string[];
+  createdAt?: string;
 };
 
 export type UserSportProfile = {
@@ -92,6 +245,11 @@ export type Exercise = {
   plannedLoad?: string;
   rest: string;
   cue: string;
+  muscleGroups?: MuscleGroup[];
+  classification?: ExerciseClassification;
+  prescription?: ExercisePrescription;
+  selectionInsight?: ExerciseSelectionInsight;
+  taxonomy?: ExerciseTaxonomy;
 };
 
 export type PlannedSession = {
@@ -101,7 +259,11 @@ export type PlannedSession = {
   focus: string;
   duration: string;
   intensity: "Légère" | "Modérée" | "Soutenue";
+  deloadEvery?: number;
+  mesocycleLength?: number;
+  phase?: TrainingPhase;
   scheduleLabel?: string;
+  weekIndex?: number;
   notes?: string[];
   exercises: Exercise[];
 };
@@ -117,6 +279,8 @@ export type ExerciseLog = {
   usedLoad: string;
   completedReps: string;
   comment: string;
+  rir?: number;
+  rpe?: number;
 };
 
 export type SessionFeedback = {
@@ -144,16 +308,21 @@ export type ExerciseProgressionLog = {
   exerciseName: string;
   nextLoad: string;
   nextTarget: string;
-  nextReps?: string;
-  nextSets?: string;
   decision: ProgressionDecision;
-  decisionCode?: ProgressionDecisionCode;
   reason: string;
   warning?: string;
-  confidence?: ProgressionConfidence;
-  evidenceTag?: ProgressionEvidenceTag;
-  adaptationExplanation?: AdaptationExplanation;
   replacementSuggestion?: string;
+};
+
+export type ExerciseHistoryPoint = {
+  completedReps?: string;
+  dateKey: string;
+  decision?: ProgressionDecision;
+  energy?: number;
+  globalPain?: number;
+  load?: string;
+  rpe: number;
+  status?: EffortStatus;
 };
 
 export type CoachAiDecision = {
@@ -170,18 +339,6 @@ export type CoachAiResponse = {
   motivationalMessage: string;
 };
 
-export type SessionActivityType = "muscu" | "cardio" | "judo" | "marche";
-
-export type CalorieEstimate = {
-  activityType: SessionActivityType;
-  calories: number;
-  durationMinutes: number;
-  intensity: number;
-  weightKg: number;
-  label: "Estimation approximative";
-  note: string;
-};
-
 export type ActiveSession = {
   dateKey: string;
   sessionId: string;
@@ -190,6 +347,7 @@ export type ActiveSession = {
   feedback: SessionFeedback;
   timer: SessionTimer;
   timing: ExerciseTiming;
+  replacements?: Record<string, Exercise>;
 };
 
 export type CompletedSession = ActiveSession & {
@@ -202,37 +360,59 @@ export type CompletedSession = ActiveSession & {
   nextSessionTitle: string;
   nextSessionDateKey: string;
   aiCoach?: CoachAiResponse;
-  calorieEstimate?: CalorieEstimate;
   totalDurationMs: number;
   exerciseDurationsMs: Record<string, number>;
+  adaptationExplanations?: Record<string, GuardrailSummary>;
+};
+
+export type WeightEntry = {
+  date: string; // ISO date string
+  kg: number;
+};
+
+export type Profile = {
+  id: string;
+  name: string;
+  avatar: string; // emoji
 };
 
 export type UserSettings = {
+  schemaVersion: number;
   athleteName: string;
-  age: number;
-  heightCm: number;
+  sex: UserSex;
   loadUnit: LoadUnit;
   currentWeightKg: number;
   targetWeightKg: number;
-  mainObjective: ProgramGoal;
-  sessionsPerWeek: 3 | 4 | 5 | 6;
-  availableDays: Weekday[];
-  sports: {
-    judo: boolean;
-    other: string;
-  };
-  equipment: string[];
-  likedExercises: string[];
-  refusedExercises: string[];
-  painWatchList: string[];
-  level: ExperienceLevel;
-  detailPreference: DetailPreference;
-  progressionStyle: ProgressionStyle;
-  dailyJudoChoice: DailyJudoChoice;
-  dailyJudoChoiceDateKey?: string;
-  onboardingCompleted: boolean;
   benchOneRepMaxKg: number;
   judoDays: Weekday[];
+  cautionLevel: CautionLevel;
   aiEnabled: boolean;
   darkMode: boolean;
+  age: number;
+  heightCm: number;
+  gym: string;
+  mainGoal: string;
+  cardioLevel: string;
+  sleepQuality: string;
+  recoveryProfile: RecoveryProfile;
+  medicalNotes: string;
+  watchPoints: string[];
+  preferences: string[];
+  avoid: string[];
+  availableDays: Weekday[];
+  externalSports: ExternalSport[];
+  constraints: TrainingConstraint[];
+  strengthReferences: StrengthReference[];
+  loadBiasByPattern?: LoadBiasByPattern;
+  exerciseSwapPreferences?: ExerciseSwapPreferences;
+  setBiasByPattern?: SetBiasByPattern;
+  repBiasByPattern?: RepBiasByPattern;
+  restBiasByPattern?: RestBiasByPattern;
+  calibrationEvents?: CalibrationEvent[];
+  sessionDurationPreference: SessionDurationPreference;
+  weightLog?: WeightEntry[];
+  primaryGoal?: PrimaryGoal;
+  experienceLevel?: ExperienceLevel;
+  equipment?: Equipment;
+  weeklyFrequency?: number; // 2-6
 };

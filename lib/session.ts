@@ -10,8 +10,7 @@ export const defaultSessionFeedback: SessionFeedback = {
 };
 
 export function getTodaySession(program: PlannedSession[] = weeklyProgram, date = new Date()): PlannedSession {
-  const weekday = getWeekday(date);
-  const session = program.find((item) => item.weekday === weekday);
+  const session = getSessionForDate(program, date);
 
   if (!session) {
     return program[0] ?? weeklyProgram[0];
@@ -26,9 +25,9 @@ export function getNextSession(program: PlannedSession[] = weeklyProgram, date =
   for (let offset = 1; offset <= 7; offset += 1) {
     const next = new Date(date);
     next.setDate(date.getDate() + offset);
-    const session = getTodaySession(program, next);
+    const session = getSessionForDate(program, next);
 
-    if (session || offset === 7) {
+    if (session) {
       return {
         session,
         date: next,
@@ -42,6 +41,11 @@ export function getNextSession(program: PlannedSession[] = weeklyProgram, date =
     date,
     offsetFromToday: todayIndex
   };
+}
+
+function getSessionForDate(program: PlannedSession[], date: Date): PlannedSession | undefined {
+  const weekday = getWeekday(date);
+  return program.find((item) => item.weekday === weekday);
 }
 
 export function createEmptyLogs(session: PlannedSession): Record<string, ExerciseLog> {

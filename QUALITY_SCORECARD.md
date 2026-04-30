@@ -1,131 +1,129 @@
-# QUALITY_SCORECARD - AthletIQ
+# QUALITY_SCORECARD - Coach Adaptatif
 
-Derniere mise a jour : 2026-04-28
+Derniere mise a jour : 2026-04-27
 
-Cette scorecard note l'etat actuel apres la refonte AthletIQ, la personnalisation du programme et l'analyse avancee locale/IA optionnelle. Aucune categorie n'est notee 10/10 : il reste des limites reelles, notamment l'absence de validation terrain sur iPhone physique, de tests navigateur automatises et de suivi long terme multi-semaines.
+Cette scorecard note l'etat actuel apres les ameliorations appliquees dans cette boucle qualite. Aucune categorie n'est notee 10/10 : il reste des limites reelles, notamment l'absence de tests automatises navigateur, de validation terrain sur iPhone en salle et de suivi long terme sur plusieurs semaines.
 
 ## Synthese
 
-| Critere | Avant refonte AthletIQ | Note actuelle |
-|---|---:|---:|
-| 1. Ergonomie mobile | 9.3/10 | 9.6/10 |
-| 2. Design visuel | 9.2/10 | 9.6/10 |
-| 3. Rapidite d'utilisation a la salle | 9.2/10 | 9.5/10 |
-| 4. Clarte du programme | 9.5/10 | 9.5/10 |
-| 5. Fiabilite du moteur de progression | 9.1/10 | 9.5/10 |
-| 6. Gestion douleur/securite | 9.1/10 | 9.3/10 |
-| 7. Utilite de l'historique | 9.1/10 | 9.3/10 |
-| 8. Utilite de la page performances | 9.3/10 | 9.4/10 |
-| 9. Simplicite generale | 9.3/10 | 9.6/10 |
-| 10. Qualite du code | 9.2/10 | 9.6/10 |
-| 11. Analyse avancee | 9.3/10 | 9.3/10 |
+| Critere | Note actuelle |
+|---|---:|
+| 1. Ergonomie mobile | 9.3/10 |
+| 2. Design visuel | 9.2/10 |
+| 3. Rapidite d'utilisation a la salle | 9.2/10 |
+| 4. Clarte du programme | 9.4/10 |
+| 5. Fiabilite du moteur de progression | 9.0/10 |
+| 6. Gestion douleur/securite | 9.1/10 |
+| 7. Utilite de l'historique | 9.1/10 |
+| 8. Utilite de la page performances | 9.3/10 |
+| 9. Simplicite generale | 9.2/10 |
+| 10. Qualite du code | 9.0/10 |
 
-## Mise a jour AthletIQ
+## 1. Ergonomie mobile - 9.3/10
 
-Ajouts du 2026-04-27 : renommage en `AthletIQ`, wordmark temporaire, icone A stylisee, theme sombre orange/noir, shell mobile premium, navigation basse a 5 onglets, dashboard plus direct, programme plus scannable, mode seance renforce pour l'utilisation a une main et onboarding plus marque.
+Justification : la navigation basse est claire, la seance guidee affiche un seul exercice a la fois, les boutons sont grands et le chrono reste visible. La consultation du programme est separee de l'execution, ce qui reduit fortement les erreurs avant seance.
 
-## 1. Ergonomie mobile - 9.6/10
+Ce qui manque pour 10/10 : test reel sur plusieurs tailles d'iPhone, retour haptique/sonore optionnel pour le timer, et micro-ajustements apres usage en salle.
 
-Justification : la navigation basse est plus claire, les boutons sont plus grands, le timer de seance est plus visible et les actions rapides du dashboard demandent moins de lecture. L'app cible mieux le format iPhone avec une largeur contenue et une zone basse respectueuse de la safe area.
+Action appliquee : ajout de garde-fous dans le mode seance, navigation plus lisible avec symboles, page Programme consultable sans demarrer le chrono.
 
-Ce qui manque pour 10/10 : test reel sur plusieurs tailles d'iPhone, retour haptique/sonore optionnel pour le timer, et micro-ajustements apres une seance complete en salle.
+Action concrete pour 10/10 : faire une session complete sur iPhone, noter les zones de friction, puis ajuster espacements et ordre des blocs.
 
-## 2. Design visuel - 9.6/10
+## 2. Design visuel - 9.2/10
 
-Justification : AthletIQ a maintenant une identite reconnaissable : noir/antracite, orange action, wordmark simple, icone A temporaire, cartes premium et hierarchie plus sportive.
+Justification : le style est moderne, sombre, contraste, mobile-first et plus premium. Les couleurs ont un role clair : orange action/progression, vert reussite, rouge douleur/alerte, gris stable.
 
-Ce qui manque pour 10/10 : librairie d'icones professionnelle, micro-interactions, transitions fines et revue visuelle sur appareil physique en lumiere de salle.
+Ce qui manque pour 10/10 : systeme d'icones professionnel complet, micro-interactions, et revue visuelle sur appareil physique pour verifier les contrastes en lumiere de salle.
 
-## 3. Rapidite d'utilisation a la salle - 9.5/10
+Action appliquee : refonte sombre premium, design system documente, navigation basse orange et cartes sombres plus coherentes.
 
-Justification : le mode seance guidee reste centre sur un exercice, les boutons tactiles sont plus hauts, le timer est plus lisible et les actions de navigation sont plus faciles au pouce.
+Action concrete pour 10/10 : ajouter une bibliotheque d'icones fiable et harmoniser tous les pictogrammes.
 
-Ce qui manque pour 10/10 : raccourcis `OK + suivant`, haptics, mode repos plein ecran et presets de charge/reps modifiables en un tap.
+## 3. Rapidite d'utilisation a la salle - 9.2/10
 
-## 4. Clarte du programme - 9.5/10
+Justification : le mode rapide permet de valider OK/Facile sans remplir les champs, avec remplissage automatique de la charge et des reps prevues. Le bouton "Tout marquer OK" accelere les seances normales.
 
-Justification : la page Programme separe toujours consultation et execution, affiche la semaine adaptee au profil et garde des CTA explicites.
+Ce qui manque pour 10/10 : mode encore plus express avec passage automatique optionnel a l'exercice suivant, et presets de charge/reps modifiables en un tap.
+
+Action appliquee : remplissage automatique, raisons rapides pour Trop dur/Douleur, et validation de toute la seance en OK.
+
+Action concrete pour 10/10 : ajouter une option "OK + suivant" configurable dans les parametres.
+
+## 4. Clarte du programme - 9.4/10
+
+Justification : la seance du jour est prioritaire, l'exercice courant expose charge, reps, repos, consigne et derniere charge. La page Programme affiche maintenant la semaine complete, les details de chaque seance, les exercices, charges, repos, consignes et badges judo/cardio/force.
 
 Ce qui manque pour 10/10 : edition directe du programme depuis l'interface, filtres par type de seance et export imprimable.
 
-## 5. Fiabilite du moteur de progression - 9.4/10
+Action appliquee : creation de `/programme`, detail par jour et bouton explicite `Commencer cette seance`.
 
-Justification : le moteur local gere OK, Facile, Trop dur, Douleur, Pas fait, cardio, signaux de commentaire, judo, douleurs, sommeil bas, machine occupee et style de progression. Il reste prioritaire sur l'IA. Les nouveaux garde-fous anti-derive evitent les changements de structure sans douleur repetee, stagnation, indisponibilite, fatigue, sommeil mauvais repete, judo ou objectif modifie. Une suite Vitest couvre maintenant 12 cas critiques de `lib/progression.ts` et verifie le contrat de sortie normalise.
+Action concrete pour 10/10 : ajouter une edition controlee des charges/objectifs depuis la page Programme.
 
-Ce qui manque pour 10/10 : execution automatique en CI, historique multi-seances plus fin branche directement sur tous les garde-fous, deloads multi-semaines et validation terrain.
+## 5. Fiabilite du moteur de progression - 9.0/10
+
+Justification : le moteur local gere OK, Facile, Trop dur, Douleur, Pas fait, cardio, signaux de commentaire, judo, poignet et exercices a eviter. Il reste prioritaire sur l'IA.
+
+Ce qui manque pour 10/10 : tests unitaires executes automatiquement dans le build, historique multi-seances plus fin pour detecter plateaux, deloads et fatigue cumulative.
+
+Action appliquee : le mode rapide normalise les logs avant calcul afin d'eviter les progressions basees sur champs vides.
+
+Action concrete pour 10/10 : ajouter une vraie suite de tests sur les cas critiques du moteur.
 
 ## 6. Gestion douleur/securite - 9.1/10
 
-Justification : douleur et signaux sensibles declenchent alertes, maintien, baisse ou remplacement. Les seuils 3/10, >=4/10, >5/10 et douleur repetee sont maintenant formalises, avec alternatives specifiques poignet, dos, genou et signaux souffle/securite.
+Justification : douleur et signaux souffle/vertige/oppression declenchent alertes, baisse ou remplacement. La seance ne peut plus etre terminee avec Trop dur/Douleur sans raison rapide ou commentaire.
 
-Ce qui manque pour 10/10 : journal douleur par zone, recurrence sur 7/30 jours affichee dans l'interface et seuils personnalises.
+Ce qui manque pour 10/10 : message medical encore plus explicite, suivi recurrent des douleurs par articulation, et seuils personnalises.
+
+Action appliquee : blocage doux a la validation si une douleur ou difficulte forte n'a pas de raison.
+
+Action concrete pour 10/10 : creer un journal douleur par zone avec recurrence sur 7/30 jours.
 
 ## 7. Utilite de l'historique - 9.1/10
 
-Justification : l'historique affiche date, duree, seance, exercices, charges, reps, retours, commentaires, calories estimees, decisions et explication principale de l'adaptation. Le lien `Comprendre la regle` garde le detail disponible sans charger la lecture par defaut.
+Justification : l'historique affiche date, duree, seance, exercices, charges, reps, retours, commentaires et decisions. Il montre maintenant un resume direct des hausses, maintiens, baisses et alertes.
 
 Ce qui manque pour 10/10 : filtres par exercice, export CSV/JSON, recherche rapide et comparaison automatique avec la derniere occurrence.
 
-## 8. Utilite de la page performances - 9.4/10
+Action appliquee : ajout des compteurs de decisions par seance.
 
-Justification : la page Performances reste lisible dans le nouveau theme et met en avant records, derniere performance, volume, tendance et prochaines cibles.
+Action concrete pour 10/10 : ajouter filtre par exercice et export local.
+
+## 8. Utilite de la page performances - 9.3/10
+
+Justification : la page `/performances` montre les exercices principaux sous forme de cartes : derniere performance, meilleure performance, prochaine cible, progression recente, tendance et volume quand calculable. Elle ajoute aussi objectifs, top progressions, prochaines cibles et signaux a surveiller.
 
 Ce qui manque pour 10/10 : filtres 4/12 semaines, graphes par exercice, comparaison de cycles et records manuels editables.
 
-## 9. Simplicite generale - 9.5/10
+Action appliquee : creation de `/performances` comme tableau de bord d'athlete, distinct de l'historique.
 
-Justification : la navigation basse a ete reduite a 5 onglets, les textes d'action sont plus courts, l'historique reste accessible sans surcharger la barre principale et l'onboarding garde une progression claire. Les nouvelles explications pedagogiques restent compactes et ouvrables a la demande.
+Action concrete pour 10/10 : ajouter des filtres de periode et une fiche detail par exercice.
 
-Ce qui manque pour 10/10 : regrouper certaines options avancees dans des sections repliees et tester le parcours avec un utilisateur non technique.
+## 9. Simplicite generale - 9.2/10
 
-## 10. Qualite du code - 9.4/10
+Justification : l'app reste locale, sans compte, avec des onglets clairs et des actions directes. Programme sert a consulter, Seance sert a executer, Performances sert a piloter la progression.
 
-Justification : l'architecture reste propre en `app`, `components`, `lib`, `data`, `types`. La refonte est principalement portee par des composants et du CSS, sans casser la logique locale. La stabilisation ajoute des scripts npm portables, un `.gitignore` plus propre, un versioning `localStorage`, une protection IA sans modele configure, un error boundary pour Performances et Vitest pour le moteur de progression. `PROGRAM_RULES.md` documente maintenant le contrat metier et les sorties du moteur exposent `decisionCode`, `confidence`, `evidenceTag` et `adaptationExplanation`.
+Ce qui manque pour 10/10 : reduire encore certains textes d'aide et transformer des reglages avances en panneaux repliables.
 
-Ce qui manque pour 10/10 : Playwright pour les parcours et captures mobiles, CI, tests de stockage local et composants UI factorises davantage.
+Action appliquee : suppression du risque de reset accidental via confirmation locale.
 
-## 11. Analyse avancee - 9.3/10
+Action concrete pour 10/10 : regrouper les options peu utilisees dans des sections repliees.
 
-Justification : l'app estime localement les calories avec un libelle approximatif clair, conserve l'IA optionnelle, transmet les commentaires quand l'analyse est activee et preserve le moteur local comme source prioritaire.
+## 10. Qualite du code - 9.0/10
 
-Ce qui manque pour 10/10 : graphes calories/semaine, detection locale de patterns 4/12 semaines et test navigateur automatise du bouton `Analyser avec l'IA`.
+Justification : architecture propre en app/components/lib/data/types, types centraux, logique locale separee, build Next.js valide et fonctions de progression isolees.
 
-## Garde-fous anti-derive du programme
+Ce qui manque pour 10/10 : tests automatises, CI, composants UI factorises davantage et verification navigateur reproductible.
 
-| Critere | Note |
-|---|---:|
-| Stabilite du programme | 9.4/10 |
-| Securite | 9.3/10 |
-| Transparence des decisions | 9.5/10 |
-| Pedagogie | 9.4/10 |
-| Controle de l'IA | 9.3/10 |
-| Gestion de la douleur | 9.3/10 |
-| Gestion volume | 9.1/10 |
-| Gestion judo | 9.4/10 |
-| Gestion fatigue | 9.2/10 |
-| Couverture des tests | 9.1/10 |
+Action appliquee : normalisation centralisee des logs a la validation et garde-fous dans les composants sans changer la logique sportive.
 
-Justification : le moteur local reste prioritaire, `validateAIRecommendation()` bloque ou modere les suggestions IA trop agressives, les explications pedagogiques affichent la regle appliquee et les tests couvrent maintenant 17 scenarios critiques. La route IA modere aussi les decisions qui contredisent les decisions locales.
-
-Ce qui manque pour 10/10 : tests Playwright du bouton `Analyser avec l'IA`, tests de la route `/api/coach` avec reponse IA simulee, historique multi-semaines branche sur tous les seuils de volume/fatigue, et validation terrain sur plusieurs semaines.
-
-## Verifications effectuees
-
-- `npm run build` : OK.
-- `npm run test:run` : OK.
-- `npm run qa:personalization` : OK.
-- `npm run qa:advanced` : OK.
-- Verification locale HTTP : OK.
-- Stabilisation ajoutee : scripts npm portables, `.env.example` sans modele impose, `STORAGE_VERSION`, error boundary Performances, theme sombre fixe.
-- Garde-fous anti-derive ajoutes : principe de stabilite, limites de progression/baisse, volume hebdomadaire, douleur prioritaire, judo, fatigue/sommeil, stagnation et exercices proteges.
-- Explications pedagogiques ajoutees : `adaptationExplanation`, section `Pourquoi ton programme evolue ?`, confiance lisible et `Comprendre la regle`.
-- Securisation IA ajoutee : moderation par `validateAIRecommendation()`, route `/api/coach` post-traitee, 17 tests Vitest.
+Action concrete pour 10/10 : ajouter Vitest pour le moteur et Playwright pour les parcours seance/historique/progression.
 
 ## Limites qui empechent le vrai 10/10
 
-- Pas encore de validation terrain sur iPhone physique.
-- Pas de captures Playwright de non-regression visuelle.
-- Pas de retour haptique/sonore pour le timer.
-- Pas de librairie d'icones professionnelle harmonisee.
-- Pas d'export/import des donnees locales.
+- Pas encore de tests automatises executes a chaque build.
+- Pas de validation terrain sur iPhone en salle avec transpiration, fatigue et mauvaise lumiere.
 - Pas de modele de fatigue long terme ni deload automatique sur plusieurs semaines.
+- Pas d'export/import des donnees locales.
+- Pas de suivi douleur structure par articulation et recurrence.
+- Pas de design system complet avec icones professionnelles.

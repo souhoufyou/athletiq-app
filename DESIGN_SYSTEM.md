@@ -1,95 +1,82 @@
-# DESIGN_SYSTEM - AthletIQ
+# DESIGN_SYSTEM - Coach Adaptatif
 
-Direction : application mobile-first sombre, sportive, premium, orientee coaching et performance. Aucun nom, logo ou element de marque externe n'est utilise.
-
-## Identite
-
-- Nom : `AthletIQ`
-- Wordmark : texte simple `AthletIQ`, blanc, graisse forte
-- Icone temporaire : A stylise noir sur carre orange
-- Ton visuel : premium, direct, sportif, dense mais lisible
-- Palette dominante : noir/antracite avec orange pour l'action
+Direction : application mobile-first sombre, sportive, premium, orientee performance. L'image de reference sert uniquement d'inspiration d'ambiance : aucun nom, logo ou element de marque externe n'est repris.
 
 ## Palette principale
 
-- Fond app : `#06070a`
-- Fond secondaire : `#0b0d11`
-- Surface carte : `#111318` vers `#202329`
-- Surface douce : `#151820`
-- Texte principal : `#f8fafc`
-- Texte secondaire : `rgba(248, 250, 252, 0.64)`
+- Fond app : `#08090b`
+- Fond secondaire : `#0d0f12`
+- Surface carte : `#14161b` vers `#202329`
+- Surface douce : `#1a1d22`
+- Texte principal : `#f6f7f8`
+- Texte secondaire : `rgba(246, 247, 248, 0.62)`
 - Bordures : `rgba(255, 255, 255, 0.10)`
 
 ## Accents
 
-- Orange action : `#ff4d00`
-- Orange principal : `#ff7a18`
-- Orange chaud : `#ff8a1f`
+- Orange action : `#ff5a00`
+- Orange progression : `#ff7a18`
+- Orange chaud / badge : `#ff9f1a`
 - Vert reussite : `#24c07a`
 - Rouge douleur / alerte : `#ff4d4d`
 - Gris stable : `#9aa3ad`
 
 ## Couleurs d'etat
 
-- Reussite / OK / Facile : vert sur fond transparent.
+- Reussite / OK / Facile : vert sur fond vert transparent.
 - Progression / prochaine cible : orange vif sur fond orange transparent.
 - Information : orange doux ou gris clair selon importance.
-- Trop dur / douleur / alerte : rouge ou corail.
+- Trop dur / douleur / alerte : rouge ou corail, jamais orange pour eviter la confusion avec une progression.
 - Pas fait / stable / donnees insuffisantes : gris sur surface sombre.
-
-## Ergonomie iPhone
-
-- Largeur cible : experience optimisee autour de `390-430px`.
-- Navigation basse : 5 onglets maximum, libelle court, icone visible, zone active large.
-- Boutons tactiles : `48-64px` de hauteur, action principale plus grande.
-- Mode seance : timer sticky visible, gros retours rapides, navigation precedente/suivante au pouce.
-- Textes : courts, hierarchie forte, pas de paragraphes longs dans les zones d'action.
-- Inputs : `16px` minimum pour eviter le zoom iOS.
-- Safe area : la zone basse garde de l'espace pour le geste iPhone.
 
 ## Espacement
 
-- Padding ecran mobile : `16px`
-- Ecart vertical entre sections : `16px`
-- Padding carte standard : `16px`
-- Padding carte hero : `20px`
-- Rayon cartes : `16-24px`
-- Navigation basse : environ `70px` + safe area
+- Padding ecran mobile : `16px`, `24px` sur large mobile.
+- Ecart vertical entre sections : `16px`.
+- Padding carte standard : `16px`.
+- Padding carte hero : `20px`.
+- Boutons tactiles : `48-64px` de hauteur.
+- Navigation basse : hauteur minimale `60px` + safe area iPhone.
 
 ## Typographie
 
-- Police : system sans-serif moderne (`Inter`, `system-ui`, `Segoe UI`)
-- Hero : `32-36px`, graisse `900`, letter-spacing `0`
-- Titre section : `20-24px`, graisse `900`, letter-spacing `0`
-- Titre carte : `16-20px`, graisse `900`, letter-spacing `0`
-- Texte courant : `14-16px`, graisse `600`
-- Labels / badges : `10-12px`, graisse forte, letter-spacing `0`
+- Police : system sans-serif moderne (`Inter`, `system-ui`, `Segoe UI`).
+- H1 page : `30-32px`, graisse `900`.
+- H2 section : `22-24px`, graisse `900`.
+- Titre carte : `18-22px`, graisse `900`.
+- Texte courant : `14-16px`, graisse `600`.
+- Labels / badges : `10-12px`, uppercase, graisse `900`, sans letter-spacing force.
 
 ## Composants UI principaux
 
-- Cartes : surface sombre, bordure fine, ombre noire, coins arrondis.
-- Cartes hero : fond noir/antracite avec accent orange lineaire, CTA orange.
-- Boutons primaires : degrade orange `#ff8a1f` vers `#ff4d00`, texte blanc.
+- Cartes : fond sombre degrade, bordure blanche 10 %, ombre noire douce, coins `16-24px`.
+- Cartes hero : fond noir/antracite avec halo orange lineaire subtil, texte blanc, CTA orange.
+- Boutons primaires : degrade orange `#ff7a18` vers `#ff4d00`, texte blanc, ombre orange faible.
 - Boutons secondaires : surface sombre, bordure blanche faible, texte blanc.
 - Badges : petites capsules contrastees, couleur d'etat claire.
-- Inputs : fond `#0e1015`, bordure claire 10 %, focus orange.
-- Navigation basse : fond sombre translucide, onglet actif orange.
+- Inputs : fond `#101216`, bordure claire 10 %, focus orange.
+- Graphiques : lignes/barres orange pour progression, vert pour hausse validee, gris pour stable, rouge pour alerte.
+- Navigation basse : fond sombre translucide, actif en orange, icone et libelle visibles au pouce.
 
-## Pages
+## Sections dashboard
 
-- Dashboard : premiere information = seance du jour + action rapide.
-- Seance : une main, timer visible, retours rapides, peu de scroll pendant l'effort.
-- Programme : planning scannable, detail seance clair, pas de lancement accidentel.
-- Performances : cartes denses, records et prochaines cibles en priorite.
-- Historique : lecture chronologique, duree, calories estimees, decisions locales.
-- Parametres : profil modifiable sans refaire l'onboarding.
-- Onboarding : court, mobile-first, progression visible, boutons larges.
+- Le premier ecran doit mettre en avant l'action utile : seance du jour, charge principale, duree, puis CTA.
+- Les mini-statistiques restent courtes : valeur forte, label discret.
+- Les sections secondaires doivent rester scannables, pas decoratives.
 
-## Principes UX
+## Etats vides
+
+- Fond carte sombre.
+- Titre direct : ce qui manque.
+- Texte court : quelle action cree la donnee.
+- Pas d'illustration obligatoire pour conserver la rapidite.
+
+## Principes UX mobile
 
 - Une action principale par bloc.
-- Aucun chrono ne demarre sans clic explicite.
-- Les retours de seance doivent rester faisables en moins de 5 secondes.
-- Les alertes douleur doivent etre visibles et impossibles a confondre avec une progression.
+- Aucun demarrage de chrono sans clic explicite sur `Commencer`.
+- Les retours de seance doivent rester utilisables en moins de 5 secondes.
+- Les alertes douleur doivent etre visibles, sobres et impossibles a confondre avec une progression.
 - Les donnees importantes doivent tenir dans le premier viewport quand possible.
-- L'app doit rester utilisable sans IA et sans compte.
+- Priorite au contraste, aux gros boutons, et a la lisibilite en salle.
+

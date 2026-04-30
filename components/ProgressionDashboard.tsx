@@ -1,9 +1,12 @@
 "use client";
 
 import { useMemo } from "react";
+import { getAdaptiveSnapshot, type AdaptiveSnapshot } from "@/lib/adaptiveInsights";
+import { estimateCalories } from "@/lib/calories";
 import { useCoachStorage } from "@/lib/storage";
 import { formatDurationLong } from "@/lib/time";
-import type { CompletedSession, ExerciseProgressionLog, ProgressionDecision } from "@/types/training";
+import { getTrainingTrendReport, type TrainingTrend, type TrainingTrendReport } from "@/lib/trainingTrends";
+import type { CompletedSession, ExerciseProgressionLog, PlannedSession, ProgressionDecision, UserSettings } from "@/types/training";
 
 type LoadPoint = {
   date: string;
@@ -34,9 +37,20 @@ const trackedLifts: LiftDefinition[] = [
 ];
 
 export function ProgressionDashboard() {
-  const { history, isReady } = useCoachStorage();
-  const metrics = useMemo(() => buildProgressionMetrics(history), [history]);
+  const { currentProgram, history, isReady, settings } = useCoachStorage();
+  const metrics = useMemo(
+    () => buildProgressionMetrics(history, currentProgram, settings.currentWeightKg),
+    [history, currentProgram, settings.currentWeightKg]
+  );
   const insights = useMemo(() => buildProgressionInsights(metrics), [metrics]);
+  const adaptiveSnapshot = useMemo(
+    () => getAdaptiveSnapshot(settings, currentProgram, history),
+    [settings, currentProgram, history]
+  );
+  const trendReport = useMemo(
+    () => getTrainingTrendReport(history, currentProgram, settings),
+    [history, currentProgram, settings]
+  );
 
   if (!isReady) {
     return <div className="rounded-lg bg-white p-5 font-bold shadow-soft">Chargement...</div>;
@@ -44,19 +58,26 @@ export function ProgressionDashboard() {
 
   if (history.length === 0) {
     return (
-      <section className="rounded-xl border border-black/10 bg-white p-5 shadow-soft">
+      <div className="space-y-4">
+        <AdaptiveProfileSection history={history} settings={settings} snapshot={adaptiveSnapshot} />
+        <TrainingTrendSection report={trendReport} />
+        <section className="card-dark p-5">
         <p className="text-sm font-black uppercase text-sky">Progression</p>
-        <h2 className="mt-1 text-2xl font-black">Aucune donnée pour l’instant</h2>
-        <p className="mt-2 text-sm font-semibold text-ink/60">
+        <h2 className="mt-1 text-2xl font-black text-white">Aucune donnée pour l’instant</h2>
+        <p className="mt-2 text-sm font-semibold text-white/55">
           Valide une séance pour alimenter les charges, la durée, le cardio et les alertes.
         </p>
-      </section>
+        </section>
+      </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      <section className="rounded-2xl bg-ink p-5 text-white shadow-soft">
+      <AdaptiveProfileSection history={history} settings={settings} snapshot={adaptiveSnapshot} />
+      <TrainingTrendSection report={trendReport} />
+
+      <section className="overflow-hidden rounded-2xl border border-white/10 premium-gradient p-5 text-white shadow-soft">
         <p className="text-sm font-black uppercase text-sky">Vue 10 secondes</p>
         <h2 className="mt-1 text-3xl font-black leading-tight">
           {metrics.isProgressing ? "Ça progresse" : "À consolider"}
@@ -65,11 +86,29 @@ export function ProgressionDashboard() {
           Dernier développé couché : {metrics.latestBench?.raw ?? "non renseigné"}
           {metrics.latestBench?.reps ? ` - ${metrics.latestBench.reps}` : ""}
         </p>
-        <div className="mt-5 grid grid-cols-3 gap-2">
-          <HeroMetric label="Séances" value={String(metrics.week.sessions)} />
-          <HeroMetric label="Temps" value={formatDurationLong(metrics.week.durationMs)} />
-          <HeroMetric label="Cardio" value={metrics.week.cardioMinutes ? `${metrics.week.cardioMinutes} min` : "0 min"} />
+        <div className="mt-5 grid grid-cols-2 gap-2">
+          <HeroMetric label="Séances sem." value={String(metrics.week.sessions)} />
+          <HeroMetric label="Temps sem." value={formatDurationLong(metrics.week.durationMs)} />
+          <HeroMetric label="Cardio sem." value={metrics.week.cardioMinutes ? `${metrics.week.cardioMinutes} min` : "0 min"} />
+          <HeroMetric label="Calories sem." value={metrics.week.caloriesKcal > 0 ? `~${metrics.week.caloriesKcal} kcal` : "—"} />
         </div>
+        {settings.weightLog && settings.weightLog.length >= 2 ? (
+          <div className="mt-4 flex items-center justify-between rounded-md bg-white/10 px-4 py-2">
+            <div>
+              <p className="text-xs font-black uppercase text-white/55">Poids actuel</p>
+              <p className="text-xl font-black">{settings.currentWeightKg} kg</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs font-black uppercase text-white/55">Depuis le début</p>
+              <p className={`text-xl font-black ${settings.weightLog[0].kg < settings.weightLog[settings.weightLog.length - 1].kg ? "text-coral" : "text-sea"}`}>
+                {(() => {
+                  const delta = settings.weightLog[0].kg - settings.weightLog[settings.weightLog.length - 1].kg;
+                  return `${delta > 0 ? "−" : "+"}${Math.abs(delta).toFixed(1)} kg`;
+                })()}
+              </p>
+            </div>
+          </div>
+        ) : null}
       </section>
 
       <section className="space-y-2">
@@ -84,11 +123,11 @@ export function ProgressionDashboard() {
         ))}
       </section>
 
-      <section className="rounded-xl border border-black/10 bg-white p-4 shadow-soft">
+      <section className="card-dark p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-sm font-black uppercase text-sky">Bench</p>
-            <h3 className="mt-1 text-xl font-black">Progression du développé couché</h3>
+            <h3 className="mt-1 text-xl font-black text-white">Progression du développé couché</h3>
           </div>
           {metrics.benchTrend ? (
             <span className={`rounded-md px-3 py-2 text-sm font-black ${metrics.benchTrend >= 0 ? "bg-sea/10 text-sea" : "bg-coral/10 text-coral"}`}>
@@ -130,9 +169,9 @@ export function ProgressionDashboard() {
         tone="steady"
       />
 
-      <section className="rounded-xl border border-black/10 bg-white p-4 shadow-soft">
+      <section className="card-dark p-4">
         <p className="text-sm font-black uppercase text-sky">Charges principales</p>
-        <h3 className="mt-1 text-xl font-black">Historique des charges</h3>
+        <h3 className="mt-1 text-xl font-black text-white">Historique des charges</h3>
         <div className="mt-4 space-y-3">
           {trackedLifts.map((lift) => (
             <LiftHistoryCard key={lift.key} label={lift.label} points={metrics.liftSeries[lift.key] ?? []} />
@@ -140,6 +179,150 @@ export function ProgressionDashboard() {
         </div>
       </section>
     </div>
+  );
+}
+
+function AdaptiveProfileSection({
+  history,
+  settings,
+  snapshot
+}: {
+  history: CompletedSession[];
+  settings: UserSettings;
+  snapshot: AdaptiveSnapshot;
+}) {
+  const learnedConstraints = settings.constraints.filter((constraint) => Boolean(constraint.createdAt));
+  const recentAdaptations = history
+    .flatMap((session) =>
+      Object.values(session.progressions ?? {})
+        .filter((progression) => progression.decision !== "maintenir" || progression.warning)
+        .map((progression) => ({
+          date: formatShortDate(session.completedAt),
+          label: `${progression.exerciseName}: ${progression.decision}`,
+          reason: progression.warning ?? progression.reason
+        }))
+    )
+    .slice(0, 4);
+
+  return (
+    <section className="card-dark border border-sky/20 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-black uppercase text-sky">Profil adaptatif</p>
+          <h2 className="mt-1 text-2xl font-black text-white">Ce que le moteur sait de toi</h2>
+        </div>
+        <span className="rounded-md bg-sky/10 px-3 py-2 text-xs font-black text-sky">
+          v{settings.schemaVersion}
+        </span>
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <ProfileMetric label="Planning" value={snapshot.scheduleLabel} />
+        <ProfileMetric label="Recuperation" value={snapshot.recoveryLabel} />
+        <ProfileMetric label="Sports" value={snapshot.externalSportsLabel} />
+        <ProfileMetric label="Charges" value={snapshot.loadBasisLabel} />
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <ProfileMetric label="A eviter" value={settings.avoid.length ? `${settings.avoid.length} item${settings.avoid.length > 1 ? "s" : ""}` : "Aucun"} />
+        <ProfileMetric label="Contraintes" value={snapshot.constraintsLabel} />
+      </div>
+
+      {learnedConstraints.length > 0 ? (
+        <div className="mt-4 rounded-lg border border-amber/20 bg-amber/10 p-3">
+          <p className="text-xs font-black uppercase text-amber">Appris apres les seances</p>
+          <div className="mt-2 space-y-2">
+            {learnedConstraints.slice(-4).map((constraint) => (
+              <p className="rounded-md bg-white/8 px-3 py-2 text-xs font-semibold leading-relaxed text-white/80" key={constraint.id}>
+                {constraint.label}
+              </p>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {recentAdaptations.length > 0 ? (
+        <div className="mt-4 space-y-2">
+          <p className="text-xs font-black uppercase text-white/40">Adaptations recentes</p>
+          {recentAdaptations.map((item) => (
+            <div className="rounded-md bg-white/5 px-3 py-2" key={`${item.date}-${item.label}`}>
+              <p className="text-sm font-black text-white">{item.label}</p>
+              <p className="mt-1 text-xs font-semibold leading-relaxed text-white/55">{item.reason}</p>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function ProfileMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md bg-white/8 p-3">
+      <p className="text-[10px] font-black uppercase text-white/40">{label}</p>
+      <p className="mt-1 text-sm font-black leading-tight text-white">{value}</p>
+    </div>
+  );
+}
+
+function TrainingTrendSection({ report }: { report: TrainingTrendReport }) {
+  return (
+    <section className="card-dark border border-amber/20 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-black uppercase text-amber">Ce que l&apos;app apprend</p>
+          <h2 className="mt-1 text-2xl font-black text-white">Tendances multi-seances</h2>
+        </div>
+        <span className="rounded-md bg-amber/10 px-3 py-2 text-xs font-black uppercase text-amber">
+          {report.confidence}
+        </span>
+      </div>
+      <p className="mt-3 rounded-md bg-white/5 p-3 text-sm font-semibold leading-relaxed text-white/70">
+        {report.summary}
+      </p>
+
+      <div className="mt-3 space-y-2">
+        {report.items.length ? (
+          report.items.slice(0, 4).map((trend) => <TrainingTrendCard key={`${trend.kind}-${trend.title}`} trend={trend} />)
+        ) : (
+          <p className="rounded-md bg-white/5 p-3 text-sm font-semibold text-white/45">
+            Continue a valider les seances: le moteur attend des signaux repetes avant de modifier fortement le programme.
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function TrainingTrendCard({ trend }: { trend: TrainingTrend }) {
+  const toneClass = {
+    critical: "border-coral/20 bg-coral/10 text-coral",
+    positive: "border-sea/20 bg-sea/10 text-sea",
+    watch: "border-amber/20 bg-amber/10 text-amber"
+  }[trend.severity];
+
+  return (
+    <article className={`rounded-lg border p-3 ${toneClass}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-black uppercase text-white/45">{trend.label}</p>
+          <h3 className="mt-1 font-black leading-tight text-white">{trend.title}</h3>
+        </div>
+        <span className="shrink-0 rounded-md bg-white/10 px-2 py-1 text-[10px] font-black uppercase text-white/70">
+          {formatTrendAction(trend.action)}
+        </span>
+      </div>
+      <p className="mt-2 text-sm font-semibold leading-relaxed text-white/70">{trend.detail}</p>
+      {trend.evidence.length > 0 ? (
+        <div className="mt-2 space-y-1">
+          {trend.evidence.slice(0, 2).map((item) => (
+            <p className="rounded-md bg-white/8 px-2 py-1.5 text-xs font-semibold leading-relaxed text-white/60" key={item}>
+              {item}
+            </p>
+          ))}
+        </div>
+      ) : null}
+    </article>
   );
 }
 
@@ -163,11 +346,25 @@ function InsightCard({
 
   return (
     <article className={`rounded-xl border p-4 shadow-soft ${toneClass}`}>
-      <p className="text-xs font-black uppercase text-ink/60">{label}</p>
-      <h3 className="mt-1 text-xl font-black leading-tight text-ink">{value}</h3>
-      <p className="mt-1 text-sm font-semibold leading-relaxed text-ink/65">{detail}</p>
+      <p className="text-xs font-black uppercase text-white/55">{label}</p>
+      <h3 className="mt-1 text-xl font-black leading-tight text-white">{value}</h3>
+      <p className="mt-1 text-sm font-semibold leading-relaxed text-white/60">{detail}</p>
     </article>
   );
+}
+
+function formatTrendAction(action: TrainingTrend["action"]): string {
+  const labels: Record<TrainingTrend["action"], string> = {
+    adjust_goal: "objectif",
+    deload_next_week: "deload",
+    increase_progression: "progresser",
+    keep_learning: "observer",
+    protect_recovery: "recuperer",
+    replace_exercise: "remplacer",
+    vary_stimulus: "varier"
+  };
+
+  return labels[action];
 }
 
 function HeroMetric({ label, value }: { label: string; value: string }) {
@@ -197,7 +394,7 @@ function StatusCard({
 
   return (
     <div className={`min-h-24 rounded-lg border p-4 ${toneClass}`}>
-      <p className="text-xs font-black uppercase text-ink/60">{label}</p>
+      <p className="text-xs font-black uppercase text-white/55">{label}</p>
       <p className="mt-2 text-3xl font-black leading-tight">{value}</p>
     </div>
   );
@@ -222,16 +419,16 @@ function ListSection({
 
   return (
     <section className={`rounded-xl border p-4 shadow-soft ${toneClass}`}>
-      <h3 className="text-lg font-black">{title}</h3>
+      <h3 className="text-lg font-black text-white">{title}</h3>
       <div className="mt-3 space-y-2">
         {items.length ? (
           items.slice(0, 6).map((item) => (
-            <p className="rounded-md bg-white/80 p-3 text-sm font-bold leading-relaxed text-ink" key={item}>
+            <p className="rounded-md bg-white/8 p-3 text-sm font-semibold leading-relaxed text-white/80" key={item}>
               {item}
             </p>
           ))
         ) : (
-          <p className="rounded-md bg-white/80 p-3 text-sm font-semibold text-ink/60">{empty}</p>
+          <p className="rounded-md bg-white/8 p-3 text-sm font-semibold text-white/50">{empty}</p>
         )}
       </div>
     </section>
@@ -242,16 +439,16 @@ function LiftHistoryCard({ label, points }: { label: string; points: LoadPoint[]
   const latest = points.at(-1);
 
   return (
-    <div className="rounded-lg border border-black/10 bg-mist p-3">
+    <div className="rounded-lg border border-white/10 bg-white/5 p-3">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="font-black">{label}</p>
-          <p className="mt-1 text-sm font-semibold text-ink/60">
+          <p className="font-black text-white">{label}</p>
+          <p className="mt-1 text-sm font-semibold text-white/55">
             {latest ? `${latest.raw}${latest.reps ? ` - ${latest.reps}` : ""}` : "Aucune charge renseignée"}
           </p>
         </div>
         {points.length >= 2 ? (
-          <span className="rounded-md bg-white px-2 py-1 text-xs font-black text-sky">
+          <span className="rounded-md bg-white/10 px-2 py-1 text-xs font-black text-sky">
             {points.length} pts
           </span>
         ) : null}
@@ -264,7 +461,7 @@ function LiftHistoryCard({ label, points }: { label: string; points: LoadPoint[]
 function LineChart({ points }: { points: LoadPoint[] }) {
   if (points.length < 2) {
     return (
-      <div className="rounded-lg bg-mist p-4 text-sm font-semibold text-ink/60">
+      <div className="rounded-lg bg-white/5 p-4 text-sm font-semibold text-white/55">
         Il faut au moins deux séances avec une charge renseignée pour tracer une courbe.
       </div>
     );
@@ -285,21 +482,21 @@ function LineChart({ points }: { points: LoadPoint[] }) {
   const path = coordinates.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`).join(" ");
 
   return (
-    <div className="rounded-lg bg-mist p-3">
+    <div className="rounded-lg bg-white/5 p-3">
       <svg aria-label="Courbe développé couché" className="h-40 w-full" role="img" viewBox={`0 0 ${width} ${height}`}>
-        <line stroke="rgba(23,23,23,0.12)" strokeWidth="1" x1={padding} x2={width - padding} y1={height - padding} y2={height - padding} />
-        <line stroke="rgba(23,23,23,0.12)" strokeWidth="1" x1={padding} x2={padding} y1={padding} y2={height - padding} />
+        <line stroke="rgba(255,255,255,0.12)" strokeWidth="1" x1={padding} x2={width - padding} y1={height - padding} y2={height - padding} />
+        <line stroke="rgba(255,255,255,0.12)" strokeWidth="1" x1={padding} x2={padding} y1={padding} y2={height - padding} />
         <path d={path} fill="none" stroke="#2f6fed" strokeLinecap="round" strokeWidth="4" />
         {coordinates.map((point) => (
           <g key={`${point.date}-${point.load}`}>
-            <circle cx={point.x} cy={point.y} fill="#171717" r="4" />
-            <text fill="#171717" fontSize="10" fontWeight="700" textAnchor="middle" x={point.x} y={Math.max(12, point.y - 8)}>
+            <circle cx={point.x} cy={point.y} fill="white" r="4" />
+            <text fill="white" fontSize="10" fontWeight="700" textAnchor="middle" x={point.x} y={Math.max(12, point.y - 8)}>
               {formatKg(point.load)}
             </text>
           </g>
         ))}
       </svg>
-      <div className="mt-2 flex justify-between text-xs font-bold text-ink/60">
+      <div className="mt-2 flex justify-between text-xs font-bold text-white/55">
         <span>{points[0]?.label}</span>
         <span>{points.at(-1)?.label}</span>
       </div>
@@ -329,7 +526,7 @@ function MiniBars({ points }: { points: LoadPoint[] }) {
   );
 }
 
-function buildProgressionMetrics(history: CompletedSession[]) {
+function buildProgressionMetrics(history: CompletedSession[], program: PlannedSession[], weightKg: number) {
   const chronological = [...history].reverse();
   const weekSessions = history.filter((session) => isThisWeek(session.completedAt));
   const liftSeries = Object.fromEntries(
@@ -339,6 +536,12 @@ function buildProgressionMetrics(history: CompletedSession[]) {
   const latestBench = benchSeries.at(-1);
   const benchTrend = benchSeries.length >= 2 ? benchSeries.at(-1)!.load - benchSeries[0].load : 0;
   const increased = collectRecentProgressions(history, "augmenter");
+  const caloriesKcal = weekSessions.reduce((total, session) => {
+    const planned = program.find((s) => s.id === session.sessionId);
+    if (!planned || !session.totalDurationMs) return total;
+    const est = estimateCalories(planned.intensity, weightKg, session.totalDurationMs);
+    return total + Math.round((est.low + est.high) / 2);
+  }, 0);
 
   return {
     benchSeries,
@@ -352,6 +555,7 @@ function buildProgressionMetrics(history: CompletedSession[]) {
     trackedWithData: Object.values(liftSeries).filter((points) => points.length > 0).length,
     week: {
       cardioMinutes: sumCardioMinutes(weekSessions),
+      caloriesKcal,
       durationMs: weekSessions.reduce((total, session) => total + (session.totalDurationMs ?? 0), 0),
       sessions: weekSessions.length
     }

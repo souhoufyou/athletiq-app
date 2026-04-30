@@ -7,29 +7,29 @@ type SessionSummaryProps = {
 
 export function SessionSummary({ completed, session }: SessionSummaryProps) {
   return (
-    <section className="rounded-lg border border-black/10 bg-white p-5 shadow-soft">
+    <section className="card-dark p-5">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-sm font-black uppercase text-sky">{session.scheduleLabel ?? session.focus}</p>
-          <h2 className="mt-1 text-2xl font-black leading-tight">{session.title}</h2>
-          {session.scheduleLabel ? <p className="mt-1 text-sm font-semibold text-ink/60">{session.focus}</p> : null}
+          <h2 className="mt-1 text-2xl font-black leading-tight text-white">{session.title}</h2>
+          {session.scheduleLabel ? <p className="mt-1 text-sm font-semibold text-white/55">{session.focus}</p> : null}
         </div>
         <span className="rounded-md bg-sky/10 px-3 py-2 text-right text-xs font-black text-sky">
           {session.duration}
         </span>
       </div>
       <div className="mt-5 grid grid-cols-3 gap-2 text-center">
-        <div className="rounded-md bg-mist p-3">
+        <div className="rounded-md bg-white/8 p-3 text-white">
           <p className="text-xl font-black">{session.exercises.length}</p>
-          <p className="text-xs font-semibold text-ink/60">exercices</p>
+          <p className="text-xs font-semibold text-white/55">exercices</p>
         </div>
         <div className="rounded-md bg-amber/10 p-3 text-amber">
           <p className="text-xl font-black">{session.intensity}</p>
-          <p className="text-xs font-semibold text-ink/60">intensité</p>
+          <p className="text-xs font-semibold text-white/55">intensité</p>
         </div>
-        <div className={`rounded-md p-3 ${completed ? "bg-sea/10 text-sea" : "bg-mist text-ink"}`}>
+        <div className={`rounded-md p-3 ${completed ? "bg-sea/10 text-sea" : "bg-white/8 text-white"}`}>
           <p className="text-xl font-black">{completed ? "Oui" : "Non"}</p>
-          <p className="text-xs font-semibold text-ink/60">validée</p>
+          <p className="text-xs font-semibold text-white/55">validée</p>
         </div>
       </div>
       {session.notes?.length ? (

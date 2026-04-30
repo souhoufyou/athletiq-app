@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
+import { AdaptationExplanationCard } from "@/components/AdaptationExplanation";
+import { estimateCalories } from "@/lib/calories";
 import { formatDateTime } from "@/lib/date";
-import { getConfidenceLabel, getLowConfidenceMessage, ruleExplanations } from "@/lib/explanations";
 import { useCoachStorage } from "@/lib/storage";
 import { formatDurationLong } from "@/lib/time";
 import type { EffortStatus, ProgressionDecision } from "@/types/training";
@@ -19,7 +21,7 @@ const statusClasses: Record<EffortStatus, string> = {
   easy: "bg-sea/10 text-sea",
   hard: "bg-coral/10 text-coral",
   pain: "bg-red-500/10 text-red-600",
-  skipped: "bg-mist text-ink/60"
+  skipped: "bg-white/10 text-white/50"
 };
 
 const decisionTone: Record<"alerts" | "down" | "same" | "up", string> = {
@@ -30,7 +32,9 @@ const decisionTone: Record<"alerts" | "down" | "same" | "up", string> = {
 };
 
 export function HistoryList() {
-  const { currentProgram, history, isReady } = useCoachStorage();
+  const { currentProgram, history, isReady, settings } = useCoachStorage();
+  const [openAdaptationSessionId, setOpenAdaptationSessionId] = useState<string | null>(null);
+  const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set());
   const exerciseNames = new Map(
     currentProgram.flatMap((session) => session.exercises.map((exercise) => [exercise.id, exercise.name]))
   );
@@ -41,9 +45,9 @@ export function HistoryList() {
 
   if (history.length === 0) {
     return (
-      <section className="rounded-lg border border-black/10 bg-white p-5 shadow-soft">
-        <h2 className="text-xl font-black">Aucune séance</h2>
-        <p className="mt-2 text-sm font-semibold text-ink/60">
+      <section className="card-dark p-5">
+        <h2 className="text-xl font-black text-white">Aucune séance</h2>
+        <p className="mt-2 text-sm font-semibold text-white/55">
           Les séances validées apparaîtront ici automatiquement.
         </p>
       </section>
@@ -55,26 +59,45 @@ export function HistoryList() {
       {history.map((session) => {
         const durationText =
           typeof session.totalDurationMs === "number" ? formatDurationLong(session.totalDurationMs) : undefined;
+        const plannedSession = currentProgram.find((s) => s.id === session.sessionId);
+        const calorieEstimate =
+          plannedSession && session.totalDurationMs
+            ? estimateCalories(plannedSession.intensity, settings.currentWeightKg, session.totalDurationMs)
+            : undefined;
         const decisionSummary = countDecisionSummary(session.progressions ?? {});
 
+        const sessionIndex = history.indexOf(session);
+        const previousSessions = history.slice(sessionIndex + 1);
+        const prExerciseIds = detectPRs(session, previousSessions);
+        const logsExpanded = expandedLogs.has(session.id);
+
         return (
-          <article className="rounded-lg border border-black/10 bg-white p-4 shadow-soft" key={session.id}>
+          <article className="card-dark p-4" key={session.id}>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm font-bold text-moss">{formatDateTime(session.completedAt)}</p>
-                <h2 className="mt-1 text-xl font-black leading-tight">{session.title}</h2>
-                <p className="text-sm font-semibold text-ink/60">{session.focus}</p>
-                {durationText ? (
-                  <p className="mt-2 rounded-md bg-sky/10 px-3 py-2 text-sm font-black text-sky">
-                    Séance terminée en {durationText}
-                  </p>
+                <h2 className="mt-1 text-xl font-black leading-tight text-white">{session.title}</h2>
+                <p className="text-sm font-semibold text-white/55">{session.focus}</p>
+                {(durationText || prExerciseIds.size > 0) ? (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {durationText ? (
+                      <span className="rounded-md bg-sky/10 px-3 py-2 text-sm font-black text-sky">
+                        {durationText}
+                      </span>
+                    ) : null}
+                    {calorieEstimate ? (
+                      <span className="rounded-md bg-amber/10 px-3 py-2 text-sm font-black text-amber">
+                        🔥 ~{Math.round((calorieEstimate.low + calorieEstimate.high) / 2)} kcal
+                      </span>
+                    ) : null}
+                    {prExerciseIds.size > 0 ? (
+                      <span className="rounded-md bg-sea/10 px-3 py-2 text-sm font-black text-sea">
+                        🏆 {prExerciseIds.size} PR
+                      </span>
+                    ) : null}
+                  </div>
                 ) : null}
-                {session.calorieEstimate ? (
-                  <p className="mt-2 rounded-md bg-amber/10 px-3 py-2 text-sm font-black text-amber">
-                    {session.calorieEstimate.label} : ~{session.calorieEstimate.calories} kcal
-                  </p>
-                ) : null}
-                <p className="mt-2 text-sm font-bold text-ink/70">
+                <p className="mt-2 text-sm font-bold text-white/60">
                   Difficulté {session.feedback?.difficulty ?? "-"} /10 - Douleur{" "}
                   {session.feedback?.globalPain ?? "-"} /10
                 </p>
@@ -85,87 +108,122 @@ export function HistoryList() {
                   <DecisionPill label="Alertes" tone="alerts" value={decisionSummary.alerts} />
                 </div>
               </div>
-              <span className="rounded-md bg-mist px-3 py-2 text-sm font-black">
+              <span className="rounded-md bg-white/8 px-3 py-2 text-sm font-black text-white">
                 {Object.values(session.logs).filter((log) => log.status).length}
               </span>
             </div>
 
-            <div className="mt-4 rounded-md bg-mist p-3">
-              <p className="text-sm font-bold text-ink/60">Exercices principaux</p>
-              <p className="mt-1 font-black">{session.mainExercises?.join(", ") || "Non renseigné"}</p>
+            <div className="mt-4 rounded-md bg-white/8 p-3">
+              <p className="text-sm font-bold text-white/45">Exercices principaux</p>
+              <p className="mt-1 font-black text-white">{session.mainExercises?.join(", ") || "Non renseigné"}</p>
             </div>
 
-            <div className="mt-4 space-y-2">
-              {Object.values(session.logs).map((log) => {
-                const progression = session.progressions?.[log.exerciseId];
-                const exerciseDuration =
-                  session.exerciseDurationsMs?.[log.exerciseId] !== undefined
-                    ? formatDurationLong(session.exerciseDurationsMs[log.exerciseId])
-                    : undefined;
-                const status = log.status;
+            <button
+              className="mt-3 w-full rounded-md border border-white/8 bg-white/5 px-4 py-2.5 text-sm font-black text-white/60 transition hover:bg-white/10 hover:text-white"
+              onClick={() =>
+                setExpandedLogs((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(session.id)) next.delete(session.id);
+                  else next.add(session.id);
+                  return next;
+                })
+              }
+              type="button"
+            >
+              {logsExpanded
+                ? "Masquer les exercices"
+                : `Voir les ${Object.values(session.logs).length} exercices`}
+            </button>
 
-                return (
-                  <div className="rounded-md border border-black/10 bg-mist p-3" key={log.exerciseId}>
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="font-black leading-tight">
-                        {progression?.exerciseName ?? exerciseNames.get(log.exerciseId) ?? log.exerciseId}
-                      </p>
-                      <p
-                        className={`shrink-0 rounded-md px-2 py-1 text-xs font-black ${
-                          status ? statusClasses[status] : "bg-white text-ink/60"
-                        }`}
-                      >
-                        {status ? statusLabels[status] : "Non noté"}
-                      </p>
-                    </div>
-                    <p className="mt-2 text-sm font-semibold text-ink/60">
-                      Charge {log.usedLoad || "-"} - Reps {log.completedReps || "-"}
-                      {exerciseDuration ? ` - ${exerciseDuration}` : ""}
-                    </p>
-                    {progression ? (
-                      <div className="mt-2 rounded-md bg-white p-3">
-                        <p className="text-sm font-black text-moss">
-                          {progression.adaptationExplanation?.decisionLabel ?? formatDecision(progression.decision)} -{" "}
-                          {progression.nextLoad} - {progression.nextTarget}
+            {logsExpanded ? (
+              <div className="mt-3 space-y-2">
+                {Object.values(session.logs).map((log) => {
+                  const progression = session.progressions?.[log.exerciseId];
+                  const exerciseDuration =
+                    session.exerciseDurationsMs?.[log.exerciseId] !== undefined
+                      ? formatDurationLong(session.exerciseDurationsMs[log.exerciseId])
+                      : undefined;
+                  const status = log.status;
+                  const isPR = prExerciseIds.has(log.exerciseId);
+
+                  return (
+                    <div className="rounded-md border border-white/8 bg-white/5 p-3" key={log.exerciseId}>
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="font-black leading-tight text-white">
+                          {progression?.exerciseName ?? exerciseNames.get(log.exerciseId) ?? log.exerciseId}
+                          {isPR ? <span className="ml-2 text-xs font-black text-sea">🏆 PR</span> : null}
                         </p>
-                        <p className="mt-1 text-sm font-semibold leading-relaxed text-ink/70">
-                          {progression.adaptationExplanation?.simpleReason ?? progression.reason}
+                        <p
+                          className={`shrink-0 rounded-md px-2 py-1 text-xs font-black ${
+                            status ? statusClasses[status] : "bg-white/10 text-white/50"
+                          }`}
+                        >
+                          {status ? statusLabels[status] : "Non noté"}
                         </p>
-                        {progression.adaptationExplanation ? (
-                          <details className="mt-2">
-                            <summary className="cursor-pointer text-sm font-black text-sky">
-                              Comprendre la regle
-                            </summary>
-                            <p className="mt-1 text-sm font-semibold leading-relaxed text-ink/70">
-                              {progression.adaptationExplanation.ruleApplied} -{" "}
-                              {ruleExplanations[
-                                progression.adaptationExplanation.ruleApplied as keyof typeof ruleExplanations
-                              ] ?? progression.adaptationExplanation.whatUserShouldLearn}
-                            </p>
-                          </details>
-                        ) : null}
-                        <p className="mt-2 text-xs font-black uppercase text-ink/50">
-                          Confiance {getConfidenceLabel(progression.confidence)}
-                        </p>
-                        {getLowConfidenceMessage(progression.confidence) ? (
-                          <p className="mt-1 text-sm font-black text-coral">
-                            {getLowConfidenceMessage(progression.confidence)}
-                          </p>
-                        ) : null}
                       </div>
-                    ) : null}
-                    {log.comment ? <p className="mt-2 text-sm font-semibold text-ink/70">{log.comment}</p> : null}
-                  </div>
-                );
-              })}
-            </div>
+                      <p className="mt-2 text-sm font-semibold text-white/55">
+                        Charge {log.usedLoad || "-"} - Reps {log.completedReps || "-"}
+                        {exerciseDuration ? ` - ${exerciseDuration}` : ""}
+                      </p>
+                      {progression ? (
+                        <p className="mt-2 text-sm font-black text-sea">
+                          Décision {formatDecision(progression.decision)} - {progression.nextLoad} -{" "}
+                          {progression.nextTarget}
+                        </p>
+                      ) : null}
+                      {log.comment ? <p className="mt-2 text-sm font-semibold text-white/65">{log.comment}</p> : null}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
 
             {session.aiCoach ? (
-              <div className="mt-4 rounded-md border border-moss/20 bg-white p-3">
+              <div className="mt-4 rounded-md border border-moss/20 bg-white/5 p-3">
                 <p className="text-sm font-bold text-moss">IA</p>
-                <p className="mt-1 font-black">{session.aiCoach.summary}</p>
+                <p className="mt-1 font-black text-white">{session.aiCoach.summary}</p>
                 {session.aiCoach.motivationalMessage ? (
-                  <p className="mt-1 text-sm font-semibold text-ink/70">{session.aiCoach.motivationalMessage}</p>
+                  <p className="mt-1 text-sm font-semibold text-white/65">{session.aiCoach.motivationalMessage}</p>
+                ) : null}
+              </div>
+            ) : null}
+
+            {session.adaptationExplanations &&
+            Object.keys(session.adaptationExplanations).length > 0 ? (
+              <div className="mt-4">
+                <button
+                  className="w-full rounded-md border border-sky/20 bg-sky/10 px-4 py-3 text-sm font-black text-sky shadow-sm"
+                  onClick={() =>
+                    setOpenAdaptationSessionId(
+                      openAdaptationSessionId === session.id ? null : session.id
+                    )
+                  }
+                  type="button"
+                >
+                  {openAdaptationSessionId === session.id
+                    ? "Masquer les adaptations"
+                    : "Voir les adaptations"}
+                </button>
+                {openAdaptationSessionId === session.id ? (
+                  <div className="mt-3 space-y-3">
+                    <p className="text-sm font-black text-sky">
+                      Pourquoi le programme a évolué après cette séance
+                    </p>
+                    {Object.entries(session.adaptationExplanations).map(
+                      ([exerciseId, summary]) => (
+                        <AdaptationExplanationCard
+                          confidence={summary.confidence}
+                          exerciseName={
+                            session.progressions?.[exerciseId]?.exerciseName ??
+                            exerciseId
+                          }
+                          explanation={summary.explanation}
+                          key={exerciseId}
+                          violations={summary.violations}
+                        />
+                      )
+                    )}
+                  </div>
                 ) : null}
               </div>
             ) : null}
@@ -188,7 +246,7 @@ function DecisionPill({
   return (
     <div className={`rounded-md border px-2 py-2 text-center ${decisionTone[tone]}`}>
       <p className="text-lg font-black leading-none">{value}</p>
-      <p className="mt-1 text-[10px] font-black uppercase text-ink/60">{label}</p>
+      <p className="mt-1 text-[10px] font-black uppercase text-white/55">{label}</p>
     </div>
   );
 }
@@ -224,4 +282,34 @@ function formatDecision(decision: ProgressionDecision): string {
   };
 
   return labels[decision];
+}
+
+function parseLoadKg(value?: string): number | undefined {
+  if (!value) return undefined;
+  const match = value.match(/(\d+(?:[,.]\d+)?)\s*kg/i) ?? value.match(/^(\d+(?:[,.]\d+)?)$/);
+  return match ? Number(match[1].replace(",", ".")) : undefined;
+}
+
+function detectPRs(
+  session: { logs: Record<string, { usedLoad: string }> },
+  previousSessions: Array<{ logs: Record<string, { usedLoad: string }> }>
+): Set<string> {
+  const prs = new Set<string>();
+
+  for (const [exerciseId, log] of Object.entries(session.logs)) {
+    const currentLoad = parseLoadKg(log.usedLoad);
+    if (currentLoad === undefined) continue;
+
+    let prevMax = 0;
+    for (const prevSession of previousSessions) {
+      const prevLoad = parseLoadKg(prevSession.logs[exerciseId]?.usedLoad);
+      if (prevLoad !== undefined && prevLoad > prevMax) prevMax = prevLoad;
+    }
+
+    if (prevMax > 0 && currentLoad > prevMax) {
+      prs.add(exerciseId);
+    }
+  }
+
+  return prs;
 }
