@@ -81,14 +81,7 @@ export function SessionRunner() {
   const [aiStatus, setAiStatus] = useState<string>("");
   const [finishWarning, setFinishWarning] = useState<string>("");
   const [loadFeedbackMessage, setLoadFeedbackMessage] = useState<string>("");
-  const [nowMs, setNowMs] = useState(() => Date.now());
   const [showAlternatives, setShowAlternatives] = useState(false);
-  const [restTimer, setRestTimer] = useState<RestTimerState>({
-    done: false,
-    initialSeconds: 0,
-    running: false,
-    secondsLeft: 0
-  });
   const {
     activeSession,
     attachAiCoachResponse,
@@ -109,6 +102,7 @@ export function SessionRunner() {
     todaySession,
     todaysCompletedSession,
     updateExerciseLog,
+    updateExerciseLogsBatch,
     updateSessionFeedback
   } = useCoachStorage();
 
@@ -131,46 +125,6 @@ export function SessionRunner() {
     ?? "";
 
   useEffect(() => {
-    if (!activeSession) {
-      return;
-    }
-
-    const interval = window.setInterval(() => setNowMs(Date.now()), 1000);
-
-    return () => window.clearInterval(interval);
-  }, [activeSession]);
-
-  useEffect(() => {
-    if (!restTimer.running) {
-      return;
-    }
-
-    const interval = window.setInterval(() => {
-      setRestTimer((current) => {
-        if (!current.running) {
-          return current;
-        }
-
-        if (current.secondsLeft <= 1) {
-          return {
-            ...current,
-            done: true,
-            running: false,
-            secondsLeft: 0
-          };
-        }
-
-        return {
-          ...current,
-          secondsLeft: current.secondsLeft - 1
-        };
-      });
-    }, 1000);
-
-    return () => window.clearInterval(interval);
-  }, [restTimer.running]);
-
-  useEffect(() => {
     setLoadFeedbackMessage("");
   }, [loadFeedbackExerciseKey]);
 
@@ -190,7 +144,6 @@ export function SessionRunner() {
   const currentExercise = currentSession.exercises[currentIndex] ?? currentSession.exercises[0];
   const previousExercise = currentSession.exercises[currentIndex - 1];
   const nextExercise = currentSession.exercises[currentIndex + 1];
-  const sessionElapsedMs = active ? getElapsedMs(active, nowMs) : 0;
   const currentRestSeconds = currentExercise ? parseRestSeconds(currentExercise.rest) : 0;
   const currentLastLoad = currentExercise ? lastLoads[currentExercise.id] : undefined;
 
@@ -198,16 +151,27 @@ export function SessionRunner() {
   const effectiveExercise = (currentExercise && active?.replacements?.[currentExercise.id]) ?? currentExercise;
   const loadInsight = effectiveExercise ? getExerciseLoadInsight(effectiveExercise, settings) : undefined;
   const isReplaced = Boolean(currentExercise && active?.replacements?.[currentExercise.id]);
-
-  const resetRestForExercise = (exerciseId?: string) => {
-    setRestTimer({
-      done: false,
-      exerciseId,
-      initialSeconds: 0,
-      running: false,
-      secondsLeft: 0
-    });
-  };
+  const feedback = active?.feedback ?? defaultSessionFeedback;
+  const currentLog = currentExercise && active
+    ? active.logs[currentExercise.id] ?? createEmptyLog(currentExercise.id)
+    : createEmptyLog(currentExercise?.id ?? "exercise");
+  const alternatives = currentExercise
+    ? getContextualAlternatives(currentExercise.id, currentExercise, {
+        avoid: settings.avoid,
+        comment: currentLog.comment,
+        equipment: settings.equipment,
+        status: currentLog.status,
+        watchPoints: settings.watchPoints
+      })
+    : [];
+  const liveAdvice = effectiveExercise
+    ? getLiveCoachAdvice({
+        exercise: effectiveExercise,
+        feedback,
+        log: currentLog,
+        session: currentSession
+      })
+    : undefined;
 
   const goToExercise = (index: number) => {
     const target = currentSession.exercises[index];
@@ -217,58 +181,8 @@ export function SessionRunner() {
     }
 
     setActiveExercise(target.id);
-    resetRestForExercise(target.id);
     setShowAlternatives(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const startRestTimer = () => {
-    if (!currentExercise) {
-      return;
-    }
-
-    const seconds = Math.max(0, currentRestSeconds);
-
-    setActiveExercise(currentExercise.id);
-    setRestTimer({
-      done: seconds === 0,
-      exerciseId: currentExercise.id,
-      initialSeconds: seconds,
-      running: seconds > 0,
-      secondsLeft: seconds
-    });
-  };
-
-  const adjustRestTimer = (delta: number) => {
-    setRestTimer((current) => ({
-      ...current,
-      done: false,
-      secondsLeft: Math.max(0, current.secondsLeft + delta)
-    }));
-  };
-
-  const skipRestTimer = () => {
-    setRestTimer((current) => ({
-      ...current,
-      done: false,
-      running: false,
-      secondsLeft: 0
-    }));
-  };
-
-  const restartRestTimer = () => {
-    setRestTimer((current) => {
-      const seconds = current.initialSeconds || currentRestSeconds;
-
-      return {
-        ...current,
-        done: false,
-        exerciseId: currentExercise?.id,
-        initialSeconds: seconds,
-        running: seconds > 0,
-        secondsLeft: seconds
-      };
-    });
   };
 
   const handleRequestAi = (session: CompletedSession) => {
@@ -329,28 +243,6 @@ export function SessionRunner() {
       </div>
     );
   }
-
-  const feedback = active.feedback ?? defaultSessionFeedback;
-  const currentLog = currentExercise
-    ? active.logs[currentExercise.id] ?? createEmptyLog(currentExercise.id)
-    : createEmptyLog("exercise");
-  const alternatives = currentExercise
-    ? getContextualAlternatives(currentExercise.id, currentExercise, {
-      avoid: settings.avoid,
-      comment: currentLog.comment,
-      equipment: settings.equipment,
-      status: currentLog.status,
-      watchPoints: settings.watchPoints
-    })
-    : [];
-  const liveAdvice = effectiveExercise
-    ? getLiveCoachAdvice({
-        exercise: effectiveExercise,
-        feedback,
-        log: currentLog,
-        session: currentSession
-      })
-    : undefined;
 
   const updateCurrentLog = (patch: Partial<ExerciseLog>) => {
     if (!currentExercise) {
@@ -431,15 +323,18 @@ export function SessionRunner() {
   };
 
   const markAllOk = () => {
-    currentSession.exercises.forEach((exercise) => {
+    updateExerciseLogsBatch(currentSession.exercises.map((exercise) => {
       const existing = active.logs[exercise.id];
 
-      updateExerciseLog(exercise.id, {
-        status: "ok",
-        usedLoad: existing?.usedLoad || exercise.plannedLoad || "",
-        completedReps: existing?.completedReps || exercise.target
-      });
-    });
+      return {
+        exerciseId: exercise.id,
+        patch: {
+          status: "ok" as EffortStatus,
+          usedLoad: existing?.usedLoad || exercise.plannedLoad || "",
+          completedReps: existing?.completedReps || exercise.target
+        }
+      };
+    }));
     setFinishWarning("");
   };
 
@@ -477,7 +372,7 @@ export function SessionRunner() {
           <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10">
             <div className="h-full rounded-full bg-sky transition-all" style={{ width: `${progressPercent}%` }} />
           </div>
-          <p className="shrink-0 text-sm font-black tabular-nums text-white">{formatDuration(sessionElapsedMs)}</p>
+          <SessionElapsedTime session={active} />
           <button
             aria-label={active.timer.isPaused ? "Reprendre" : "Pause"}
             className="flex size-8 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/5 text-xs font-black text-white/70 transition hover:bg-white/10"
@@ -648,33 +543,14 @@ export function SessionRunner() {
         </>
       ) : null}
 
-      <section
-        className={`rounded-xl border p-4 shadow-soft ${
-          restTimer.done ? "border-amber bg-amber/10" : "border-white/10 bg-white/5"
-        }`}
-      >
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-xs font-black uppercase text-amber">Minuteur repos</p>
-            <p className="mt-1 text-4xl font-black tabular-nums text-white">{formatDuration(restTimer.secondsLeft * 1000)}</p>
-            <p className="mt-1 text-sm font-bold text-white/55">Repos conseillé : {currentExercise?.rest ?? "-"}</p>
-          </div>
-          <button
-            className="h-14 rounded-md bg-amber px-4 text-sm font-black text-white shadow-sm"
-            onClick={startRestTimer}
-            type="button"
-          >
-            Lancer repos
-          </button>
-        </div>
-        {restTimer.done ? <p className="mt-3 text-sm font-black text-amber">Repos terminé. Tu peux reprendre.</p> : null}
-        <div className="mt-4 grid grid-cols-4 gap-2">
-          <TimerButton onClick={() => adjustRestTimer(30)}>+30 s</TimerButton>
-          <TimerButton onClick={() => adjustRestTimer(-30)}>-30 s</TimerButton>
-          <TimerButton onClick={skipRestTimer}>Passer</TimerButton>
-          <TimerButton onClick={restartRestTimer}>Relancer</TimerButton>
-        </div>
-      </section>
+      <RestTimerCard
+        exerciseId={currentExercise?.id}
+        onBeforeStart={() => {
+          if (currentExercise) setActiveExercise(currentExercise.id);
+        }}
+        restLabel={currentExercise?.rest ?? "-"}
+        restSeconds={currentRestSeconds}
+      />
 
       <section className="card-dark p-4">
         <h2 className="text-lg font-black text-white">Retour exercice</h2>
@@ -1012,6 +888,154 @@ function NumberFeedback({
         value={value}
       />
     </label>
+  );
+}
+
+function SessionElapsedTime({ session }: { session: ActiveSession }) {
+  const [nowMs, setNowMs] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (session.timer.isPaused) {
+      return;
+    }
+
+    const interval = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(interval);
+  }, [session.timer.isPaused, session.timer.pausedTotalMs, session.timer.startedAt]);
+
+  return (
+    <p className="shrink-0 text-sm font-black tabular-nums text-white">
+      {formatDuration(getElapsedMs(session, nowMs))}
+    </p>
+  );
+}
+
+function RestTimerCard({
+  exerciseId,
+  onBeforeStart,
+  restLabel,
+  restSeconds
+}: {
+  exerciseId?: string;
+  onBeforeStart: () => void;
+  restLabel: string;
+  restSeconds: number;
+}) {
+  const [timer, setTimer] = useState<RestTimerState>({
+    done: false,
+    exerciseId,
+    initialSeconds: 0,
+    running: false,
+    secondsLeft: 0
+  });
+
+  useEffect(() => {
+    setTimer({
+      done: false,
+      exerciseId,
+      initialSeconds: 0,
+      running: false,
+      secondsLeft: 0
+    });
+  }, [exerciseId]);
+
+  useEffect(() => {
+    if (!timer.running) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      setTimer((current) => {
+        if (!current.running) return current;
+
+        if (current.secondsLeft <= 1) {
+          return {
+            ...current,
+            done: true,
+            running: false,
+            secondsLeft: 0
+          };
+        }
+
+        return { ...current, secondsLeft: current.secondsLeft - 1 };
+      });
+    }, 1000);
+
+    return () => window.clearInterval(interval);
+  }, [timer.running]);
+
+  const startRestTimer = () => {
+    const seconds = Math.max(0, restSeconds);
+    onBeforeStart();
+    setTimer({
+      done: seconds === 0,
+      exerciseId,
+      initialSeconds: seconds,
+      running: seconds > 0,
+      secondsLeft: seconds
+    });
+  };
+
+  const adjustRestTimer = (delta: number) => {
+    setTimer((current) => ({
+      ...current,
+      done: false,
+      secondsLeft: Math.max(0, current.secondsLeft + delta)
+    }));
+  };
+
+  const skipRestTimer = () => {
+    setTimer((current) => ({
+      ...current,
+      done: false,
+      running: false,
+      secondsLeft: 0
+    }));
+  };
+
+  const restartRestTimer = () => {
+    setTimer((current) => {
+      const seconds = current.initialSeconds || restSeconds;
+
+      return {
+        ...current,
+        done: false,
+        exerciseId,
+        initialSeconds: seconds,
+        running: seconds > 0,
+        secondsLeft: seconds
+      };
+    });
+  };
+
+  return (
+    <section
+      className={`rounded-xl border p-4 shadow-soft ${
+        timer.done ? "border-amber bg-amber/10" : "border-white/10 bg-white/5"
+      }`}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-black uppercase text-amber">Minuteur repos</p>
+          <p className="mt-1 text-4xl font-black tabular-nums text-white">{formatDuration(timer.secondsLeft * 1000)}</p>
+          <p className="mt-1 text-sm font-bold text-white/55">Repos conseille : {restLabel}</p>
+        </div>
+        <button
+          className="h-14 rounded-md bg-amber px-4 text-sm font-black text-white shadow-sm"
+          onClick={startRestTimer}
+          type="button"
+        >
+          Lancer repos
+        </button>
+      </div>
+      {timer.done ? <p className="mt-3 text-sm font-black text-amber">Repos termine. Tu peux reprendre.</p> : null}
+      <div className="mt-4 grid grid-cols-4 gap-2">
+        <TimerButton onClick={() => adjustRestTimer(30)}>+30 s</TimerButton>
+        <TimerButton onClick={() => adjustRestTimer(-30)}>-30 s</TimerButton>
+        <TimerButton onClick={skipRestTimer}>Passer</TimerButton>
+        <TimerButton onClick={restartRestTimer}>Relancer</TimerButton>
+      </div>
+    </section>
   );
 }
 

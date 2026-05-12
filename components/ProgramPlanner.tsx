@@ -1,10 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { PROGRAM_CATALOG } from "@/data/programCatalog";
 import { appendCalibrationEvent, createLoadFeedbackCalibrationEvent } from "@/lib/calibrationEvents";
 import { getProgramDeloadState } from "@/lib/deloadState";
 import { rememberExerciseSwap } from "@/lib/exerciseSwapPreferences";
+import { instantiateProgramTemplate } from "@/lib/programInstantiation";
+import { recommendPrograms } from "@/lib/programRecommendation";
 import { getExerciseLoadInsight } from "@/lib/loadInsights";
 import { applyLoadFeedbackToSettings, tuneExerciseLoad, type LoadFeedback } from "@/lib/loadTuning";
 import { getContextualAlternatives } from "@/lib/alternatives";
@@ -12,7 +16,7 @@ import { normalizeExerciseV2 } from "@/lib/programSchema";
 import { GLOBAL_DELOAD_NOTE } from "@/lib/programAdaptation";
 import { useCoachStorage } from "@/lib/storage";
 import { getTrainingTrendReport } from "@/lib/trainingTrends";
-import type { Exercise, ExerciseSelectionInsight, PlannedSession, UserSettings } from "@/types/training";
+import type { Exercise, ExerciseSelectionInsight, PlannedSession, ProgramRecommendation, ProgramTemplate, UserSettings } from "@/types/training";
 
 const goalLabels: Record<NonNullable<UserSettings["primaryGoal"]>, string> = {
   "perte-gras": "Perte de gras",
@@ -46,11 +50,12 @@ const weekdayLabels: Record<PlannedSession["weekday"], string> = {
 };
 
 export function ProgramPlanner() {
-  const { currentProgram, history, isReady, setCurrentProgram, setSettings, settings, startSession, todaySession } = useCoachStorage();
+  const { activeSession, cancelActiveSession, currentProgram, history, isReady, setCurrentProgram, setSettings, settings, startSession, todaySession } = useCoachStorage();
   const [selectedId, setSelectedId] = useState(todaySession.id);
   const [isEditing, setIsEditing] = useState(false);
   const [draftSession, setDraftSession] = useState<PlannedSession | null>(null);
   const [loadFeedbackMessage, setLoadFeedbackMessage] = useState<string>("");
+  const [programMessage, setProgramMessage] = useState<string>("");
   const router = useRouter();
   const selectedSession = useMemo(
     () => currentProgram.find((session) => session.id === selectedId) ?? todaySession,
@@ -62,6 +67,31 @@ export function ProgramPlanner() {
     setIsEditing(false);
   }, [selectedSession]);
 
+  const todayExternalSports = useMemo(
+    () => getExternalSportsForDay(todaySession, settings),
+    [todaySession, settings]
+  );
+  const selectedExternalSports = useMemo(
+    () => getExternalSportsForDay(selectedSession, settings),
+    [selectedSession, settings]
+  );
+  const sessionExternalSports = useMemo(
+    () => new Map(currentProgram.map((session) => [session.id, getExternalSportsForDay(session, settings)])),
+    [currentProgram, settings]
+  );
+  const basis = useMemo(() => getProgramBasis(settings, currentProgram), [settings, currentProgram]);
+  const deloadState = useMemo(() => getProgramDeloadState(currentProgram, history), [currentProgram, history]);
+  const trendReport = useMemo(
+    () => getTrainingTrendReport(history, currentProgram, settings),
+    [history, currentProgram, settings]
+  );
+  const recommendations = useMemo(() => recommendPrograms(settings), [settings]);
+  const recommendationByProgramId = useMemo(
+    () => new Map(recommendations.map((recommendation) => [recommendation.program.id, recommendation])),
+    [recommendations]
+  );
+  const activeTemplateId = useMemo(() => getActiveTemplateId(currentProgram), [currentProgram]);
+
   if (!isReady) {
     return <div className="rounded-lg bg-white p-5 font-bold shadow-soft">Chargement...</div>;
   }
@@ -69,6 +99,22 @@ export function ProgramPlanner() {
   const startSelectedSession = (session: PlannedSession) => {
     startSession(session);
     router.push("/seance");
+  };
+  const applyProgramTemplate = (template: ProgramTemplate) => {
+    if (activeSession) {
+      cancelActiveSession();
+    }
+
+    const nextProgram = instantiateProgramTemplate(template, settings);
+    setCurrentProgram(nextProgram);
+    setSelectedId(nextProgram[0]?.id ?? todaySession.id);
+    setDraftSession(nextProgram[0] ?? null);
+    setIsEditing(false);
+    setProgramMessage(
+      activeSession
+        ? `${template.name} est maintenant actif. La seance en cours non validee a ete annulee, historique conserve.`
+        : `${template.name} est maintenant ton programme actif. Historique conserve.`
+    );
   };
   const saveDraftSession = () => {
     if (!draftSession) return;
@@ -140,12 +186,6 @@ export function ProgramPlanner() {
           : `${targetExercise.name}: charge reduite et futur calibrage un peu plus prudent.`
     );
   };
-  const todayExternalSports = getExternalSportsForDay(todaySession, settings);
-  const selectedExternalSports = getExternalSportsForDay(selectedSession, settings);
-  const basis = getProgramBasis(settings, currentProgram);
-  const deloadState = getProgramDeloadState(currentProgram, history);
-  const trendReport = getTrainingTrendReport(history, currentProgram, settings);
-
   return (
     <div className="space-y-4">
       <section className="overflow-hidden rounded-2xl border border-white/10 premium-gradient p-5 text-white shadow-soft">
@@ -183,6 +223,14 @@ export function ProgramPlanner() {
         </div>
       </section>
 
+      <ProgramCatalogSection
+        activeTemplateId={activeTemplateId}
+        message={programMessage}
+        onChoose={applyProgramTemplate}
+        recommendationByProgramId={recommendationByProgramId}
+        recommendations={recommendations}
+      />
+
       <ProgramBasisCard items={basis} />
       <DeloadCycleCard state={deloadState} trendDetail={getDeloadTrendDetail(trendReport)} />
 
@@ -204,7 +252,7 @@ export function ProgramPlanner() {
               key={session.id}
               onSelect={() => setSelectedId(session.id)}
               session={session}
-              externalSports={getExternalSportsForDay(session, settings)}
+              externalSports={sessionExternalSports.get(session.id) ?? []}
             />
           ))}
         </div>
@@ -253,6 +301,113 @@ function ProgramBasisCard({ items }: { items: Array<{ label: string; value: stri
         ))}
       </div>
     </details>
+  );
+}
+
+function ProgramCatalogSection({
+  activeTemplateId,
+  message,
+  onChoose,
+  recommendationByProgramId,
+  recommendations
+}: {
+  activeTemplateId?: string;
+  message: string;
+  onChoose: (template: ProgramTemplate) => void;
+  recommendationByProgramId: Map<string, ProgramRecommendation>;
+  recommendations: ProgramRecommendation[];
+}) {
+  return (
+    <section className="card-dark p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-black uppercase text-sky">Bibliotheque</p>
+          <h2 className="mt-1 text-2xl font-black text-white">Programmes disponibles</h2>
+          <p className="mt-1 text-sm font-semibold text-white/55">
+            {PROGRAM_CATALOG.length} programmes prets. Changer de programme conserve ton historique.
+          </p>
+        </div>
+        <span className="rounded-md bg-white/8 px-3 py-2 text-xs font-black text-white/55">
+          {recommendations.length} reco.
+        </span>
+      </div>
+
+      {message ? (
+        <p className="mt-3 rounded-md border border-sky/20 bg-sky/10 px-3 py-2 text-sm font-semibold text-sky">
+          {message}
+        </p>
+      ) : null}
+
+      <div className="mt-4 space-y-3">
+        {PROGRAM_CATALOG.map((program) => {
+          const recommendation = recommendationByProgramId.get(program.id);
+          const isActive = activeTemplateId === program.id;
+
+          return (
+            <ProgramTemplateCard
+              isActive={isActive}
+              key={program.id}
+              onChoose={() => onChoose(program)}
+              program={program}
+              recommendation={recommendation}
+            />
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function ProgramTemplateCard({
+  isActive,
+  onChoose,
+  program,
+  recommendation
+}: {
+  isActive: boolean;
+  onChoose: () => void;
+  program: ProgramTemplate;
+  recommendation?: ProgramRecommendation;
+}) {
+  return (
+    <article className={`rounded-xl border p-3 ${isActive ? "border-sea/40 bg-sea/10" : "border-white/8 bg-white/5"}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap gap-2">
+            {isActive ? <Badge tone="calm">Actif</Badge> : null}
+            {recommendation ? <Badge tone="info">Reco #{recommendation.rank}</Badge> : null}
+            <Badge tone="muted">{program.level}</Badge>
+            <Badge tone="warn">{program.frequency} j/sem.</Badge>
+          </div>
+          <h3 className="mt-2 text-lg font-black leading-tight text-white">{program.name}</h3>
+          <p className="mt-1 text-sm font-semibold leading-relaxed text-white/60">{program.description}</p>
+        </div>
+        <button
+          className={`h-11 shrink-0 rounded-md px-3 text-sm font-black transition ${
+            isActive
+              ? "border border-sea/30 bg-sea/10 text-sea"
+              : "bg-coral text-white hover:bg-coral/90 disabled:bg-white/10 disabled:text-white/35"
+          }`}
+          disabled={isActive}
+          onClick={onChoose}
+          type="button"
+        >
+          {isActive ? "Actif" : "Choisir"}
+        </button>
+      </div>
+
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        <MiniStat label="Objectif" value={program.primaryObjective} />
+        <MiniStat label="Duree" value={program.averageDuration} />
+        <MiniStat label="Seances" value={String(program.sessions.length)} />
+      </div>
+
+      {recommendation?.reasons.length ? (
+        <p className="mt-3 rounded-md bg-sky/10 px-3 py-2 text-xs font-semibold leading-relaxed text-sky">
+          {recommendation.reasons.slice(0, 2).join(" ")}
+        </p>
+      ) : null}
+    </article>
   );
 }
 
@@ -404,6 +559,25 @@ function SessionDetailCard({
     setSwapMessage("");
   }, [session.id]);
 
+  const exerciseInsights = useMemo(
+    () => new Map(session.exercises.map((exercise) => [exercise.id, getExerciseLoadInsight(exercise, settings)])),
+    [session.exercises, settings]
+  );
+  const exerciseAlternatives = useMemo(
+    () =>
+      new Map(
+        session.exercises.map((exercise) => [
+          exercise.id,
+          getContextualAlternatives(exercise.id, exercise, {
+            avoid: settings.avoid,
+            equipment: settings.equipment,
+            watchPoints: settings.watchPoints
+          }).filter((alternative) => alternative.name !== exercise.name)
+        ])
+      ),
+    [session.exercises, settings.avoid, settings.equipment, settings.watchPoints]
+  );
+
   if (isEditing && draftSession) {
     return (
       <SessionEditor
@@ -473,12 +647,8 @@ function SessionDetailCard({
 
       <div className="mt-4 space-y-3">
         {session.exercises.map((exercise, index) => {
-          const loadInsight = getExerciseLoadInsight(exercise, settings);
-          const alternatives = getContextualAlternatives(exercise.id, exercise, {
-            avoid: settings.avoid,
-            equipment: settings.equipment,
-            watchPoints: settings.watchPoints
-          }).filter((alternative) => alternative.name !== exercise.name);
+          const loadInsight = exerciseInsights.get(exercise.id);
+          const alternatives = exerciseAlternatives.get(exercise.id) ?? [];
           const alternativesOpen = expandedExerciseId === exercise.id;
 
           return (
@@ -848,7 +1018,7 @@ function MiniStat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Badge({ children, tone }: { children: string; tone: "calm" | "force" | "info" | "muted" | "warn" }) {
+function Badge({ children, tone }: { children: ReactNode; tone: "calm" | "force" | "info" | "muted" | "warn" }) {
   const toneClass = {
     calm: "bg-sea/10 text-sea",
     force: "bg-coral/10 text-coral",
@@ -965,6 +1135,13 @@ function getProgramBasis(
           : "Estimation prudente"
     }
   ];
+}
+
+function getActiveTemplateId(program: PlannedSession[]): string | undefined {
+  const firstId = program[0]?.id;
+  if (!firstId) return undefined;
+  const templateId = firstId.split(":")[0];
+  return PROGRAM_CATALOG.some((template) => template.id === templateId) ? templateId : undefined;
 }
 
 function getDeloadTrendDetail(report: ReturnType<typeof getTrainingTrendReport>): string | undefined {

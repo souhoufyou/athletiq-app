@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { AdaptationExplanationCard } from "@/components/AdaptationExplanation";
 import { estimateCalories } from "@/lib/calories";
 import { formatDateTime } from "@/lib/date";
@@ -35,8 +35,24 @@ export function HistoryList() {
   const { currentProgram, history, isReady, settings } = useCoachStorage();
   const [openAdaptationSessionId, setOpenAdaptationSessionId] = useState<string | null>(null);
   const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set());
-  const exerciseNames = new Map(
-    currentProgram.flatMap((session) => session.exercises.map((exercise) => [exercise.id, exercise.name]))
+  const [showAllHistory, setShowAllHistory] = useState(false);
+  const exerciseNames = useMemo(
+    () => new Map(currentProgram.flatMap((session) => session.exercises.map((exercise) => [exercise.id, exercise.name]))),
+    [currentProgram]
+  );
+  const visibleHistory = useMemo(
+    () => (showAllHistory ? history : history.slice(0, 12)),
+    [history, showAllHistory]
+  );
+  const prBySessionId = useMemo(
+    () =>
+      new Map(
+        visibleHistory.map((session, sessionIndex) => [
+          session.id,
+          detectPRs(session, history.slice(sessionIndex + 1))
+        ])
+      ),
+    [history, visibleHistory]
   );
 
   if (!isReady) {
@@ -56,7 +72,7 @@ export function HistoryList() {
 
   return (
     <div className="space-y-4">
-      {history.map((session) => {
+      {visibleHistory.map((session) => {
         const durationText =
           typeof session.totalDurationMs === "number" ? formatDurationLong(session.totalDurationMs) : undefined;
         const plannedSession = currentProgram.find((s) => s.id === session.sessionId);
@@ -66,9 +82,7 @@ export function HistoryList() {
             : undefined;
         const decisionSummary = countDecisionSummary(session.progressions ?? {});
 
-        const sessionIndex = history.indexOf(session);
-        const previousSessions = history.slice(sessionIndex + 1);
-        const prExerciseIds = detectPRs(session, previousSessions);
+        const prExerciseIds = prBySessionId.get(session.id) ?? new Set<string>();
         const logsExpanded = expandedLogs.has(session.id);
 
         return (
@@ -230,6 +244,15 @@ export function HistoryList() {
           </article>
         );
       })}
+      {!showAllHistory && history.length > visibleHistory.length ? (
+        <button
+          className="h-12 w-full rounded-md border border-white/10 bg-white/8 px-4 font-black text-white/70"
+          onClick={() => setShowAllHistory(true)}
+          type="button"
+        >
+          Afficher les {history.length - visibleHistory.length} seances plus anciennes
+        </button>
+      ) : null}
     </div>
   );
 }

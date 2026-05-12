@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { getAdaptiveSnapshot, type AdaptiveSnapshot } from "@/lib/adaptiveInsights";
 import { estimateCalories } from "@/lib/calories";
@@ -27,16 +28,22 @@ export function Dashboard() {
   const router = useRouter();
   const latest = history[0];
   const activeToday = activeSession?.dateKey === dateKey && activeSession.sessionId === todaySession.id;
-  const weeklySessions = getSessionsThisWeek(history);
-  const cardioDone = countCardioThisWeek(weeklySessions);
-  const lastCompound = getLastCompoundPerformance(history, currentProgram);
-  const todayExternalSports = getTodayExternalSports(settings);
+  const weeklySessions = useMemo(() => getSessionsThisWeek(history), [history]);
+  const cardioDone = useMemo(() => countCardioThisWeek(weeklySessions), [weeklySessions]);
+  const lastCompound = useMemo(() => getLastCompoundPerformance(history, currentProgram), [history, currentProgram]);
+  const todayExternalSports = useMemo(() => getTodayExternalSports(settings), [settings]);
   const hasEveningSport = settings.externalSports.length > 0 || settings.judoDays.length > 0;
   const eveningSportTonight = todayExternalSports.length > 0;
-  const streak = computeStreak(history);
-  const adaptiveSnapshot = getAdaptiveSnapshot(settings, currentProgram, history);
-  const trendReport = getTrainingTrendReport(history, currentProgram, settings);
-  const deloadState = getProgramDeloadState(currentProgram, history);
+  const streak = useMemo(() => computeStreak(history), [history]);
+  const adaptiveSnapshot = useMemo(
+    () => getAdaptiveSnapshot(settings, currentProgram, history),
+    [settings, currentProgram, history]
+  );
+  const trendReport = useMemo(
+    () => getTrainingTrendReport(history, currentProgram, settings),
+    [history, currentProgram, settings]
+  );
+  const deloadState = useMemo(() => getProgramDeloadState(currentProgram, history), [currentProgram, history]);
 
   // Latest session enrichment
   const latestPlanned = latest ? currentProgram.find((s) => s.id === latest.sessionId) : undefined;
@@ -47,12 +54,16 @@ export function Dashboard() {
   const latestDuration = latest?.totalDurationMs ? formatDurationLong(latest.totalDurationMs) : undefined;
 
   // Weekly calorie total
-  const weeklyCalories = weeklySessions.reduce((total, session) => {
-    const planned = currentProgram.find((s) => s.id === session.sessionId);
-    if (!planned || !session.totalDurationMs) return total;
-    const est = estimateCalories(planned.intensity, settings.currentWeightKg, session.totalDurationMs);
-    return total + Math.round((est.low + est.high) / 2);
-  }, 0);
+  const weeklyCalories = useMemo(
+    () =>
+      weeklySessions.reduce((total, session) => {
+        const planned = currentProgram.find((s) => s.id === session.sessionId);
+        if (!planned || !session.totalDurationMs) return total;
+        const est = estimateCalories(planned.intensity, settings.currentWeightKg, session.totalDurationMs);
+        return total + Math.round((est.low + est.high) / 2);
+      }, 0),
+    [currentProgram, settings.currentWeightKg, weeklySessions]
+  );
 
   if (!isReady) {
     return <div className="rounded-lg bg-white p-5 font-bold shadow-soft">Chargement...</div>;

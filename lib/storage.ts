@@ -144,12 +144,35 @@ function readJson<T>(key: string, fallback: T): T {
   }
 }
 
+const serializedStorageCache = new Map<string, string>();
+
 function writeJson<T>(key: string, value: T): void {
   if (typeof window === "undefined") {
     return;
   }
 
-  window.localStorage.setItem(key, JSON.stringify(value));
+  const serialized = JSON.stringify(value);
+
+  if (serializedStorageCache.get(key) === serialized) {
+    return;
+  }
+
+  if (window.localStorage.getItem(key) === serialized) {
+    serializedStorageCache.set(key, serialized);
+    return;
+  }
+
+  window.localStorage.setItem(key, serialized);
+  serializedStorageCache.set(key, serialized);
+}
+
+function removeStoredJson(key: string): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  serializedStorageCache.delete(key);
+  window.localStorage.removeItem(key);
 }
 
 function migrateLegacyDataIfNeeded(): ProfilesState {
@@ -304,11 +327,15 @@ function persistProfilesAndUpdate(nextProfiles: Profile[], nextActiveId: string)
 
 function setActiveSessionStore(updater: (curr: ActiveSession | null) => ActiveSession | null) {
   const next = updater(store.activeSession);
+  if (next === store.activeSession) {
+    return;
+  }
+
   store = { ...store, activeSession: next };
   if (next) {
     writeJson(activeSessionKeyFor(store.activeProfileId), next);
-  } else if (typeof window !== "undefined") {
-    window.localStorage.removeItem(activeSessionKeyFor(store.activeProfileId));
+  } else {
+    removeStoredJson(activeSessionKeyFor(store.activeProfileId));
   }
   emit();
 }
@@ -322,6 +349,10 @@ function setHistoryStore(updater: (curr: CompletedSession[]) => CompletedSession
 
 function setSettingsStore(next: UserSettings) {
   const normalized = normalizeUserSettings(next, defaultSettings);
+  if (JSON.stringify(normalized) === JSON.stringify(store.settings)) {
+    return;
+  }
+
   store = { ...store, settings: normalized };
   writeJson(settingsKeyFor(store.activeProfileId), normalized);
   if (typeof document !== "undefined") {
@@ -347,6 +378,10 @@ function startSessionAction(session: PlannedSession): ActiveSession {
   };
   setActiveSessionStore(() => next);
   return next;
+}
+
+function cancelActiveSessionAction() {
+  setActiveSessionStore(() => null);
 }
 
 function pauseSessionTimerAction() {
@@ -434,13 +469,50 @@ function updateExerciseLogAction(exerciseId: string, patch: Partial<ExerciseLog>
       completedReps: "",
       comment: ""
     };
+    const nextLog = { ...currentLog, ...safePatch, exerciseId };
+    if (JSON.stringify(currentLog) === JSON.stringify(nextLog)) {
+      return current;
+    }
+
     return {
       ...current,
       logs: {
         ...current.logs,
-        [exerciseId]: { ...currentLog, ...safePatch, exerciseId }
+        [exerciseId]: nextLog
       }
     };
+  });
+}
+
+function updateExerciseLogsBatchAction(updates: Array<{ exerciseId: string; patch: Partial<ExerciseLog> }>) {
+  const sanitized = updates.map(({ exerciseId, patch }) => {
+    const safePatch: Partial<ExerciseLog> = { ...patch };
+    delete safePatch.exerciseId;
+    return { exerciseId, patch: safePatch };
+  });
+
+  setActiveSessionStore((current) => {
+    if (!current || sanitized.length === 0) return current;
+
+    const logs = { ...current.logs };
+    let changed = false;
+
+    for (const { exerciseId, patch } of sanitized) {
+      const currentLog = logs[exerciseId] ?? {
+        exerciseId,
+        usedLoad: "",
+        completedReps: "",
+        comment: ""
+      };
+      const nextLog = { ...currentLog, ...patch, exerciseId };
+
+      if (JSON.stringify(currentLog) !== JSON.stringify(nextLog)) {
+        logs[exerciseId] = nextLog;
+        changed = true;
+      }
+    }
+
+    return changed ? { ...current, logs } : current;
   });
 }
 
@@ -562,9 +634,7 @@ function completeSessionAction(session: PlannedSession): CompletedSession | unde
   writeJson(historyKeyFor(store.activeProfileId), nextHistory);
   writeJson(settingsKeyFor(store.activeProfileId), nextSettings);
   writeJson(programKeyFor(store.activeProfileId), nextProgram);
-  if (typeof window !== "undefined") {
-    window.localStorage.removeItem(activeSessionKeyFor(store.activeProfileId));
-  }
+  removeStoredJson(activeSessionKeyFor(store.activeProfileId));
   emit();
 
   return completed;
@@ -595,6 +665,10 @@ function completeOnboardingAction(next: UserSettings) {
  */
 function regenerateProgramAction() {
   const program = normalizeProgramV2(buildProgram(store.settings));
+  if (JSON.stringify(program) === JSON.stringify(store.currentProgram)) {
+    return;
+  }
+
   writeJson(programKeyFor(store.activeProfileId), program);
   store = { ...store, currentProgram: program };
   emit();
@@ -602,6 +676,10 @@ function regenerateProgramAction() {
 
 function setCurrentProgramAction(program: PlannedSession[]) {
   const normalized = normalizeProgramV2(program);
+  if (JSON.stringify(normalized) === JSON.stringify(store.currentProgram)) {
+    return;
+  }
+
   writeJson(programKeyFor(store.activeProfileId), normalized);
   store = { ...store, currentProgram: normalized };
   emit();
@@ -679,13 +757,11 @@ function deleteProfileAction(profileId: string) {
   const remaining = store.profiles.filter((p) => p.id !== profileId);
   const nextActive = store.activeProfileId === profileId ? remaining[0].id : store.activeProfileId;
 
-  if (typeof window !== "undefined") {
-    window.localStorage.removeItem(activeSessionKeyFor(profileId));
-    window.localStorage.removeItem(historyKeyFor(profileId));
-    window.localStorage.removeItem(programKeyFor(profileId));
-    window.localStorage.removeItem(settingsKeyFor(profileId));
-    window.localStorage.removeItem(onboardingKeyFor(profileId));
-  }
+  removeStoredJson(activeSessionKeyFor(profileId));
+  removeStoredJson(historyKeyFor(profileId));
+  removeStoredJson(programKeyFor(profileId));
+  removeStoredJson(settingsKeyFor(profileId));
+  removeStoredJson(onboardingKeyFor(profileId));
 
   writeJson<ProfilesState>(PROFILES_KEY, { profiles: remaining, activeProfileId: nextActive });
 
@@ -698,13 +774,11 @@ function deleteProfileAction(profileId: string) {
 
 function resetAllAction() {
   const profileId = store.activeProfileId;
-  if (typeof window !== "undefined") {
-    window.localStorage.removeItem(activeSessionKeyFor(profileId));
-    window.localStorage.removeItem(historyKeyFor(profileId));
-    window.localStorage.removeItem(programKeyFor(profileId));
-    window.localStorage.removeItem(settingsKeyFor(profileId));
-    window.localStorage.removeItem(onboardingKeyFor(profileId));
-  }
+  removeStoredJson(activeSessionKeyFor(profileId));
+  removeStoredJson(historyKeyFor(profileId));
+  removeStoredJson(programKeyFor(profileId));
+  removeStoredJson(settingsKeyFor(profileId));
+  removeStoredJson(onboardingKeyFor(profileId));
   store = {
     ...store,
     activeSession: null,
@@ -759,6 +833,7 @@ export function useCoachStorage() {
     activeProfileId,
     activeSession,
     attachAiCoachResponse: attachAiCoachResponseAction,
+    cancelActiveSession: cancelActiveSessionAction,
     clearReplacement: clearReplacementAction,
     completeOnboarding: completeOnboardingAction,
     completeSession,
@@ -786,6 +861,7 @@ export function useCoachStorage() {
     todaySession,
     todaysCompletedSession,
     updateExerciseLog: updateExerciseLogAction,
+    updateExerciseLogsBatch: updateExerciseLogsBatchAction,
     updateSessionFeedback: updateSessionFeedbackAction
   };
 }
