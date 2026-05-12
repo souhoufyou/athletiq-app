@@ -9,6 +9,7 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "node scripts/run-tests.mjs",
+    "test:run": "node scripts/run-tests.mjs",
     "test:unit": "node scripts/run-tests.mjs"
   },
   "dependencies": {

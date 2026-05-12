@@ -370,6 +370,117 @@ export type WeightEntry = {
   kg: number;
 };
 
+export type ProgramLevel = "debutant" | "intermediaire" | "avance";
+
+export type ProgramObjective =
+  | PrimaryGoal
+  | "force"
+  | "cardio-sante"
+  | "judo"
+  | "fessiers"
+  | "post-partum";
+
+export type ProgramTag =
+  | "cardio"
+  | "debutant"
+  | "fessiers"
+  | "force"
+  | "femme"
+  | "homme"
+  | "judo"
+  | "machines"
+  | "perte-gras"
+  | "post-partum"
+  | "prise-masse"
+  | "recomposition"
+  | "sante";
+
+export type ProgramProgressionRules = {
+  loadStepKg?: {
+    compoundUpper?: number;
+    compoundLower?: number;
+    isolation?: number;
+    machineUpper?: number;
+    machineLower?: number;
+  };
+  method:
+    | "double-progression"
+    | "linear-load"
+    | "rep-first"
+    | "technique-first";
+  notes?: string[];
+};
+
+export type CardioProgressionRules = {
+  allowedModalities: string[];
+  method: "duration-first" | "incline-first" | "intensity-first";
+  maxSingleChange?: "duration" | "incline" | "speed" | "resistance";
+  notes?: string[];
+};
+
+export type ReplacementRules = {
+  avoidPatterns?: MovementPattern[];
+  preferEquipment?: Equipment[];
+  rules?: string[];
+};
+
+export type ProgramGuardrails = {
+  contraindications: string[];
+  deloadEveryWeeks?: number;
+  notes?: string[];
+  painRules?: string[];
+};
+
+export type ProgramSessionTemplate = {
+  id: string;
+  weekday?: Weekday;
+  scheduleLabel?: string;
+  title: string;
+  focus: string;
+  duration: string;
+  intensity: PlannedSession["intensity"];
+  phase?: TrainingPhase;
+  notes?: string[];
+  exercises: Exercise[];
+};
+
+export type ProgramTemplate = {
+  id: string;
+  name: string;
+  description: string;
+  level: ProgramLevel;
+  primaryObjective: ProgramObjective;
+  secondaryObjectives: ProgramObjective[];
+  frequency: 3 | 4 | 5 | 6;
+  averageDuration: string;
+  requiredEquipment: Equipment[];
+  contraindications: string[];
+  tags: ProgramTag[];
+  weeklyStructure: string[];
+  sessions: ProgramSessionTemplate[];
+  progressionRules: ProgramProgressionRules;
+  cardioRules?: CardioProgressionRules;
+  replacementRules?: ReplacementRules;
+  guardrails: ProgramGuardrails;
+};
+
+export type ProgramRecommendation = {
+  program: ProgramTemplate;
+  score: number;
+  rank: number;
+  reasons: string[];
+  warnings: string[];
+};
+
+export type ActiveProgramMeta = {
+  programId: string;
+  programName: string;
+  selectedAt: string;
+  source: "manual" | "onboarding" | "preset" | "recommended";
+  profileId?: string;
+  templateVersion?: number;
+};
+
 export type Profile = {
   id: string;
   name: string;

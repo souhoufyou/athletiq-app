@@ -1,35 +1,27 @@
 import type { Metadata, Viewport } from "next";
+import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "StockFlash",
-  description: "Gérez votre stock simplement.",
-  manifest: "/manifest.webmanifest",
-  appleWebApp: {
-    capable: true,
-    title: "StockFlash",
-    statusBarStyle: "black-translucent",
-  },
+  title: "AthletIQ IA",
+  description: "Ton coach adaptatif intelligent. Progression personnalisee, guardrails de securite, analyse de seances.",
   icons: {
-    icon: [
-      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
-      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
-    ],
-    apple: [
-      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
-    ],
-  },
+    apple: "/brand/athletiq-icon.svg",
+    icon: "/brand/athletiq-icon.svg"
+  }
 };
 
 export const viewport: Viewport = {
-  themeColor: "#FF8A00",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  themeColor: "#ff5a00"
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children
+}: Readonly<{
+  children: ReactNode;
+}>) {
   return (
     <html lang="fr">
       <body>{children}</body>
