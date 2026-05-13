@@ -71,7 +71,6 @@ export function ProgramPlanner() {
     () => currentProgram.find((session) => session.id === selectedId) ?? todaySession,
     [currentProgram, selectedId, todaySession]
   );
-  const todayExternalSports = useMemo(() => getExternalSportsForDay(todaySession, settings), [todaySession, settings]);
   const activeProgram = useMemo(() => getActiveProgramTemplate(currentProgram), [currentProgram]);
   const activeTemplateId = useMemo(() => getActiveProgramTemplateId(currentProgram), [currentProgram]);
   const recommendations = useMemo(() => recommendPrograms(settings), [settings]);
@@ -113,65 +112,60 @@ export function ProgramPlanner() {
 
   return (
     <div className="space-y-4">
-      <section className="overflow-hidden rounded-[28px] border border-white/10 premium-gradient p-5 text-white shadow-soft">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-sky">Programme actif</p>
-            <h1 className="mt-2 text-4xl font-black leading-none">
-              {activeProgram?.name ?? "Programme personnalise"}
-            </h1>
-          </div>
-          <span className="rounded-full border border-white/10 bg-black/25 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-white backdrop-blur">
-            {activeProgram?.level ?? "Perso"}
-          </span>
-        </div>
-        <p className="mt-3 text-sm font-semibold text-white/72">
-          {activeProgram?.description ?? "Plan actif genere a partir de ton profil et de tes reglages."}
-        </p>
-
-        <div className="mt-5 grid grid-cols-3 gap-2">
-          <HeroTile label="Objectif" value={formatProgramObjective(activeProgram?.primaryObjective, settings)} />
-          <HeroTile label="Frequence" value={activeProgram ? `${activeProgram.frequency} j/sem.` : `${currentProgram.length} j/sem.`} />
-          <HeroTile label="Duree" value={activeProgram?.averageDuration ?? todaySession.duration} />
-        </div>
-
-        <div className="mt-5 rounded-[22px] border border-white/10 bg-[#0b0d14]/80 p-4 backdrop-blur">
+      <section className="relative -mx-4 overflow-hidden border-b border-white/10 bg-[#050607] p-5 text-white shadow-[0_30px_90px_rgba(0,0,0,0.55)] sm:-mx-6 sm:px-6">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_88%_0%,rgba(255,90,0,0.54),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.08),transparent_40%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.08)_0_1px,transparent_1px_18px)] opacity-35" />
+        <div className="relative">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-xs font-black uppercase tracking-[0.2em] text-sky">Seance du jour</p>
-              <h2 className="mt-2 text-2xl font-black">
-                {todaySession.title}
-              </h2>
-              <p className="mt-1 text-sm font-semibold text-white/70">{todaySession.focus}</p>
+              <p className="text-xs font-black uppercase tracking-[0.28em] text-coral">Programme OS</p>
+              <h1 className="mt-3 text-5xl font-black leading-[0.86] tracking-normal text-white">
+                {activeProgram?.name ?? "Programme personnalise"}
+              </h1>
+              <p className="mt-4 max-w-[23rem] text-sm font-semibold leading-relaxed text-white/68">
+                {activeProgram?.description ?? "Plan actif genere a partir de ton profil et de tes reglages."}
+              </p>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-white/8 px-4 py-3 text-center">
-              <p className="text-xl font-black">{todaySession.exercises.length}</p>
-              <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-white/50">Exercices</p>
-            </div>
-          </div>
-
-          <div className="mt-4 flex flex-wrap gap-2 text-xs font-black text-white/75">
-            <span className="rounded-full bg-white/10 px-3 py-1.5">{todaySession.duration}</span>
-            <span className="rounded-full bg-white/10 px-3 py-1.5">
-              {todayExternalSports.length ? todayExternalSports.join(" + ") : "Pas d'autre sport"}
+            <span className="shrink-0 rounded-[1.3rem] border border-coral/35 bg-coral/15 px-4 py-3 text-xs font-black uppercase tracking-[0.18em] text-coral">
+              {activeProgram?.level ?? "Perso"}
             </span>
           </div>
 
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            <button
-              className="h-12 rounded-xl border border-white/15 bg-white/10 px-3 font-black text-white"
-              onClick={() => setSelectedId(todaySession.id)}
-              type="button"
-            >
-              Voir la semaine
-            </button>
-            <button
-              className="h-12 rounded-xl bg-coral px-3 font-black text-white shadow-sm"
-              onClick={() => startSelectedSession(todaySession)}
-              type="button"
-            >
-              Commencer
-            </button>
+          <div className="mt-6 grid grid-cols-3 gap-2">
+            <HeroTile label="Objectif" value={formatProgramObjective(activeProgram?.primaryObjective, settings)} />
+            <HeroTile label="Frequence" value={activeProgram ? `${activeProgram.frequency} j/sem.` : `${currentProgram.length} j/sem.`} />
+            <HeroTile label="Duree" value={activeProgram?.averageDuration ?? todaySession.duration} />
+          </div>
+
+          <div className="mt-5 rounded-[2rem] border border-white/12 bg-[#080a0f]/88 p-4 backdrop-blur-xl">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-xs font-black uppercase tracking-[0.22em] text-coral">Bloc a executer</p>
+                <h2 className="mt-2 text-3xl font-black leading-tight">{todaySession.title}</h2>
+                <p className="mt-2 text-sm font-semibold text-white/65">{todaySession.focus}</p>
+              </div>
+              <div className="rounded-[1.25rem] border border-white/10 bg-white/8 px-4 py-3 text-center">
+                <p className="text-2xl font-black">{todaySession.exercises.length}</p>
+                <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-white/50">exos</p>
+              </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <button
+                className="h-14 rounded-[1.25rem] border border-white/15 bg-white/10 px-3 font-black text-white"
+                onClick={() => setSelectedId(todaySession.id)}
+                type="button"
+              >
+                Voir la semaine
+              </button>
+              <button
+                className="h-14 rounded-[1.25rem] bg-coral px-3 font-black text-white shadow-[0_18px_45px_rgba(255,90,0,0.28)]"
+                onClick={() => startSelectedSession(todaySession)}
+                type="button"
+              >
+                Commencer
+              </button>
+            </div>
           </div>
         </div>
       </section>
@@ -585,6 +579,8 @@ function getExternalSportsForDay(session: PlannedSession, settings: UserSettings
 
   return names;
 }
+
+void getExternalSportsForDay;
 
 function isCardioSession(session: PlannedSession) {
   return /cardio|tapis|marche|rameur|stairmaster|intervalles|zone 2/i.test(

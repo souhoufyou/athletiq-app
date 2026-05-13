@@ -85,12 +85,15 @@ export function PerformanceDashboard() {
 
   if (history.length === 0) {
     return (
-      <section className="card-dark p-5">
+      <section className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#11131a] p-5 text-white shadow-soft">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_90%_0%,rgba(255,91,0,0.28),transparent_32%)]" />
+        <div className="relative">
         <p className="text-sm font-black uppercase text-sky">Mes performances</p>
         <h2 className="mt-1 text-2xl font-black text-white">Fais ta première séance pour générer tes performances.</h2>
         <p className="mt-2 text-sm font-semibold text-white/55">
           Les records, volumes, tendances et prochaines cibles seront calculés depuis ton historique local.
         </p>
+        </div>
       </section>
     );
   }
@@ -99,7 +102,38 @@ export function PerformanceDashboard() {
 
   return (
     <div className="space-y-4">
-      <section className="overflow-hidden rounded-2xl border border-white/10 premium-gradient p-5 text-white shadow-soft">
+      <section className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#11131a] p-5 text-white shadow-soft">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_90%_0%,rgba(255,91,0,0.32),transparent_34%),linear-gradient(135deg,rgba(255,255,255,0.08),transparent_46%)]" />
+        <div className="relative">
+          <p className="text-xs font-black uppercase tracking-[0.2em] text-coral">Vue athlete</p>
+          <div className="mt-2 flex items-end justify-between gap-3">
+            <div>
+              <h2 className="text-3xl font-black leading-tight">
+                {bench?.trend === "progresse" ? "Progression visible" : "Command center"}
+              </h2>
+              <p className="mt-2 text-sm font-semibold text-white/55">
+                {settings.athleteName} - {settings.mainGoal}
+              </p>
+            </div>
+            <div className="shrink-0 text-right">
+              <p className="text-4xl font-black leading-none text-coral">{dashboard.summary.sessions}</p>
+              <p className="text-[10px] font-black uppercase text-white/45">seances</p>
+            </div>
+          </div>
+          <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <HeroMetric label="Bench" value={bench?.latest ?? "-"} />
+            <HeroMetric label="Record" value={bench?.best ?? "127 kg x 1"} />
+            <HeroMetric label="Volume total" value={formatCompactNumber(dashboard.summary.totalVolumeKg)} />
+            <HeroMetric label="Cardio" value={`${dashboard.summary.cardioSessions}`} />
+          </div>
+          <div className="mt-3 rounded-2xl border border-coral/20 bg-coral/10 p-3">
+            <p className="text-xs font-black uppercase text-coral">Prochaine cible</p>
+            <p className="mt-1 text-sm font-black text-white">{bench?.nextTarget ?? dashboard.nextTargets[0] ?? "Valider 2 seances pour calibrer les cibles."}</p>
+          </div>
+        </div>
+      </section>
+
+      <section className="hidden">
         <p className="text-sm font-black uppercase text-sky">Vue athlète</p>
         <h2 className="mt-1 text-3xl font-black leading-tight">
           {bench?.trend === "progresse" ? "Tu avances" : "Repères principaux"}
@@ -345,6 +379,7 @@ function TrendBadge({ trend }: { trend: ExercisePerformance["trend"] }) {
 
 function buildPerformanceDashboard(history: CompletedSession[], program: PlannedSession[]) {
   const performances = performanceDefinitions.map((definition) => buildExercisePerformance(definition, history, program));
+  const summary = buildPerformanceSummary(history);
   const watchItems = buildWatchItems(history, performances);
   const topProgressions = performances
     .filter((performance) => performance.recentDelta > 0)
@@ -358,9 +393,30 @@ function buildPerformanceDashboard(history: CompletedSession[], program: Planned
       .slice(0, 5)
       .map((performance) => `${performance.definition.label} : ${performance.nextTarget}`),
     performances,
+    summary,
     topProgressions,
     watchItems
   };
+}
+
+function buildPerformanceSummary(history: CompletedSession[]) {
+  return history.reduce(
+    (summary, session) => {
+      summary.sessions += 1;
+      if (Object.values(session.logs).some((log) => /tapis|cardio|rameur|stairmaster|velo|elliptique/i.test(`${log.exerciseId} ${log.comment}`))) {
+        summary.cardioSessions += 1;
+      }
+      for (const log of Object.values(session.logs)) {
+        const load = parseKg(log.usedLoad);
+        const reps = parseReps(log.completedReps).total;
+        if (load !== undefined && reps > 0) {
+          summary.totalVolumeKg += load * reps;
+        }
+      }
+      return summary;
+    },
+    { cardioSessions: 0, sessions: 0, totalVolumeKg: 0 }
+  );
 }
 
 function buildExercisePerformance(
@@ -581,6 +637,18 @@ function formatCardioMetrics(metrics?: CardioMetrics) {
 
 function formatVolume(value?: number) {
   return value ? `${Math.round(value)} kg` : "Non calculable";
+}
+
+function formatCompactNumber(value: number) {
+  if (!value) {
+    return "-";
+  }
+
+  if (value >= 1000) {
+    return `${Math.round(value / 100) / 10}k kg`;
+  }
+
+  return `${Math.round(value)} kg`;
 }
 
 function formatJournalDate(value: string) {

@@ -23,7 +23,8 @@ import type {
   CompletedSession,
   EffortStatus,
   ExerciseSelectionInsight,
-  ExerciseLog
+  ExerciseLog,
+  PlannedSession
 } from "@/types/training";
 
 type RestTimerState = {
@@ -206,6 +207,29 @@ export function SessionRunner() {
 
     return (
       <div className="space-y-5">
+        <section className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#11131a] p-5 text-white shadow-soft">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_5%,rgba(255,91,0,0.34),transparent_34%),linear-gradient(135deg,rgba(255,255,255,0.08),transparent_44%)]" />
+          <div className="relative">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-xs font-black uppercase tracking-[0.22em] text-coral">Mode seance</p>
+                <h1 className="mt-2 text-3xl font-black leading-[0.95] text-white">{todaySession.title}</h1>
+                <p className="mt-2 text-sm font-semibold leading-relaxed text-white/60">
+                  {activeProgram?.name ?? "Programme actif"} - {todaySession.focus}
+                </p>
+              </div>
+              <span className="shrink-0 rounded-2xl border border-coral/30 bg-coral/15 px-3 py-2 text-sm font-black text-coral">
+                Aujourd&apos;hui
+              </span>
+            </div>
+
+            <div className="mt-5 grid grid-cols-3 gap-2">
+              <LaunchMetric label="Duree" value={todaySession.duration} />
+              <LaunchMetric label="Exercices" value={String(todaySession.exercises.length)} />
+              <LaunchMetric label="Intensite" value={todaySession.intensity} />
+            </div>
+          </div>
+        </section>
         {summarySession?.progressions ? (
           <GuidedSessionReport
             aiEnabled={settings.aiEnabled}
@@ -225,7 +249,7 @@ export function SessionRunner() {
           </div>
         ) : null}
         <button
-          className="h-16 w-full rounded-md bg-coral px-4 text-lg font-black text-white shadow-soft transition hover:bg-coral/90"
+          className="h-16 w-full rounded-2xl bg-coral px-4 text-lg font-black text-white shadow-[0_18px_45px_rgba(255,91,0,0.32)] transition hover:bg-coral/90"
           onClick={() => {
             setLastSummary(null);
             setAiStatus("");
@@ -235,6 +259,35 @@ export function SessionRunner() {
         >
           Commencer la séance guidée
         </button>
+        <section className="card-dark p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-black uppercase text-white/40">Plan du jour</p>
+              <h2 className="mt-1 text-xl font-black text-white">Ce que tu vas faire</h2>
+            </div>
+            <Link
+              className="rounded-xl border border-white/10 bg-white/8 px-3 py-2 text-xs font-black text-white/70"
+              href="/programme"
+            >
+              Programme
+            </Link>
+          </div>
+          <div className="mt-4 space-y-2">
+            {todaySession.exercises.slice(0, 6).map((exercise, index) => (
+              <div className="flex items-center gap-3 rounded-2xl border border-white/8 bg-white/5 p-3" key={exercise.id}>
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-coral/15 text-sm font-black text-coral">
+                  {index + 1}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-black text-white">{exercise.name}</p>
+                  <p className="text-xs font-semibold text-white/45">
+                    {exercise.plannedLoad ? `${exercise.plannedLoad} - ` : ""}{exercise.target}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
         <Link
           className="block h-12 rounded-md border border-white/10 bg-white/8 px-4 py-3 text-center font-black text-white"
           href="/"
@@ -385,7 +438,18 @@ export function SessionRunner() {
         </div>
       </section>
 
-      <section className="card-dark p-3">
+      <SessionCockpitCard
+        active={active}
+        completedCount={completedCount}
+        currentIndex={currentIndex}
+        currentSession={currentSession}
+        onMarkAllOk={markAllOk}
+        programName={activeProgram?.name ?? "Programme personnalise"}
+        programMeta={activeProgram ? `${activeProgram.frequency} j/sem. - ${activeProgram.averageDuration}` : `${currentProgram.length} jours actifs`}
+        progressPercent={progressPercent}
+      />
+
+      <section className="hidden">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="text-xs font-black uppercase text-sky">Séance guidée</p>
@@ -401,20 +465,18 @@ export function SessionRunner() {
         </div>
       </section>
 
-      <SessionProgramCard
-        programName={activeProgram?.name ?? "Programme personnalise"}
-        programMeta={activeProgram ? `${activeProgram.frequency} j/sem. - ${activeProgram.averageDuration}` : `${currentProgram.length} jours actifs`}
-      />
-
       {finishWarning ? (
         <div className="rounded-xl border border-coral/20 bg-coral/10 p-4 text-sm font-black leading-relaxed text-coral shadow-soft">
           {finishWarning}
         </div>
       ) : null}
 
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.18fr)_minmax(24rem,0.82fr)] xl:items-start">
+        <div className="space-y-4">
       {effectiveExercise ? (
         <>
-          <section className="rounded-2xl bg-ink p-5 text-white shadow-soft">
+          <section className="relative overflow-hidden rounded-[28px] border border-white/10 bg-ink p-5 text-white shadow-soft">
+            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-coral via-amber to-sky" />
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm font-black uppercase text-sky">
@@ -553,7 +615,9 @@ export function SessionRunner() {
           ) : null}
         </>
       ) : null}
+        </div>
 
+        <aside className="space-y-4 xl:sticky xl:top-32">
       <RestTimerCard
         exerciseId={currentExercise?.id}
         onBeforeStart={() => {
@@ -563,7 +627,8 @@ export function SessionRunner() {
         restSeconds={currentRestSeconds}
       />
 
-      <section className="card-dark p-4">
+      <section className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#11131a] p-4 shadow-soft">
+        <div className="absolute inset-x-0 top-0 h-1 bg-coral" />
         <h2 className="text-lg font-black text-white">Action rapide</h2>
         <p className="mt-1 text-sm font-semibold text-white/55">
           Donne ton retour principal, puis passe a l&apos;exercice suivant.
@@ -576,7 +641,7 @@ export function SessionRunner() {
 
               return (
                 <button
-                  className={`min-h-14 rounded-md border px-3 text-base font-black transition ${
+                  className={`min-h-16 rounded-2xl border px-3 text-base font-black transition ${
                     selected ? status.active : status.idle
                   }`}
                   key={status.value}
@@ -590,7 +655,7 @@ export function SessionRunner() {
         </div>
         <div className="mt-3 grid grid-cols-2 gap-2">
           <button
-            className={`h-11 rounded-md border px-4 text-sm font-black transition ${
+            className={`h-12 rounded-2xl border px-4 text-sm font-black transition ${
               showAlternatives
                 ? "border-amber bg-amber/20 text-amber"
                 : "border-amber/30 bg-amber/10 text-amber hover:bg-amber/20"
@@ -601,7 +666,7 @@ export function SessionRunner() {
             {showAlternatives ? "Fermer remplacement" : "Remplacer"}
           </button>
           <button
-            className={`h-11 rounded-md border px-4 text-sm font-black transition ${
+            className={`h-12 rounded-2xl border px-4 text-sm font-black transition ${
               currentLog.status === "skipped"
                 ? "border-zinc-500 bg-zinc-600 text-white"
                 : "border-white/10 bg-white/8 text-white/70"
@@ -762,6 +827,8 @@ export function SessionRunner() {
           </label>
         </div>
       </details>
+        </aside>
+      </div>
 
       <nav className="sticky bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-10 -mx-2 rounded-2xl border border-white/10 bg-[#0f111a]/95 p-2 shadow-soft backdrop-blur">
         <div className="grid grid-cols-2 gap-2">
@@ -791,6 +858,95 @@ export function SessionRunner() {
         </div>
       </nav>
     </div>
+  );
+}
+
+function LaunchMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/10 p-3 text-center">
+      <p className="text-lg font-black leading-tight text-white">{value}</p>
+      <p className="mt-1 text-[10px] font-black uppercase text-white/55">{label}</p>
+    </div>
+  );
+}
+
+function SessionCockpitCard({
+  active,
+  completedCount,
+  currentIndex,
+  currentSession,
+  onMarkAllOk,
+  programMeta,
+  programName,
+  progressPercent
+}: {
+  active: ActiveSession;
+  completedCount: number;
+  currentIndex: number;
+  currentSession: PlannedSession;
+  onMarkAllOk: () => void;
+  programMeta: string;
+  programName: string;
+  progressPercent: number;
+}) {
+  return (
+    <section className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#11131a] p-4 text-white shadow-soft">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_88%_0%,rgba(255,91,0,0.28),transparent_32%),linear-gradient(135deg,rgba(255,255,255,0.08),transparent_45%)]" />
+      <div className="relative">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-coral">Training cockpit</p>
+            <h2 className="mt-1 truncate text-2xl font-black text-white">{currentSession.title}</h2>
+            <p className="mt-1 truncate text-sm font-semibold text-white/55">{programName} - {programMeta}</p>
+          </div>
+          <div className="shrink-0 text-right">
+            <p className="text-4xl font-black leading-none text-coral">{progressPercent}%</p>
+            <p className="text-[10px] font-black uppercase text-white/45">complete</p>
+          </div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-3 gap-2">
+          <LaunchMetric label="Faits" value={`${completedCount}/${currentSession.exercises.length}`} />
+          <LaunchMetric label="Actuel" value={`${currentIndex + 1}`} />
+          <div className="rounded-2xl border border-white/10 bg-white/10 p-3 text-center">
+            <SessionElapsedTime session={active} />
+            <p className="mt-1 text-[10px] font-black uppercase text-white/55">chrono</p>
+          </div>
+        </div>
+
+        <div className="mt-4 flex gap-1.5 overflow-x-auto pb-1">
+          {currentSession.exercises.map((exercise, index) => {
+            const status = active.logs[exercise.id]?.status;
+            const isCurrent = index === currentIndex;
+            const isDone = Boolean(status);
+
+            return (
+              <span
+                className={`flex h-9 min-w-9 items-center justify-center rounded-xl border text-xs font-black ${
+                  isCurrent
+                    ? "border-coral bg-coral text-white"
+                    : isDone
+                      ? "border-sea/30 bg-sea/15 text-sea"
+                      : "border-white/10 bg-white/5 text-white/45"
+                }`}
+                key={exercise.id}
+                title={exercise.name}
+              >
+                {index + 1}
+              </span>
+            );
+          })}
+        </div>
+
+        <button
+          className="mt-4 h-11 w-full rounded-2xl border border-sea/25 bg-sea/15 px-3 text-sm font-black text-sea transition hover:bg-sea/20"
+          onClick={onMarkAllOk}
+          type="button"
+        >
+          Tout marquer OK
+        </button>
+      </div>
+    </section>
   );
 }
 
@@ -843,6 +999,8 @@ function SessionProgramCard({
     </section>
   );
 }
+
+void SessionProgramCard;
 
 function SelectionInsightCard({ insight }: { insight: ExerciseSelectionInsight }) {
   return (

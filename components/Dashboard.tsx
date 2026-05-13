@@ -55,71 +55,89 @@ export function Dashboard() {
 
   return (
     <div className="space-y-4">
-      <section className="overflow-hidden rounded-[28px] border border-white/10 premium-gradient text-white shadow-soft">
+      <section className="relative -mx-4 overflow-hidden border-b border-white/10 bg-[#050607] text-white shadow-[0_30px_90px_rgba(0,0,0,0.55)] sm:-mx-6">
         <div
-          className="relative h-[16.5rem] w-full bg-cover bg-center"
+          className="absolute inset-0 bg-cover bg-center opacity-72"
           style={{ backgroundImage: `url(${getSessionImage(todaySession.title, todaySession.focus)})` }}
-        >
-          <div className="absolute inset-0 bg-gradient-to-br from-[#090b12]/96 via-[#0f111a]/72 to-[#ff6a1a]/28" />
-          <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.08)_0%,rgba(255,255,255,0)_32%,rgba(255,255,255,0)_100%)]" />
-          <div className="absolute inset-x-0 top-0 flex items-start justify-between p-5">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.2em] text-white/55">Accueil coach</p>
-              <h1 className="mt-2 text-3xl font-black leading-none">Salut {settings.athleteName}</h1>
-              <p className="mt-2 text-sm font-semibold text-white/72">{mainGoal}</p>
+        />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_88%_5%,rgba(255,90,0,0.58),transparent_34%),linear-gradient(180deg,rgba(3,4,6,0.70),rgba(3,4,6,0.98)_76%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.12)_0_1px,transparent_1px_18px)] opacity-35" />
+
+        <div className="relative px-4 pb-5 pt-6 sm:px-6">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs font-black uppercase tracking-[0.28em] text-coral">AthletIQ Coach OS 2.0</p>
+              <h1 className="mt-3 text-5xl font-black leading-[0.86] tracking-normal text-white">
+                {settings.athleteName || "Athlete"}
+              </h1>
+              <p className="mt-3 max-w-[18rem] text-sm font-semibold leading-relaxed text-white/68">
+                {mainGoal}. Aujourd&apos;hui, l&apos;app te donne une mission claire, pas un tableau complique.
+              </p>
             </div>
-            <span className="rounded-full border border-white/10 bg-black/35 px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-white backdrop-blur">
-              {todayStatus}
-            </span>
+            <div className="shrink-0 rounded-[1.4rem] border border-coral/35 bg-coral/15 px-4 py-3 text-right backdrop-blur">
+              <p className="text-3xl font-black leading-none text-coral">{todayStatus}</p>
+              <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-white/45">statut</p>
+            </div>
           </div>
 
-          <div className="absolute inset-x-0 bottom-0 p-5">
-            <div className="rounded-[24px] border border-white/10 bg-[#0b0d14]/82 p-4 backdrop-blur">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-xs font-black uppercase tracking-[0.2em] text-sky">Aujourd&apos;hui</p>
-                  <h2 className="mt-2 text-3xl font-black leading-tight">{todaySession.title}</h2>
-                  <p className="mt-2 text-sm font-semibold text-white/70">{todaySession.focus}</p>
-                </div>
-                <div className="grid min-w-[7.5rem] gap-2">
-                  <DashboardPill label="Duree" value={todaySession.duration} />
-                  <DashboardPill label="Exercices" value={String(todaySession.exercises.length)} />
-                </div>
+          <div className="mt-8 rounded-[2rem] border border-white/12 bg-[#080a0f]/86 p-4 shadow-[0_22px_70px_rgba(0,0,0,0.55)] backdrop-blur-xl">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-black uppercase tracking-[0.22em] text-coral">Mission du jour</p>
+                <h2 className="mt-2 text-4xl font-black leading-[0.92] text-white">{todaySession.title}</h2>
+                <p className="mt-3 text-sm font-semibold leading-relaxed text-white/65">{todaySession.focus}</p>
+              </div>
+              <div className="grid w-[6.25rem] shrink-0 gap-2">
+                <DashboardPill label="Duree" value={todaySession.duration} />
+                <DashboardPill label="Exos" value={String(todaySession.exercises.length)} />
               </div>
             </div>
+
+            <div className="mt-5 grid grid-cols-[1fr_auto] gap-3">
+              <button
+                className="h-16 rounded-[1.35rem] bg-coral px-4 text-base font-black text-white shadow-[0_18px_46px_rgba(255,90,0,0.34)] transition active:scale-[0.99]"
+                onClick={() => {
+                  if (!activeToday && !todaysCompletedSession) {
+                    startSession(todaySession);
+                  }
+
+                  router.push("/seance");
+                }}
+                type="button"
+              >
+                {ctaLabel}
+              </button>
+              <Link
+                className="flex h-16 w-16 items-center justify-center rounded-[1.35rem] border border-white/12 bg-white/10 text-xl font-black text-white backdrop-blur"
+                href="/programme"
+                title="Voir le programme"
+              >
+                →
+              </Link>
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            <HeroMetric label="Programme" value={activeProgram?.name ?? "Programme perso"} />
+            <HeroMetric label="Semaine" value={`${weeklySessions.length}/${activeProgram?.frequency ?? currentProgram.length}`} />
+            <HeroMetric label="Ce soir" value={hasEveningSport ? (eveningSportTonight ? todayExternalSports.join(" + ") : "Repos") : "Libre"} />
           </div>
         </div>
+      </section>
 
-        <div className="border-t border-white/10 bg-[#0b0d14]/92 p-5">
-          <div className="grid grid-cols-2 gap-2">
-            <Link
-              className="flex h-14 items-center justify-center rounded-xl border border-white/15 bg-white/10 px-4 text-center font-black text-white"
-              href="/programme"
-            >
-              Voir le programme
-            </Link>
-            <button
-              className="h-14 rounded-xl premium-action px-4 font-black transition"
-              onClick={() => {
-                if (!activeToday && !todaysCompletedSession) {
-                  startSession(todaySession);
-                }
-
-                router.push("/seance");
-              }}
-              type="button"
-            >
-              {ctaLabel}
-            </button>
+      <section className="rounded-[28px] border border-white/10 bg-[#10131d] p-4 shadow-soft">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-coral">Coach briefing</p>
+            <h2 className="mt-2 text-2xl font-black text-white">Ce qui compte maintenant</h2>
           </div>
-
-          <div className={`mt-4 grid gap-2 ${hasEveningSport ? "grid-cols-3" : "grid-cols-2"}`}>
-            <HeroMetric label="Programme actif" value={activeProgram?.name ?? "Programme perso"} />
-            <HeroMetric label="Cette semaine" value={`${weeklySessions.length} seance${weeklySessions.length > 1 ? "s" : ""}`} />
-            {hasEveningSport ? (
-              <HeroMetric label="Sport ce soir" value={eveningSportTonight ? todayExternalSports.join(" + ") : "Repos"} />
-            ) : null}
-          </div>
+          <span className="rounded-full bg-white/8 px-3 py-2 text-xs font-black text-white/55">2.0</span>
+        </div>
+        <div className="mt-4 grid gap-2">
+          <CoachBriefLine label="Priorite" value={todaySession.exercises[0]?.name ?? todaySession.title} />
+          <CoachBriefLine label="Charge a suivre" value={lastCompound.value} />
+          <CoachBriefLine label="Cardio semaine" value={cardioDone} />
+          <CoachBriefLine label="Rythme" value={streak > 0 ? `${streak} semaine${streak > 1 ? "s" : ""} active${streak > 1 ? "s" : ""}` : "Relancer la regularite"} />
         </div>
       </section>
 
@@ -217,9 +235,18 @@ function DashboardPill({ label, value }: { label: string; value: string }) {
 
 function HeroMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-white/8 bg-white/[0.04] p-3">
+    <div className="rounded-[1.25rem] border border-white/10 bg-black/35 p-3 backdrop-blur">
       <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/45">{label}</p>
       <p className="mt-2 text-sm font-black leading-tight text-white">{value}</p>
+    </div>
+  );
+}
+
+function CoachBriefLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/8 bg-white/[0.04] px-4 py-3">
+      <p className="text-xs font-black uppercase tracking-[0.18em] text-white/40">{label}</p>
+      <p className="max-w-[62%] text-right text-sm font-black leading-tight text-white">{value}</p>
     </div>
   );
 }

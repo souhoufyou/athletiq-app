@@ -54,6 +54,7 @@ export function HistoryList() {
       ),
     [history, visibleHistory]
   );
+  const historyStats = useMemo(() => buildHistoryStats(history), [history]);
 
   if (!isReady) {
     return <div className="rounded-lg bg-white p-5 font-bold shadow-soft">Chargement...</div>;
@@ -61,17 +62,36 @@ export function HistoryList() {
 
   if (history.length === 0) {
     return (
-      <section className="card-dark p-5">
+      <section className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#11131a] p-5 text-white shadow-soft">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_90%_0%,rgba(255,91,0,0.28),transparent_32%)]" />
+        <div className="relative">
         <h2 className="text-xl font-black text-white">Aucune séance</h2>
         <p className="mt-2 text-sm font-semibold text-white/55">
           Les séances validées apparaîtront ici automatiquement.
         </p>
+        </div>
       </section>
     );
   }
 
   return (
     <div className="space-y-4">
+      <section className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#11131a] p-5 text-white shadow-soft">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_92%_0%,rgba(255,91,0,0.30),transparent_34%),linear-gradient(135deg,rgba(255,255,255,0.07),transparent_45%)]" />
+        <div className="relative">
+          <p className="text-xs font-black uppercase tracking-[0.2em] text-coral">Historique</p>
+          <h1 className="mt-2 text-3xl font-black leading-tight text-white">Timeline entrainement</h1>
+          <p className="mt-2 text-sm font-semibold text-white/55">
+            Derniere seance : {historyStats.lastTitle}
+          </p>
+          <div className="mt-5 grid grid-cols-4 gap-2">
+            <HistoryMetric label="Seances" value={String(historyStats.sessions)} />
+            <HistoryMetric label="Exos notes" value={String(historyStats.loggedExercises)} />
+            <HistoryMetric label="Difficulte" value={historyStats.avgDifficulty} />
+            <HistoryMetric label="Temps" value={historyStats.totalDuration} />
+          </div>
+        </div>
+      </section>
       {visibleHistory.map((session) => {
         const durationText =
           typeof session.totalDurationMs === "number" ? formatDurationLong(session.totalDurationMs) : undefined;
@@ -86,7 +106,8 @@ export function HistoryList() {
         const logsExpanded = expandedLogs.has(session.id);
 
         return (
-          <article className="card-dark p-4" key={session.id}>
+          <article className="relative overflow-hidden rounded-[24px] border border-white/10 bg-[#11131a]/92 p-4 pl-5 shadow-soft" key={session.id}>
+            <div className="absolute left-0 top-0 h-full w-1 bg-gradient-to-b from-coral via-amber to-sky" />
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm font-bold text-moss">{formatDateTime(session.completedAt)}</p>
@@ -255,6 +276,40 @@ export function HistoryList() {
       ) : null}
     </div>
   );
+}
+
+function HistoryMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/10 p-2 text-center">
+      <p className="text-lg font-black leading-tight text-white">{value}</p>
+      <p className="mt-1 text-[9px] font-black uppercase text-white/45">{label}</p>
+    </div>
+  );
+}
+
+function buildHistoryStats(history: Array<{
+  feedback?: { difficulty?: number };
+  logs: Record<string, unknown>;
+  title: string;
+  totalDurationMs?: number;
+}>) {
+  const sessions = history.length;
+  const loggedExercises = history.reduce((sum, session) => sum + Object.keys(session.logs).length, 0);
+  const difficultyValues = history
+    .map((session) => session.feedback?.difficulty)
+    .filter((value): value is number => typeof value === "number");
+  const avgDifficulty = difficultyValues.length
+    ? `${Math.round((difficultyValues.reduce((sum, value) => sum + value, 0) / difficultyValues.length) * 10) / 10}/10`
+    : "-";
+  const totalDurationMs = history.reduce((sum, session) => sum + (session.totalDurationMs ?? 0), 0);
+
+  return {
+    avgDifficulty,
+    lastTitle: history[0]?.title ?? "Aucune",
+    loggedExercises,
+    sessions,
+    totalDuration: totalDurationMs ? formatDurationLong(totalDurationMs) : "-"
+  };
 }
 
 function DecisionPill({

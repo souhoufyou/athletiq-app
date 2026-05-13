@@ -254,8 +254,10 @@ export function OnboardingFlow() {
         </div>
       </div>
 
+      <OnboardingCoachPreview data={data} progress={progress} step={step} />
+
       {/* Steps */}
-      <div className="space-y-4">
+      <div className="mt-5 space-y-4 rounded-[28px] border border-white/10 bg-[#11131a]/90 p-4 shadow-soft">
         {step === 1 && (
           <StepWrapper subtitle="Quelques infos pour personnaliser ton programme." title="Bienvenue 👋">
             <TextField
@@ -769,6 +771,54 @@ export function OnboardingFlow() {
           Retour
         </button>
       )}
+    </div>
+  );
+}
+
+function OnboardingCoachPreview({ data, progress, step }: { data: OnboardingData; progress: number; step: number }) {
+  const goal = goalOptions.find((option) => option.value === data.primaryGoal)?.label ?? "Objectif";
+  const level = experienceOptions.find((option) => option.value === data.experienceLevel)?.label ?? "Niveau";
+  const equipment = equipmentOptions.find((option) => option.value === data.equipment)?.label ?? "Materiel";
+  const constraintsCount =
+    parseTextList(data.watchPointsText).length +
+    parseTextList(data.avoidText).length +
+    (data.medicalNotes.trim() ? 1 : 0);
+
+  return (
+    <section className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#11131a] p-4 text-white shadow-soft">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_90%_0%,rgba(255,91,0,0.30),transparent_34%),linear-gradient(135deg,rgba(255,255,255,0.08),transparent_45%)]" />
+      <div className="relative">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-coral">Coach setup</p>
+            <h2 className="mt-1 text-2xl font-black leading-tight">
+              {data.athleteName.trim() ? `Plan pour ${data.athleteName.trim()}` : "On construit ton plan"}
+            </h2>
+          </div>
+          <div className="shrink-0 text-right">
+            <p className="text-3xl font-black leading-none text-coral">{progress}%</p>
+            <p className="text-[10px] font-black uppercase text-white/45">etape {step}</p>
+          </div>
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <PreviewPill label="Objectif" value={goal} />
+          <PreviewPill label="Frequence" value={`${data.weeklyFrequency}x/sem.`} />
+          <PreviewPill label="Niveau" value={level} />
+          <PreviewPill label="Materiel" value={equipment} />
+        </div>
+        <p className="mt-3 rounded-2xl border border-white/10 bg-white/8 p-3 text-xs font-semibold text-white/60">
+          Contraintes prises en compte : {constraintsCount}. Sport externe : {data.hasEveningSport ? data.externalSportName || "oui" : "non"}.
+        </p>
+      </div>
+    </section>
+  );
+}
+
+function PreviewPill({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/10 p-3">
+      <p className="text-[10px] font-black uppercase text-white/45">{label}</p>
+      <p className="mt-1 truncate text-sm font-black text-white">{value}</p>
     </div>
   );
 }

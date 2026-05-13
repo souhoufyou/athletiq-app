@@ -20,7 +20,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   if (!isReady) {
     return (
-      <div className="app-shell mx-auto flex min-h-screen w-full max-w-xl items-center justify-center px-4 safe-bottom sm:px-6">
+      <div className="app-shell mx-auto flex min-h-screen w-full max-w-[96rem] items-center justify-center px-4 safe-bottom sm:px-6 lg:px-8">
         <div className="card-dark w-full max-w-md p-6 text-center">
           <p className="text-sm font-black uppercase text-sky">Chargement</p>
           <h1 className="mt-3 text-2xl font-black text-white">On remet ton espace en place</h1>
@@ -34,7 +34,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   if (!isOnboardingDone) {
     return (
-      <div className="app-shell mx-auto flex min-h-screen w-full max-w-xl items-center justify-center px-4 safe-bottom sm:px-6">
+      <div className="app-shell mx-auto flex min-h-screen w-full max-w-[96rem] items-center justify-center px-4 safe-bottom sm:px-6 lg:px-8">
         <div className="card-dark w-full max-w-md p-6 text-center">
           <p className="text-sm font-black uppercase text-sky">Configuration</p>
           <h1 className="mt-3 text-2xl font-black text-white">On t&apos;emmene vers l&apos;onboarding</h1>
@@ -54,7 +54,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="app-shell mx-auto min-h-screen w-full max-w-xl px-4 pt-4 safe-bottom sm:px-6">
+    <div className="app-shell mx-auto min-h-screen w-full max-w-[96rem] px-4 pt-4 safe-bottom sm:px-6 lg:px-8">
       <AppHeader />
       <main className="app-content">{children}</main>
       <BottomNav />
