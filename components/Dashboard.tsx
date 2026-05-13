@@ -3,14 +3,21 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { getAdaptiveSnapshot, type AdaptiveSnapshot } from "@/lib/adaptiveInsights";
-import { estimateCalories } from "@/lib/calories";
-import { getProgramDeloadState } from "@/lib/deloadState";
+import { getActiveProgramTemplate } from "@/lib/activeProgram";
 import { getSessionImage } from "@/lib/session-images";
 import { useCoachStorage } from "@/lib/storage";
 import { formatDurationLong } from "@/lib/time";
-import { getTrainingTrendReport, type TrainingTrendReport } from "@/lib/trainingTrends";
-import type { CompletedSession, PlannedSession, UserSettings, Weekday } from "@/types/training";
+import type { CompletedSession, PlannedSession, ProgramTemplate, UserSettings, Weekday } from "@/types/training";
+
+const goalLabels: Record<string, string> = {
+  "perte-gras": "Perte de gras",
+  "prise-masse": "Prise de masse",
+  cardio: "Cardio",
+  "cardio-sante": "Cardio / sante",
+  performance: "Performance",
+  recomposition: "Recomposition",
+  sante: "Sante"
+};
 
 export function Dashboard() {
   const {
@@ -19,7 +26,6 @@ export function Dashboard() {
     dateKey,
     history,
     isReady,
-    nextSession,
     settings,
     startSession,
     todaySession,
@@ -35,79 +41,65 @@ export function Dashboard() {
   const hasEveningSport = settings.externalSports.length > 0 || settings.judoDays.length > 0;
   const eveningSportTonight = todayExternalSports.length > 0;
   const streak = useMemo(() => computeStreak(history), [history]);
-  const adaptiveSnapshot = useMemo(
-    () => getAdaptiveSnapshot(settings, currentProgram, history),
-    [settings, currentProgram, history]
-  );
-  const trendReport = useMemo(
-    () => getTrainingTrendReport(history, currentProgram, settings),
-    [history, currentProgram, settings]
-  );
-  const deloadState = useMemo(() => getProgramDeloadState(currentProgram, history), [currentProgram, history]);
-
-  // Latest session enrichment
-  const latestPlanned = latest ? currentProgram.find((s) => s.id === latest.sessionId) : undefined;
-  const latestCalories =
-    latestPlanned && latest?.totalDurationMs
-      ? estimateCalories(latestPlanned.intensity, settings.currentWeightKg, latest.totalDurationMs)
-      : undefined;
+  const activeProgram = useMemo(() => getActiveProgramTemplate(currentProgram), [currentProgram]);
+  const latestPlanned = latest ? currentProgram.find((session) => session.id === latest.sessionId) : undefined;
   const latestDuration = latest?.totalDurationMs ? formatDurationLong(latest.totalDurationMs) : undefined;
-
-  // Weekly calorie total
-  const weeklyCalories = useMemo(
-    () =>
-      weeklySessions.reduce((total, session) => {
-        const planned = currentProgram.find((s) => s.id === session.sessionId);
-        if (!planned || !session.totalDurationMs) return total;
-        const est = estimateCalories(planned.intensity, settings.currentWeightKg, session.totalDurationMs);
-        return total + Math.round((est.low + est.high) / 2);
-      }, 0),
-    [currentProgram, settings.currentWeightKg, weeklySessions]
-  );
 
   if (!isReady) {
     return <div className="rounded-lg bg-white p-5 font-bold shadow-soft">Chargement...</div>;
   }
 
-  const todayStatus = todaysCompletedSession ? "Validée" : activeToday ? "En cours" : "Prête";
-  const ctaLabel = todaysCompletedSession ? "Voir le résumé" : activeToday ? "Reprendre" : "Commencer";
+  const todayStatus = todaysCompletedSession ? "Validee" : activeToday ? "En cours" : "Prete";
+  const ctaLabel = todaysCompletedSession ? "Voir le resume" : activeToday ? "Reprendre la seance" : "Commencer la seance";
+  const mainGoal = formatGoal(settings.primaryGoal, settings.mainGoal);
 
   return (
     <div className="space-y-4">
-      <section className="overflow-hidden rounded-2xl border border-white/10 premium-gradient text-white shadow-soft">
+      <section className="overflow-hidden rounded-[28px] border border-white/10 premium-gradient text-white shadow-soft">
         <div
-          className="relative h-40 w-full bg-cover bg-center"
+          className="relative h-[16.5rem] w-full bg-cover bg-center"
           style={{ backgroundImage: `url(${getSessionImage(todaySession.title, todaySession.focus)})` }}
         >
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0f111a] via-[#0f111a]/40 to-transparent" />
-          <span className="absolute right-3 top-3 rounded-md border border-white/10 bg-black/40 px-3 py-1.5 text-xs font-black text-white backdrop-blur">
-            {todayStatus}
-          </span>
+          <div className="absolute inset-0 bg-gradient-to-br from-[#090b12]/96 via-[#0f111a]/72 to-[#ff6a1a]/28" />
+          <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.08)_0%,rgba(255,255,255,0)_32%,rgba(255,255,255,0)_100%)]" />
+          <div className="absolute inset-x-0 top-0 flex items-start justify-between p-5">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.2em] text-white/55">Accueil coach</p>
+              <h1 className="mt-2 text-3xl font-black leading-none">Salut {settings.athleteName}</h1>
+              <p className="mt-2 text-sm font-semibold text-white/72">{mainGoal}</p>
+            </div>
+            <span className="rounded-full border border-white/10 bg-black/35 px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-white backdrop-blur">
+              {todayStatus}
+            </span>
+          </div>
+
+          <div className="absolute inset-x-0 bottom-0 p-5">
+            <div className="rounded-[24px] border border-white/10 bg-[#0b0d14]/82 p-4 backdrop-blur">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs font-black uppercase tracking-[0.2em] text-sky">Aujourd&apos;hui</p>
+                  <h2 className="mt-2 text-3xl font-black leading-tight">{todaySession.title}</h2>
+                  <p className="mt-2 text-sm font-semibold text-white/70">{todaySession.focus}</p>
+                </div>
+                <div className="grid min-w-[7.5rem] gap-2">
+                  <DashboardPill label="Duree" value={todaySession.duration} />
+                  <DashboardPill label="Exercices" value={String(todaySession.exercises.length)} />
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-        <div className="p-5">
-          <div className="min-w-0">
-            <p className="text-xs font-black uppercase text-sky">Séance du jour</p>
-            <h3 className="mt-1 text-3xl font-black leading-tight">{todaySession.title}</h3>
-            <p className="mt-2 text-sm font-semibold text-white/70">{todaySession.focus}</p>
-          </div>
 
-          <div className={`mt-5 grid gap-2 text-center ${hasEveningSport ? "grid-cols-3" : "grid-cols-2"}`}>
-            <DashboardPill label="Exos" value={String(todaySession.exercises.length)} />
-            <DashboardPill label="Durée" value={todaySession.duration} />
-            {hasEveningSport ? (
-              <DashboardPill label="Sport soir" value={eveningSportTonight ? todayExternalSports.join(" + ") : "Non"} />
-            ) : null}
-          </div>
-
-          <div className="mt-5 grid grid-cols-2 gap-2">
+        <div className="border-t border-white/10 bg-[#0b0d14]/92 p-5">
+          <div className="grid grid-cols-2 gap-2">
             <Link
-              className="flex h-14 items-center justify-center rounded-md border border-white/15 bg-white/10 px-4 text-center font-black text-white"
+              className="flex h-14 items-center justify-center rounded-xl border border-white/15 bg-white/10 px-4 text-center font-black text-white"
               href="/programme"
             >
-              Voir le détail
+              Voir le programme
             </Link>
             <button
-              className="h-14 rounded-md premium-action px-4 font-black transition"
+              className="h-14 rounded-xl premium-action px-4 font-black transition"
               onClick={() => {
                 if (!activeToday && !todaysCompletedSession) {
                   startSession(todaySession);
@@ -121,86 +113,94 @@ export function Dashboard() {
             </button>
           </div>
 
-          {todaySession.notes?.length ? (
-            <div className="mt-4 rounded-md bg-coral/15 p-3">
-              {todaySession.notes.map((note) => (
-                <p className="text-sm font-black text-white" key={note}>
-                  {note}
-                </p>
-              ))}
-            </div>
-          ) : null}
-
-          <div className="mt-4 space-y-2">
-            {todaySession.exercises.slice(0, 3).map((exercise, index) => (
-              <div className="rounded-md bg-white/10 p-3" key={exercise.id}>
-                <p className="text-xs font-black uppercase text-white/55">Exercice {index + 1}</p>
-                <p className="mt-1 font-black">
-                  {exercise.name}
-                  {exercise.plannedLoad ? ` - ${exercise.plannedLoad}` : ""}
-                </p>
-                <p className="mt-1 text-sm font-semibold text-white/65">{exercise.target}</p>
-              </div>
-            ))}
+          <div className={`mt-4 grid gap-2 ${hasEveningSport ? "grid-cols-3" : "grid-cols-2"}`}>
+            <HeroMetric label="Programme actif" value={activeProgram?.name ?? "Programme perso"} />
+            <HeroMetric label="Cette semaine" value={`${weeklySessions.length} seance${weeklySessions.length > 1 ? "s" : ""}`} />
+            {hasEveningSport ? (
+              <HeroMetric label="Sport ce soir" value={eveningSportTonight ? todayExternalSports.join(" + ") : "Repos"} />
+            ) : null}
           </div>
         </div>
       </section>
 
-      {/* ── Suivi semaine ── */}
-      <WeeklyTracker currentProgram={currentProgram} sessions={weeklySessions} streak={streak} />
-
-      <DeloadStatusCard state={deloadState} trendReport={trendReport} />
-      <AdaptiveCoachCard snapshot={adaptiveSnapshot} />
-      <TrendPreviewCard report={trendReport} />
-
-      {/* ── Métriques rapides ── */}
-      <section className="grid grid-cols-2 gap-3">
-        <MetricCard label="Séances semaine" value={String(weeklySessions.length)} tone="calm" />
-        <MetricCard label="Cardio semaine" value={cardioDone} tone="info" />
-        <MetricCard label="Calories semaine" value={weeklyCalories > 0 ? `~${weeklyCalories} kcal` : "—"} tone="warn" />
-        <MetricCard label={lastCompound.label} value={lastCompound.value} tone="warn" />
+      <section className="grid gap-4 md:grid-cols-[1.15fr_0.85fr]">
+        <ActiveProgramCard
+          athleteName={settings.athleteName}
+          goal={mainGoal}
+          program={activeProgram}
+          sessionsCount={currentProgram.length}
+        />
+        <section className="rounded-[24px] border border-white/10 bg-[#10131d] p-4 shadow-soft">
+          <p className="text-xs font-black uppercase tracking-[0.2em] text-sky">Progression rapide</p>
+          <div className="mt-4 grid grid-cols-1 gap-2">
+            <MetricCard label="Cardio valide" value={cardioDone} />
+            <MetricCard label={lastCompound.label} value={lastCompound.value} />
+            <MetricCard label="Serie active" value={streak > 0 ? `${streak} semaine${streak > 1 ? "s" : ""}` : "A relancer"} />
+          </div>
+        </section>
       </section>
 
-      {/* ── À venir ── */}
-      <section className="card-dark p-4">
+      <section className="rounded-[24px] border border-white/10 bg-[#10131d] p-4 shadow-soft">
         <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-black uppercase text-sky">À venir</p>
-            <h2 className="mt-1 text-xl font-black text-white">{nextSession.session.title}</h2>
-            <p className="mt-1 text-sm font-semibold text-white/60">{nextSession.session.focus}</p>
+          <div className="min-w-0">
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-sky">Plan d&apos;attaque</p>
+            <h2 className="mt-2 text-2xl font-black text-white">Les 3 prochains exos</h2>
+            <p className="mt-1 text-sm font-semibold text-white/55">Ce que tu vas faire en ouvrant la seance.</p>
           </div>
-          <span className="rounded-md bg-sky/10 px-3 py-2 text-sm font-black text-sky">
-            {nextSession.session.duration}
+          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs font-black text-white/65">
+            {todaySession.exercises.length} blocs
           </span>
         </div>
+
+        <div className="mt-4 space-y-3">
+          {todaySession.exercises.slice(0, 3).map((exercise, index) => (
+            <div className="flex items-start gap-3 rounded-2xl border border-white/8 bg-white/[0.04] p-4" key={exercise.id}>
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-coral font-black text-white">
+                {index + 1}
+              </div>
+              <div className="min-w-0">
+                <p className="text-lg font-black text-white">{exercise.name}</p>
+                <p className="mt-1 text-sm font-semibold text-white/65">
+                  {exercise.plannedLoad ? `${exercise.plannedLoad} · ` : ""}
+                  {exercise.target}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
       </section>
 
-      {/* ── Dernière séance enrichie ── */}
-      <section className="card-dark p-4">
-        <p className="text-xs font-black uppercase text-white/40">Dernière séance</p>
-        {latest ? (
-          <>
-            <p className="mt-1 text-base font-black text-white">{latest.title}</p>
-            <div className="mt-3 grid grid-cols-3 gap-2">
-              <MiniMetric
-                label="Exos"
-                value={String(Object.values(latest.logs).filter((log) => log.status).length)}
-              />
-              <MiniMetric label="Durée" value={latestDuration ?? "—"} />
-              <MiniMetric
-                label="Calories"
-                value={latestCalories ? `~${Math.round((latestCalories.low + latestCalories.high) / 2)}` : "—"}
-              />
-            </div>
-            {latest.aiCoach?.summary && latest.aiCoach.summary !== "IA désactivée" ? (
-              <p className="mt-3 rounded-md bg-white/5 px-3 py-2 text-xs font-semibold italic text-white/55">
-                &ldquo;{latest.aiCoach.summary}&rdquo;
-              </p>
-            ) : null}
-          </>
-        ) : (
-          <p className="mt-1 text-sm font-semibold text-white/50">Aucune séance validée pour le moment.</p>
-        )}
+      <WeeklyTracker currentProgram={currentProgram} sessions={weeklySessions} streak={streak} />
+
+      <section className="rounded-[24px] border border-white/10 bg-[#10131d] p-4 shadow-soft">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-sky">Progression recente</p>
+            <h2 className="mt-2 text-2xl font-black text-white">
+              {latest ? latest.title : "Tu n'as pas encore valide de seance"}
+            </h2>
+            <p className="mt-1 text-sm font-semibold text-white/55">
+              {latest
+                ? latestDuration
+                  ? `Derniere seance terminee en ${latestDuration}.`
+                  : "Derniere seance enregistree dans ton historique."
+                : "Valide une premiere seance pour commencer a suivre tes progres."}
+            </p>
+          </div>
+          <Link
+            className="shrink-0 rounded-xl border border-sky/25 bg-sky/10 px-3 py-2 text-xs font-black text-sky"
+            href={latest ? "/historique" : "/seance"}
+          >
+            {latest ? "Voir l'historique" : "Lancer la seance"}
+          </Link>
+        </div>
+
+        {latestPlanned ? (
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <MiniMetric label="Bloc valide" value={latestPlanned.title} />
+            <MiniMetric label="Duree" value={latestDuration ?? "Enregistre"} />
+          </div>
+        ) : null}
       </section>
     </div>
   );
@@ -208,131 +208,67 @@ export function Dashboard() {
 
 function DashboardPill({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-white/10 bg-white/10 p-3">
+    <div className="rounded-2xl border border-white/10 bg-white/10 p-3 text-center backdrop-blur">
       <p className="text-lg font-black leading-tight">{value}</p>
-      <p className="mt-1 text-[11px] font-bold uppercase text-white/65">{label}</p>
+      <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-white/65">{label}</p>
     </div>
   );
 }
 
-function AdaptiveCoachCard({ snapshot }: { snapshot: AdaptiveSnapshot }) {
+function HeroMetric({ label, value }: { label: string; value: string }) {
   return (
-    <section className="card-dark border border-sky/20 p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-black uppercase text-sky">Coach adaptatif</p>
-          <h2 className="mt-1 text-xl font-black text-white">Ce que l&apos;app prend en compte</h2>
-        </div>
-        <span className="rounded-md bg-sky/10 px-3 py-2 text-xs font-black text-sky">
-          Actif
-        </span>
-      </div>
-      <div className="mt-4 grid grid-cols-2 gap-2">
-        <MiniMetric label="Planning" value={snapshot.scheduleLabel} />
-        <MiniMetric label="Récupération" value={snapshot.recoveryLabel} />
-        <MiniMetric label="Charges" value={snapshot.loadBasisLabel} />
-        <MiniMetric label="Contraintes" value={snapshot.constraintsLabel} />
-      </div>
-      <div className="mt-3 rounded-md bg-white/5 px-3 py-2">
-        <p className="text-[10px] font-black uppercase text-white/40">Sport externe</p>
-        <p className="mt-1 text-sm font-black text-white">{snapshot.externalSportsLabel}</p>
-      </div>
-      {snapshot.notes.length > 0 ? (
-        <div className="mt-3 space-y-2">
-          {snapshot.notes.map((note) => (
-            <p className="rounded-md bg-sky/10 px-3 py-2 text-xs font-semibold leading-relaxed text-sky" key={note}>
-              {note}
-            </p>
-          ))}
-        </div>
-      ) : null}
-    </section>
+    <div className="rounded-2xl border border-white/8 bg-white/[0.04] p-3">
+      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/45">{label}</p>
+      <p className="mt-2 text-sm font-black leading-tight text-white">{value}</p>
+    </div>
   );
 }
 
-function DeloadStatusCard({
-  state,
-  trendReport
+function ActiveProgramCard({
+  athleteName,
+  goal,
+  program,
+  sessionsCount
 }: {
-  state: ReturnType<typeof getProgramDeloadState>;
-  trendReport: TrainingTrendReport;
+  athleteName: string;
+  goal: string;
+  program?: ProgramTemplate;
+  sessionsCount: number;
 }) {
-  if (!state.active) {
-    return null;
-  }
-
-  const deloadReason = trendReport.items.find((item) =>
-    item.action === "deload_next_week" || item.action === "protect_recovery"
-  );
-
   return (
-    <section className="rounded-xl border border-amber/20 bg-amber/10 p-4 shadow-soft">
+    <section className="rounded-[24px] border border-sky/20 bg-[linear-gradient(180deg,rgba(17,20,30,1),rgba(11,13,20,1))] p-5 shadow-soft">
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-black uppercase text-white/45">Semaine allegee</p>
-          <h2 className="mt-1 text-xl font-black text-white">Deload en cours</h2>
-        </div>
-        <span className="rounded-md bg-amber/15 px-3 py-2 text-xs font-black uppercase text-amber">
-          {state.remainingSessions}/{state.totalSessions} restantes
-        </span>
-      </div>
-      <p className="mt-2 text-sm font-semibold leading-relaxed text-white/70">
-        {deloadReason?.detail ?? state.guideNote ?? "Le programme a ete allege pour refaire monter la recuperation avant de pousser de nouveau."}
-      </p>
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <MiniMetric label="Deja faites" value={String(state.completedSessions)} />
-        <MiniMetric label="Prochaine allegee" value={state.nextSessionTitle ?? "Cycle en cours"} />
-      </div>
-    </section>
-  );
-}
-
-function TrendPreviewCard({ report }: { report: TrainingTrendReport }) {
-  const topTrend = report.items[0];
-  const toneClass = topTrend
-    ? {
-        critical: "border-coral/20 bg-coral/10 text-coral",
-        positive: "border-sea/20 bg-sea/10 text-sea",
-        watch: "border-amber/20 bg-amber/10 text-amber"
-      }[topTrend.severity]
-    : "border-white/10 bg-white/5 text-white/60";
-
-  return (
-    <section className={`rounded-xl border p-4 shadow-soft ${toneClass}`}>
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-black uppercase text-white/45">Apprentissage</p>
-          <h2 className="mt-1 text-xl font-black text-white">
-            {topTrend ? topTrend.title : "Pas encore de tendance forte"}
+        <div className="min-w-0">
+          <p className="text-xs font-black uppercase tracking-[0.2em] text-sky">Ton plan</p>
+          <h2 className="mt-2 text-2xl font-black leading-tight text-white">
+            {program?.name ?? "Programme personnalise"}
           </h2>
+          <p className="mt-3 text-sm font-semibold leading-relaxed text-white/55">
+            {program?.description ?? "Programme actif adapte depuis tes reglages et tes retours."}
+          </p>
         </div>
-        <span className="rounded-md bg-white/10 px-3 py-2 text-xs font-black uppercase text-white/70">
-          {report.confidence}
-        </span>
+        <Link
+          className="shrink-0 rounded-xl border border-sky/25 bg-sky/10 px-3 py-2 text-xs font-black text-sky"
+          href="/programme"
+        >
+          Ouvrir
+        </Link>
       </div>
-      <p className="mt-2 text-sm font-semibold leading-relaxed text-white/70">
-        {topTrend ? topTrend.detail : report.summary}
-      </p>
-      {topTrend?.evidence[0] ? (
-        <p className="mt-3 rounded-md bg-white/8 px-3 py-2 text-xs font-semibold leading-relaxed text-white/60">
-          {topTrend.evidence[0]}
-        </p>
-      ) : null}
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <MiniMetric label="Profil actif" value={athleteName || "Profil"} />
+        <MiniMetric label="Objectif" value={goal} />
+        <MiniMetric label="Frequence" value={program ? `${program.frequency} j/sem.` : `${sessionsCount} jours`} />
+        <MiniMetric label="Niveau" value={program?.level ?? "Perso"} />
+      </div>
     </section>
   );
 }
 
-function MetricCard({ label, tone, value }: { label: string; value: string; tone: "calm" | "info" | "warn" }) {
-  const toneClass = {
-    calm: "bg-sea/10 text-sea border-sea/20",
-    info: "bg-sky/10 text-sky border-sky/20",
-    warn: "bg-amber/10 text-amber border-amber/20"
-  }[tone];
-
+function MetricCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className={`min-h-24 rounded-xl border p-4 shadow-soft ${toneClass}`}>
-      <p className="text-xs font-black uppercase text-white/60">{label}</p>
-      <p className="mt-2 line-clamp-2 text-xl font-black leading-tight">{value}</p>
+    <div className="rounded-2xl border border-white/8 bg-white/[0.04] p-4">
+      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/45">{label}</p>
+      <p className="mt-2 text-lg font-black leading-tight text-white">{value}</p>
     </div>
   );
 }
@@ -362,15 +298,10 @@ function countCardioThisWeek(history: CompletedSession[]) {
   return count ? `${count} bloc${count > 1 ? "s" : ""}` : "0 bloc";
 }
 
-/**
- * Pulls the most recent completed compound exercise from history,
- * derived from the user's actual program (no hardcoded movement bias).
- */
 function getLastCompoundPerformance(
   history: CompletedSession[],
   program: PlannedSession[]
 ): { label: string; value: string } {
-  // Build set of compound exercise names by classification "force"/"hypertrophie" + multiple muscle groups
   const compoundExerciseNames = new Set<string>();
   for (const session of program) {
     for (const exercise of session.exercises) {
@@ -389,13 +320,12 @@ function getLastCompoundPerformance(
       const log = session.logs[progression.exerciseId];
       if (!log?.usedLoad && !log?.completedReps) continue;
       const value = `${log.usedLoad || "-"} · ${log.completedReps || "-"}`;
-      // Keep the label compact: first 2 words of the exercise
       const shortName = progression.exerciseName.split(" ").slice(0, 2).join(" ");
       return { label: shortName, value };
     }
   }
 
-  return { label: "Charge récente", value: "Non renseigné" };
+  return { label: "Charge cle", value: "Non renseignee" };
 }
 
 function getTodayWeekday(): Weekday {
@@ -417,27 +347,27 @@ function getTodayExternalSports(settings: UserSettings): string[] {
 }
 
 function getWeekStart(offsetWeeks: number): Date {
-  const d = new Date();
-  const day = d.getDay() === 0 ? 6 : d.getDay() - 1;
-  d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() - day + offsetWeeks * 7);
-  return d;
+  const date = new Date();
+  const day = date.getDay() === 0 ? 6 : date.getDay() - 1;
+  date.setHours(0, 0, 0, 0);
+  date.setDate(date.getDate() - day + offsetWeeks * 7);
+  return date;
 }
 
 function computeStreak(history: CompletedSession[]): number {
   if (!history.length) return 0;
 
   const thisWeekStart = getWeekStart(0);
-  const hasThisWeek = history.some((s) => new Date(s.completedAt) >= thisWeekStart);
+  const hasThisWeek = history.some((session) => new Date(session.completedAt) >= thisWeekStart);
   const startOffset = hasThisWeek ? 0 : -1;
   let streak = 0;
 
   for (let i = startOffset; i >= -52; i--) {
     const start = getWeekStart(i);
     const end = getWeekStart(i + 1);
-    const hasSession = history.some((s) => {
-      const d = new Date(s.completedAt);
-      return d >= start && d < end;
+    const hasSession = history.some((session) => {
+      const completedAt = new Date(session.completedAt);
+      return completedAt >= start && completedAt < end;
     });
     if (!hasSession) break;
     streak++;
@@ -475,45 +405,56 @@ function WeeklyTracker({
   streak: number;
 }) {
   const todayKey = getTodayWeekday();
-  const completedSessionIds = new Set(sessions.map((s) => s.sessionId));
+  const completedSessionIds = new Set(sessions.map((session) => session.sessionId));
 
   return (
-    <section className="card-dark p-4">
-      <p className="text-xs font-black uppercase text-white/40">Semaine en cours</p>
+    <section className="rounded-[24px] border border-white/10 bg-[#10131d] p-5 shadow-soft">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.2em] text-white/40">Ta semaine</p>
+          <h2 className="mt-2 text-2xl font-black text-white">Ou tu en es</h2>
+        </div>
+        {streak > 0 ? (
+          <span className="rounded-full bg-amber/10 px-3 py-2 text-xs font-black text-amber">
+            {streak} sem. d&apos;affilee
+          </span>
+        ) : null}
+      </div>
+
       <div className="mt-3 grid grid-cols-7 gap-1.5">
         {WEEKDAYS.map(({ key, short }) => {
-          const planned = currentProgram.find((s) => s.weekday === key);
+          const planned = currentProgram.find((session) => session.weekday === key);
           const isToday = key === todayKey;
           const isDone = planned ? completedSessionIds.has(planned.id) : false;
           const isRestDay = !planned || planned.id.includes("sunday");
 
-          let dotClass = "bg-white/10 text-white/25"; // rest / not planned
+          let dotClass = "bg-white/10 text-white/25";
           if (isDone) dotClass = "bg-sea text-white";
           else if (isToday && !isDone) dotClass = "bg-sky/20 text-sky ring-1 ring-sky/60";
           else if (planned && !isDone) dotClass = "bg-white/8 text-white/40";
 
           return (
             <div className="flex flex-col items-center gap-1" key={key}>
-              <div
-                className={`flex size-9 items-center justify-center rounded-full text-xs font-black transition ${dotClass}`}
-              >
-                {isDone ? "✓" : isRestDay ? "—" : short}
+              <div className={`flex size-9 items-center justify-center rounded-full text-xs font-black ${dotClass}`}>
+                {isDone ? "✓" : isRestDay ? "-" : short}
               </div>
               <p className={`text-[9px] font-black uppercase ${isToday ? "text-sky" : "text-white/30"}`}>{short}</p>
             </div>
           );
         })}
       </div>
-      <div className="mt-3 flex items-center justify-between">
-        <p className="text-xs font-semibold text-white/40">
-          {sessions.length} séance{sessions.length > 1 ? "s" : ""} validée{sessions.length > 1 ? "s" : ""} cette semaine
-        </p>
-        {streak > 0 ? (
-          <p className="text-xs font-black text-amber">
-            {streak} sem.{streak > 1 ? "" : ""} d&apos;affilée 🔥
-          </p>
-        ) : null}
-      </div>
+
+      <p className="mt-3 text-xs font-semibold text-white/40">
+        {sessions.length} seance{sessions.length > 1 ? "s" : ""} validee{sessions.length > 1 ? "s" : ""} cette semaine
+      </p>
     </section>
   );
+}
+
+function formatGoal(primaryGoal?: string, fallback?: string) {
+  if (primaryGoal && goalLabels[primaryGoal]) {
+    return goalLabels[primaryGoal];
+  }
+
+  return fallback || "Objectif en cours";
 }

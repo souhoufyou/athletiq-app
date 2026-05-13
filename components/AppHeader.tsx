@@ -25,16 +25,18 @@ const pageTitles: Record<string, string> = {
 
 export function AppHeader() {
   const pathname = usePathname();
-  const { settings, isReady } = useCoachStorage();
+  const { currentProgram, settings, isReady, todaySession } = useCoachStorage();
   const pageTitle = pageTitles[pathname] ?? "";
   const athleteName = isReady ? settings.athleteName : undefined;
   const isHome = pathname === "/";
+  const activeDays = currentProgram.filter((session) => !session.id.includes("rest")).length;
 
   return (
     <header className="app-header">
+      <div className="app-header-topline" />
       <div className="flex items-center justify-between gap-3">
         <Link aria-label="Accueil AthletIQ IA" className="min-w-0" href="/">
-          <BrandLogo className="h-9" priority variant="wordmark" />
+          <BrandLogo className="h-11" priority variant="wordmark" />
         </Link>
 
         <Link aria-label="Parametres" className="app-header-settings" href="/parametres">
@@ -50,9 +52,11 @@ export function AppHeader() {
         </Link>
       </div>
 
-      <div className="mt-3 flex items-end justify-between gap-3">
+      <div className="mt-4 flex items-end justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase text-white/35">Entraine. Progresse. Depasse-toi.</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.28em] text-white/35">
+            Entraine. Progresse. Depasse-toi.
+          </p>
           {pageTitle ? (
             <p className="mt-0.5 text-xl font-black leading-tight text-white">{pageTitle}</p>
           ) : (
@@ -61,11 +65,14 @@ export function AppHeader() {
             </p>
           )}
         </div>
-        {isHome ? (
-          <p className="shrink-0 text-right text-[11px] font-semibold capitalize leading-tight text-white/40">
-            {formatLongDate()}
+        <div className="shrink-0 text-right">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-coral">
+            {activeDays} jours actifs
           </p>
-        ) : null}
+          <p className="mt-1 max-w-[8.8rem] truncate text-[11px] font-semibold capitalize leading-tight text-white/45">
+            {isHome ? formatLongDate() : todaySession.title}
+          </p>
+        </div>
       </div>
     </header>
   );

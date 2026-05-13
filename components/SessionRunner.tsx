@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { AdaptationExplanationCard } from "@/components/AdaptationExplanation";
 import { SessionSummary } from "@/components/SessionSummary";
+import { getActiveProgramTemplate } from "@/lib/activeProgram";
 import { getContextualAlternatives } from "@/lib/alternatives";
 import { estimateCalories, type CalorieEstimate } from "@/lib/calories";
 import { appendCalibrationEvent, createLoadFeedbackCalibrationEvent } from "@/lib/calibrationEvents";
@@ -123,6 +124,7 @@ export function SessionRunner() {
     ?? activePlannedSession?.exercises[0]?.id
     ?? todaySession.exercises[0]?.id
     ?? "";
+  const activeProgram = useMemo(() => getActiveProgramTemplate(currentProgram), [currentProgram]);
 
   useEffect(() => {
     setLoadFeedbackMessage("");
@@ -146,7 +148,6 @@ export function SessionRunner() {
   const nextExercise = currentSession.exercises[currentIndex + 1];
   const currentRestSeconds = currentExercise ? parseRestSeconds(currentExercise.rest) : 0;
   const currentLastLoad = currentExercise ? lastLoads[currentExercise.id] : undefined;
-
   // Use replacement if user swapped the exercise this session
   const effectiveExercise = (currentExercise && active?.replacements?.[currentExercise.id]) ?? currentExercise;
   const loadInsight = effectiveExercise ? getExerciseLoadInsight(effectiveExercise, settings) : undefined;
@@ -400,6 +401,11 @@ export function SessionRunner() {
         </div>
       </section>
 
+      <SessionProgramCard
+        programName={activeProgram?.name ?? "Programme personnalise"}
+        programMeta={activeProgram ? `${activeProgram.frequency} j/sem. - ${activeProgram.averageDuration}` : `${currentProgram.length} jours actifs`}
+      />
+
       {finishWarning ? (
         <div className="rounded-xl border border-coral/20 bg-coral/10 p-4 text-sm font-black leading-relaxed text-coral shadow-soft">
           {finishWarning}
@@ -455,23 +461,28 @@ export function SessionRunner() {
             ) : null}
 
             {effectiveExercise.plannedLoad ? (
-              <div className="mt-3 grid grid-cols-3 gap-2">
-                <LoadFeedbackButton
-                  label="Trop leger"
-                  onClick={() => applyLiveLoadFeedback("too-light")}
-                  tone="info"
-                />
-                <LoadFeedbackButton
-                  label="Correct"
-                  onClick={() => applyLiveLoadFeedback("correct")}
-                  tone="calm"
-                />
-                <LoadFeedbackButton
-                  label="Trop lourd"
-                  onClick={() => applyLiveLoadFeedback("too-heavy")}
-                  tone="warn"
-                />
-              </div>
+              <details className="mt-3 rounded-xl border border-white/10 bg-white/5 p-3">
+                <summary className="cursor-pointer list-none text-sm font-black text-white/70">
+                  Ajuster la charge du jour
+                </summary>
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  <LoadFeedbackButton
+                    label="Trop leger"
+                    onClick={() => applyLiveLoadFeedback("too-light")}
+                    tone="info"
+                  />
+                  <LoadFeedbackButton
+                    label="Correct"
+                    onClick={() => applyLiveLoadFeedback("correct")}
+                    tone="calm"
+                  />
+                  <LoadFeedbackButton
+                    label="Trop lourd"
+                    onClick={() => applyLiveLoadFeedback("too-heavy")}
+                    tone="warn"
+                  />
+                </div>
+              </details>
             ) : null}
 
             <button
@@ -553,7 +564,68 @@ export function SessionRunner() {
       />
 
       <section className="card-dark p-4">
-        <h2 className="text-lg font-black text-white">Retour exercice</h2>
+        <h2 className="text-lg font-black text-white">Action rapide</h2>
+        <p className="mt-1 text-sm font-semibold text-white/55">
+          Donne ton retour principal, puis passe a l&apos;exercice suivant.
+        </p>
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          {statusOptions
+            .filter((status) => status.value !== "skipped")
+            .map((status) => {
+              const selected = currentLog.status === status.value;
+
+              return (
+                <button
+                  className={`min-h-14 rounded-md border px-3 text-base font-black transition ${
+                    selected ? status.active : status.idle
+                  }`}
+                  key={status.value}
+                  onClick={() => handleStatus(status.value)}
+                  type="button"
+                >
+                  {status.label}
+                </button>
+              );
+            })}
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <button
+            className={`h-11 rounded-md border px-4 text-sm font-black transition ${
+              showAlternatives
+                ? "border-amber bg-amber/20 text-amber"
+                : "border-amber/30 bg-amber/10 text-amber hover:bg-amber/20"
+            }`}
+            onClick={() => setShowAlternatives((value) => !value)}
+            type="button"
+          >
+            {showAlternatives ? "Fermer remplacement" : "Remplacer"}
+          </button>
+          <button
+            className={`h-11 rounded-md border px-4 text-sm font-black transition ${
+              currentLog.status === "skipped"
+                ? "border-zinc-500 bg-zinc-600 text-white"
+                : "border-white/10 bg-white/8 text-white/70"
+            }`}
+            onClick={() => handleStatus("skipped")}
+            type="button"
+          >
+            Passer
+          </button>
+        </div>
+      </section>
+
+      <details className="card-dark group p-4">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-black text-white">Ajustements detailles</h2>
+            <p className="mt-1 text-sm font-semibold text-white/55">
+              Charge realisee, reps et commentaire si tu veux etre plus precis.
+            </p>
+          </div>
+          <span className="rounded-md bg-white/8 px-3 py-2 text-xs font-black text-white/55 group-open:bg-sky/10 group-open:text-sky">
+            Ouvrir
+          </span>
+        </summary>
         <div className="mt-4 grid grid-cols-2 gap-2">
           {statusOptions.map((status) => {
             const selected = currentLog.status === status.value;
@@ -597,7 +669,12 @@ export function SessionRunner() {
         ) : null}
 
         {liveAdvice ? (
-          <LiveCoachAdviceCard advice={liveAdvice} onShowAlternatives={revealAlternatives} />
+          <details className="mt-4 rounded-xl border border-sky/20 bg-sky/10 p-3">
+            <summary className="cursor-pointer list-none text-sm font-black text-sky">
+              Voir le conseil adaptatif
+            </summary>
+            <LiveCoachAdviceCard advice={liveAdvice} onShowAlternatives={revealAlternatives} />
+          </details>
         ) : null}
 
         <div className="mt-5 grid grid-cols-2 gap-3">
@@ -632,10 +709,20 @@ export function SessionRunner() {
             value={currentLog.comment}
           />
         </label>
-      </section>
+      </details>
 
-      <section className="card-dark p-4">
-        <h2 className="text-lg font-black text-white">Retour global</h2>
+      <details className="card-dark group p-4">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-black text-white">Retour global</h2>
+            <p className="mt-1 text-sm font-semibold text-white/55">
+              Ressenti general de la seance pour ajuster la prochaine.
+            </p>
+          </div>
+          <span className="rounded-md bg-white/8 px-3 py-2 text-xs font-black text-white/55 group-open:bg-sky/10 group-open:text-sky">
+            Ouvrir
+          </span>
+        </summary>
         <div className="mt-4 grid grid-cols-2 gap-3">
           <NumberFeedback
             label="Difficulté"
@@ -674,7 +761,7 @@ export function SessionRunner() {
             </select>
           </label>
         </div>
-      </section>
+      </details>
 
       <nav className="sticky bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-10 -mx-2 rounded-2xl border border-white/10 bg-[#0f111a]/95 p-2 shadow-soft backdrop-blur">
         <div className="grid grid-cols-2 gap-2">
@@ -728,6 +815,32 @@ function FocusStat({
       <dt className="text-[11px] font-black uppercase text-white/65">{label}</dt>
       <dd className="mt-1 text-lg font-black leading-tight">{value}</dd>
     </div>
+  );
+}
+
+function SessionProgramCard({
+  programMeta,
+  programName
+}: {
+  programMeta: string;
+  programName: string;
+}) {
+  return (
+    <section className="rounded-xl border border-sky/20 bg-sky/10 p-3 shadow-soft">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[10px] font-black uppercase text-sky">Programme actif</p>
+          <p className="mt-0.5 truncate text-sm font-black text-white">{programName}</p>
+          <p className="mt-0.5 text-xs font-semibold text-white/55">{programMeta}</p>
+        </div>
+        <Link
+          className="shrink-0 rounded-md border border-sky/25 bg-sky/10 px-3 py-2 text-xs font-black text-sky"
+          href="/programme"
+        >
+          Voir
+        </Link>
+      </div>
+    </section>
   );
 }
 

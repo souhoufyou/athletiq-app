@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import {
   appendCalibrationEvent,
@@ -75,7 +76,11 @@ const weekdays: Array<{ value: Weekday; label: string }> = [
   { value: "sunday", label: "Dimanche" }
 ];
 
-export function SettingsPanel() {
+function getPrimaryGoalLabel(settings: UserSettings): string {
+  return settings.primaryGoal ? goalLabels[settings.primaryGoal] : settings.mainGoal;
+}
+
+function LegacySettingsPanel() {
   const [confirmReset, setConfirmReset] = useState(false);
   const [confirmRegen, setConfirmRegen] = useState(false);
   const {
@@ -466,6 +471,441 @@ export function SettingsPanel() {
   );
 }
 
+void LegacySettingsPanel;
+
+export function SettingsPanel() {
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [confirmRegen, setConfirmRegen] = useState(false);
+  const {
+    activeProfileId,
+    createProfile,
+    currentProgram,
+    deleteProfile,
+    history,
+    isReady,
+    profiles,
+    regenerateProgram,
+    renameProfile,
+    resetAll,
+    setSettings,
+    settings,
+    switchProfile
+  } = useCoachStorage();
+
+  if (!isReady) {
+    return <div className="rounded-lg bg-white p-5 font-bold shadow-soft">Chargement...</div>;
+  }
+
+  const goalLabel = getPrimaryGoalLabel(settings);
+  const weeklyFrequency = settings.weeklyFrequency ?? Math.max(currentProgram.length, 3);
+  const restrictionsCount = settings.watchPoints.length + settings.avoid.length + (settings.medicalNotes.trim() ? 1 : 0);
+  const sportsSummary = settings.externalSports.length > 0 ? `${settings.externalSports.length} sport(s)` : "Aucun";
+
+  return (
+    <div className="space-y-4">
+      <ProfilesSection
+        activeProfileId={activeProfileId}
+        onCreate={createProfile}
+        onDelete={deleteProfile}
+        onRename={renameProfile}
+        onSwitch={switchProfile}
+        profiles={profiles}
+      />
+
+      <section className="overflow-hidden rounded-2xl border border-white/10 premium-gradient p-5 text-white shadow-soft">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-black uppercase text-sky">Parametres essentiels</p>
+            <h2 className="mt-1 text-2xl font-black">{settings.athleteName}</h2>
+            <p className="mt-2 text-sm font-semibold text-white/70">
+              {goalLabel} · {weeklyFrequency} seance{weeklyFrequency > 1 ? "s" : ""}/semaine
+            </p>
+          </div>
+          <Link
+            className="inline-flex h-11 shrink-0 items-center rounded-md border border-white/15 bg-white/10 px-4 text-sm font-black text-white transition hover:bg-white/15"
+            href="/programme"
+          >
+            Voir le programme
+          </Link>
+        </div>
+
+        <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
+          <ProfileTile label="Programme" value={`${currentProgram.length} jours actifs`} />
+          <ProfileTile label="Disponibilite" value={`${settings.availableDays.length} j/sem`} />
+          <ProfileTile label="Contraintes" value={restrictionsCount > 0 ? `${restrictionsCount} point(s)` : "Aucune"} />
+          <ProfileTile label="Sports" value={sportsSummary} />
+        </div>
+
+        <p className="mt-2 text-sm font-semibold text-white/50">
+          {settings.gym ? `Salle ${settings.gym}` : "Profil libre"} · {history.length} seance{history.length > 1 ? "s" : ""} enregistree{history.length > 1 ? "s" : ""}
+        </p>
+      </section>
+
+      <section className="card-dark p-4">
+        <h2 className="text-xl font-black text-white">Programme & objectif</h2>
+        <p className="mt-1 text-sm font-semibold text-white/55">
+          Change l&apos;objectif, la frequence ou le materiel, puis regenere seulement quand tu veux vraiment changer de plan.
+        </p>
+
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <ProfileTile label="Objectif" value={goalLabel} />
+          <ProfileTile label="Frequence" value={`${weeklyFrequency} seances`} />
+          <ProfileTile label="Materiel" value={equipmentLabels[settings.equipment ?? "salle-complete"]} />
+          <ProfileTile label="Niveau" value={experienceLabels[settings.experienceLevel ?? "intermediaire"]} />
+        </div>
+
+        <div className="mt-4 space-y-3">
+          <div>
+            <p className="text-sm font-bold text-white/60">Objectif principal</p>
+            <select
+              className="mt-1 h-12 w-full rounded-md border border-white/10 bg-white/5 px-3 font-semibold text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
+              onChange={(e) => setSettings({ ...settings, primaryGoal: e.target.value as PrimaryGoal })}
+              value={settings.primaryGoal ?? "recomposition"}
+            >
+              {(Object.entries(goalLabels) as Array<[PrimaryGoal, string]>).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <p className="text-sm font-bold text-white/60">Frequence (seances/semaine)</p>
+            <div className="mt-1 grid grid-cols-5 gap-2">
+              {[2, 3, 4, 5, 6].map((freq) => (
+                <button
+                  className={`h-11 rounded-md border font-black transition ${
+                    (settings.weeklyFrequency ?? 4) === freq
+                      ? "border-sky/50 bg-sky/10 text-sky"
+                      : "border-white/10 bg-white/5 text-white/60"
+                  }`}
+                  key={freq}
+                  onClick={() => setSettings({ ...settings, weeklyFrequency: freq })}
+                  type="button"
+                >
+                  {freq}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-sm font-bold text-white/60">Materiel</p>
+            <select
+              className="mt-1 h-12 w-full rounded-md border border-white/10 bg-white/5 px-3 font-semibold text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
+              onChange={(e) => setSettings({ ...settings, equipment: e.target.value as Equipment })}
+              value={settings.equipment ?? "salle-complete"}
+            >
+              {(Object.entries(equipmentLabels) as Array<[Equipment, string]>).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <p className="text-sm font-bold text-white/60">Niveau d&apos;experience</p>
+            <select
+              className="mt-1 h-12 w-full rounded-md border border-white/10 bg-white/5 px-3 font-semibold text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
+              onChange={(e) => setSettings({ ...settings, experienceLevel: e.target.value as ExperienceLevel })}
+              value={settings.experienceLevel ?? "intermediaire"}
+            >
+              {(Object.entries(experienceLabels) as Array<[ExperienceLevel, string]>).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <button
+          className="mt-4 h-12 w-full rounded-md border border-sky/30 bg-sky/10 px-4 font-black text-sky transition hover:bg-sky/20"
+          onClick={() => setConfirmRegen(true)}
+          type="button"
+        >
+          Regenerer mon programme
+        </button>
+        {confirmRegen ? (
+          <div className="mt-3 rounded-lg border border-sky/20 bg-sky/10 p-3">
+            <p className="text-sm font-black text-sky">
+              Cela remplace le programme actuel par un nouveau base sur tes reglages. Ton historique reste conserve.
+            </p>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button
+                className="h-11 rounded-md border border-white/10 bg-white/8 px-3 font-black text-white"
+                onClick={() => setConfirmRegen(false)}
+                type="button"
+              >
+                Annuler
+              </button>
+              <button
+                className="h-11 rounded-md bg-sky px-3 font-black text-white"
+                onClick={() => {
+                  regenerateProgram();
+                  setConfirmRegen(false);
+                }}
+                type="button"
+              >
+                Regenerer
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </section>
+
+      <section className="card-dark p-4">
+        <h2 className="text-xl font-black text-white">Preferences & contraintes</h2>
+        <p className="mt-1 text-sm font-semibold text-white/55">
+          Ces listes servent a ajuster le prochain programme sans te noyer dans les reglages.
+        </p>
+        <TextListField
+          label="Points de vigilance"
+          onChange={(values) => setSettings({ ...settings, watchPoints: values })}
+          placeholder="ex. poignet droit, lombaires, genou gauche"
+          values={settings.watchPoints}
+        />
+        <TextListField
+          label="Preferences"
+          onChange={(values) => setSettings({ ...settings, preferences: values })}
+          placeholder="ex. machines, halteres, full body"
+          values={settings.preferences}
+        />
+        <TextListField
+          label="Exercices a eviter"
+          onChange={(values) => setSettings({ ...settings, avoid: values })}
+          placeholder="ex. dips, squat barre, course"
+          values={settings.avoid}
+        />
+      </section>
+
+      <details className="card-dark group p-4" open>
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-black text-white">Profil & rythme</h2>
+            <p className="mt-1 text-sm font-semibold text-white/55">
+              Identite, poids, jours disponibles et reglages de seance.
+            </p>
+          </div>
+          <span className="rounded-md bg-white/8 px-3 py-2 text-xs font-black text-white/55 group-open:bg-sky/10 group-open:text-sky">
+            Ouvrir
+          </span>
+        </summary>
+
+        <label className="mt-4 block">
+          <span className="text-sm font-bold text-white/60">Prenom</span>
+          <input
+            className="mt-1 h-12 w-full rounded-md border border-white/10 px-3 font-semibold outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
+            onChange={(event) => setSettings({ ...settings, athleteName: event.target.value })}
+            placeholder="Ton prenom"
+            value={settings.athleteName}
+          />
+        </label>
+        <label className="mt-4 block">
+          <span className="text-sm font-bold text-white/60">Profil biologique</span>
+          <select
+            className="mt-1 h-12 w-full rounded-md border border-white/10 bg-white/5 px-3 font-semibold text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
+            onChange={(event) => setSettings({ ...settings, sex: event.target.value as UserSex })}
+            value={settings.sex}
+          >
+            {(Object.entries(sexLabels) as Array<[UserSex, string]>).map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+        </label>
+
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <NumberField
+            label="Poids actuel"
+            onChange={(value) => setSettings({ ...settings, currentWeightKg: value })}
+            value={settings.currentWeightKg}
+          />
+          <NumberField
+            label="Objectif poids"
+            onChange={(value) => setSettings({ ...settings, targetWeightKg: value })}
+            value={settings.targetWeightKg}
+          />
+        </div>
+        <NumberField
+          className="mt-4"
+          label="1RM developpe couche"
+          onChange={(value) => setSettings({ ...settings, benchOneRepMaxKg: value })}
+          value={settings.benchOneRepMaxKg}
+        />
+        <label className="mt-4 block">
+          <span className="text-sm font-bold text-white/60">Unite de charge</span>
+          <select
+            className="mt-1 h-12 w-full rounded-md border border-white/10 bg-white/5 px-3 font-semibold text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
+            onChange={(event) => setSettings({ ...settings, loadUnit: event.target.value === "lb" ? "lb" : "kg" })}
+            value={settings.loadUnit}
+          >
+            <option value="kg">kg</option>
+            <option value="lb">lb</option>
+          </select>
+        </label>
+
+        <p className="mt-5 text-sm font-semibold text-white/55">Jours de judo</p>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          {weekdays.map((day) => {
+            const checked = settings.judoDays.includes(day.value);
+
+            return (
+              <label
+                className={`flex min-h-12 items-center gap-2 rounded-md border px-3 font-bold ${
+                  checked ? "border-sky/40 bg-sky/10 text-sky" : "border-white/8 bg-white/5 text-white/60"
+                }`}
+                key={day.value}
+              >
+                <input
+                  checked={checked}
+                  onChange={(event) => {
+                    const nextDays = event.target.checked
+                      ? [...settings.judoDays, day.value]
+                      : settings.judoDays.filter((item) => item !== day.value);
+                    setSettings({ ...settings, judoDays: nextDays });
+                  }}
+                  type="checkbox"
+                />
+                {day.label}
+              </label>
+            );
+          })}
+        </div>
+
+        <p className="mt-5 text-sm font-semibold text-white/55">Jours disponibles pour la muscu</p>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          {weekdays.map((day) => {
+            const checked = settings.availableDays.includes(day.value);
+
+            return (
+              <label
+                className={`flex min-h-12 items-center gap-2 rounded-md border px-3 font-bold ${
+                  checked ? "border-sea/40 bg-sea/10 text-sea" : "border-white/8 bg-white/5 text-white/60"
+                }`}
+                key={day.value}
+              >
+                <input
+                  checked={checked}
+                  onChange={(event) => {
+                    const nextDays = event.target.checked
+                      ? [...settings.availableDays, day.value]
+                      : settings.availableDays.filter((item) => item !== day.value);
+                    setSettings({ ...settings, availableDays: nextDays.length > 0 ? nextDays : settings.availableDays });
+                  }}
+                  type="checkbox"
+                />
+                {day.label}
+              </label>
+            );
+          })}
+        </div>
+
+        <label className="mt-4 block">
+          <span className="text-sm font-bold text-white/60">Duree preferee des seances</span>
+          <select
+            className="mt-1 h-12 w-full rounded-md border border-white/10 bg-white/5 px-3 font-semibold text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
+            onChange={(event) =>
+              setSettings({ ...settings, sessionDurationPreference: event.target.value as SessionDurationPreference })
+            }
+            value={settings.sessionDurationPreference}
+          >
+            {(Object.entries(durationLabels) as Array<[SessionDurationPreference, string]>).map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+        </label>
+
+        <label className="mt-4 block">
+          <span className="text-sm font-bold text-white/60">Niveau de prudence</span>
+          <select
+            className="mt-1 h-12 w-full rounded-md border border-white/10 bg-white/5 px-3 font-semibold text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
+            onChange={(event) => setSettings({ ...settings, cautionLevel: event.target.value as CautionLevel })}
+            value={settings.cautionLevel}
+          >
+            <option value="prudent">Prudent</option>
+            <option value="normal">Normal</option>
+            <option value="agressif">Agressif</option>
+          </select>
+        </label>
+
+        <ToggleRow
+          checked={settings.aiEnabled}
+          label="Activer l'IA coach"
+          onChange={(checked) => setSettings({ ...settings, aiEnabled: checked })}
+        />
+      </details>
+
+      <WeightLogSection
+        currentWeightKg={settings.currentWeightKg}
+        targetWeightKg={settings.targetWeightKg}
+        weightLog={settings.weightLog ?? []}
+        onLog={(entry) => {
+          const existing = settings.weightLog ?? [];
+          const sameDay = existing.find((e) => e.date === entry.date);
+          const nextLog = sameDay
+            ? existing.map((e) => (e.date === entry.date ? entry : e))
+            : [entry, ...existing].slice(0, 30);
+          setSettings({ ...settings, weightLog: nextLog, currentWeightKg: entry.kg });
+        }}
+      />
+
+      <ExternalSportsSection
+        externalSports={settings.externalSports}
+        onChange={(externalSports) => setSettings({ ...settings, externalSports })}
+      />
+
+      <StrengthReferencesSection
+        loadUnit={settings.loadUnit}
+        onChange={(strengthReferences) => setSettings({ ...settings, strengthReferences })}
+        onSettingsChange={setSettings}
+        settings={settings}
+        strengthReferences={settings.strengthReferences}
+      />
+
+      <details className="card-dark group p-4">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-black text-white">Donnees locales</h2>
+            <p className="mt-1 text-sm font-semibold text-white/55">
+              {history.length} seance{history.length > 1 ? "s" : ""} enregistree{history.length > 1 ? "s" : ""}.
+            </p>
+          </div>
+          <span className="rounded-md bg-white/8 px-3 py-2 text-xs font-black text-white/55 group-open:bg-coral/10 group-open:text-coral">
+            Ouvrir
+          </span>
+        </summary>
+        <button
+          className="mt-4 h-12 w-full rounded-md border border-coral/30 bg-coral/10 px-4 font-black text-coral transition hover:bg-coral hover:text-white"
+          onClick={() => setConfirmReset(true)}
+          type="button"
+        >
+          Reinitialiser les donnees locales
+        </button>
+        {confirmReset ? (
+          <div className="mt-3 rounded-lg border border-coral/20 bg-coral/10 p-3">
+            <p className="text-sm font-black text-coral">Cette action efface l&apos;historique et le programme ajuste.</p>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button
+                className="h-11 rounded-md border border-white/10 bg-white/8 px-3 font-black text-white"
+                onClick={() => setConfirmReset(false)}
+                type="button"
+              >
+                Annuler
+              </button>
+              <button
+                className="h-11 rounded-md bg-coral px-3 font-black text-white"
+                onClick={() => {
+                  resetAll();
+                  setConfirmReset(false);
+                }}
+                type="button"
+              >
+                Confirmer
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </details>
+    </div>
+  );
+}
+
 function ProfileTile({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-md bg-white/10 p-3">
@@ -542,22 +982,26 @@ function ExternalSportsSection({
   };
 
   return (
-    <section className="card-dark p-4">
-      <div className="flex items-start justify-between gap-3">
+    <details className="card-dark group p-4">
+      <summary className="flex cursor-pointer list-none items-start justify-between gap-3">
         <div>
           <h2 className="text-xl font-black text-white">Sports externes</h2>
           <p className="mt-1 text-sm font-semibold text-white/55">
             L&apos;app evite les semaines trop chargees quand ces sports sont renseignes.
           </p>
         </div>
-        <button
-          className="h-10 shrink-0 rounded-md bg-sky px-3 text-sm font-black text-white transition hover:bg-sky/80"
-          onClick={addSport}
-          type="button"
-        >
-          + Sport
-        </button>
-      </div>
+        <span className="rounded-md bg-white/8 px-3 py-2 text-xs font-black text-white/55 group-open:bg-sky/10 group-open:text-sky">
+          {externalSports.length > 0 ? `${externalSports.length} sport(s)` : "Ouvrir"}
+        </span>
+      </summary>
+
+      <button
+        className="mt-4 h-10 rounded-md bg-sky px-3 text-sm font-black text-white transition hover:bg-sky/80"
+        onClick={addSport}
+        type="button"
+      >
+        + Sport
+      </button>
 
       {externalSports.length === 0 ? (
         <p className="mt-4 rounded-md bg-white/5 p-3 text-sm font-semibold text-white/50">
@@ -631,7 +1075,7 @@ function ExternalSportsSection({
           ))}
         </div>
       )}
-    </section>
+    </details>
   );
 }
 
@@ -715,22 +1159,26 @@ function StrengthReferencesSection({
     .filter((item) => item.reference.origin !== "learned");
 
   return (
-    <section className="card-dark p-4">
-      <div className="flex items-start justify-between gap-3">
+    <details className="card-dark group p-4">
+      <summary className="flex cursor-pointer list-none items-start justify-between gap-3">
         <div>
           <h2 className="text-xl font-black text-white">Reperes de force</h2>
           <p className="mt-1 text-sm font-semibold text-white/55">
             Renseigne une serie propre, par exemple 100 kg x 5. L&apos;app estime ensuite ton 1RM.
           </p>
         </div>
-        <button
-          className="h-10 shrink-0 rounded-md bg-sky px-3 text-sm font-black text-white transition hover:bg-sky/80"
-          onClick={addReference}
-          type="button"
-        >
-          + Repere
-        </button>
-      </div>
+        <span className="rounded-md bg-white/8 px-3 py-2 text-xs font-black text-white/55 group-open:bg-sky/10 group-open:text-sky">
+          {strengthReferences.length > 0 ? `${strengthReferences.length} repere(s)` : "Ouvrir"}
+        </span>
+      </summary>
+
+      <button
+        className="mt-4 h-10 rounded-md bg-sky px-3 text-sm font-black text-white transition hover:bg-sky/80"
+        onClick={addReference}
+        type="button"
+      >
+        + Repere
+      </button>
 
       {strengthReferences.length === 0 ? (
         <p className="mt-4 rounded-md bg-white/5 p-3 text-sm font-semibold text-white/50">
@@ -905,7 +1353,7 @@ function StrengthReferencesSection({
           ) : null}
         </div>
       )}
-    </section>
+    </details>
   );
 }
 
@@ -996,8 +1444,18 @@ function WeightLogSection({
   const toGoKg = +(currentWeightKg - targetWeightKg).toFixed(1);
 
   return (
-    <section className="card-dark p-4">
-      <h2 className="text-xl font-black text-white">Suivi du poids</h2>
+    <details className="card-dark group p-4">
+      <summary className="flex cursor-pointer list-none items-start justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-black text-white">Suivi du poids</h2>
+          <p className="mt-1 text-sm font-semibold text-white/55">
+            Journal rapide du poids actuel, de l&apos;objectif et de la tendance recente.
+          </p>
+        </div>
+        <span className="rounded-md bg-white/8 px-3 py-2 text-xs font-black text-white/55 group-open:bg-sky/10 group-open:text-sky">
+          {weightLog.length > 0 ? `${weightLog.length} entree(s)` : "Ouvrir"}
+        </span>
+      </summary>
 
       <div className="mt-4 flex gap-2">
         <input
@@ -1050,7 +1508,7 @@ function WeightLogSection({
           ))}
         </div>
       ) : null}
-    </section>
+    </details>
   );
 }
 

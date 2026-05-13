@@ -8,9 +8,14 @@ export function BrandLogo({ className = "", variant = "icon" }: BrandLogoProps) 
   if (variant === "wordmark") {
     return (
       <div className={`brand-wordmark ${className}`} aria-label="AthletIQ IA">
-        <LogoMark className="brand-wordmark-mark" />
-        <span className="brand-wordmark-text">
-          ATHLET<span>IQ</span>
+        <span className="brand-wordmark-icon">
+          <LogoMark className="brand-wordmark-mark" />
+        </span>
+        <span className="brand-wordmark-copy">
+          <span className="brand-wordmark-text">
+            ATHLET<span>IQ</span>
+          </span>
+          <span className="brand-wordmark-tagline">Coach adaptatif</span>
         </span>
         <span className="brand-wordmark-ai">IA</span>
       </div>

@@ -16,8 +16,8 @@ export function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-white/95 px-2 pb-[calc(0.65rem+env(safe-area-inset-bottom))] pt-2 shadow-soft backdrop-blur">
-      <div className="mx-auto grid max-w-xl grid-cols-6 gap-1">
+    <nav className="fixed inset-x-0 bottom-0 z-30 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2">
+      <div className="mx-auto grid max-w-xl grid-cols-6 gap-1 rounded-[1.6rem] border border-white/10 bg-[#090a0d]/94 p-1.5 shadow-[0_20px_60px_rgba(0,0,0,0.62)] backdrop-blur-xl">
         {items.map((item) => {
           const isActive = pathname === item.href;
 
@@ -25,15 +25,17 @@ export function BottomNav() {
             <Link
               aria-label={item.label}
               aria-current={isActive ? "page" : undefined}
-              className={`flex min-h-[3.75rem] flex-col items-center justify-center rounded-lg px-0.5 text-[9px] font-black transition ${
-                isActive ? "text-sky" : "text-white/50 hover:bg-white/5"
+              className={`flex min-h-[3.85rem] flex-col items-center justify-center rounded-[1.2rem] px-0.5 text-[9px] font-black transition ${
+                isActive
+                  ? "bg-gradient-to-b from-[#ff7a18] to-[#ff4d00] text-white shadow-[0_10px_26px_rgba(255,90,0,0.26)]"
+                  : "text-white/45 hover:bg-white/5 hover:text-white/75"
               }`}
               href={item.href}
               key={item.href}
             >
               <span
-                className={`flex size-6 items-center justify-center rounded-full text-sm font-black leading-none ${
-                  isActive ? "bg-sky/10 text-sky" : "bg-white/8 text-white/50"
+                className={`flex size-7 items-center justify-center rounded-full text-sm font-black leading-none ${
+                  isActive ? "bg-black/20 text-white" : "bg-white/8 text-white/50"
                 }`}
                 aria-hidden="true"
               >
