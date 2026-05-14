@@ -16,7 +16,7 @@ type ExerciseSignal = {
   painCount: number;
 };
 
-export const GLOBAL_DELOAD_NOTE = "Deload automatique: semaine allegee sur l'ensemble du programme.";
+export const GLOBAL_DELOAD_NOTE = "Semaine plus legere: volume reduit sur l'ensemble du programme.";
 export const GLOBAL_DELOAD_GUIDE_NOTE = "Objectif du cycle: recuperer, garder une execution propre et laisser revenir les sensations.";
 
 /**
@@ -122,7 +122,7 @@ export function adaptProgramAfterSession(
       }
 
       if (isNextSession && signal && shouldDeloadExercise(signal) && pressure !== "pain") {
-        notes.add(`Deload local sur ${exercise.name}: l'exercice coince depuis plusieurs passages, on reduit pour relancer proprement.`);
+        notes.add(`Seance allegee sur ${exercise.name}: l'exercice coince depuis plusieurs passages, on reduit pour relancer proprement.`);
         return applyLocalDeload(exercise, signal);
       }
 
@@ -276,7 +276,7 @@ function applyLocalDeload(exercise: Exercise, signal: ExerciseSignal): Exercise 
     target: reduceTarget(exercise.target),
     plannedLoad: reduceLoad(exercise.plannedLoad, reductionPercent),
     rest: increaseRest(exercise.rest),
-    cue: `${exercise.cue} Deload local: calmer la fatigue sur cet exercice avant de reprogresser proprement.`
+    cue: `${exercise.cue} Seance allegee: calmer la fatigue sur cet exercice avant de reprogresser proprement.`
   });
 }
 
@@ -285,7 +285,7 @@ function applyGlobalDeloadToExercise(exercise: Exercise): Exercise {
     return normalizeExerciseV2({
       ...exercise,
       target: reduceTarget(exercise.target),
-      cue: `${exercise.cue} Deload global: rester facile, souffle propre et recuperation prioritaire.`
+      cue: `${exercise.cue} Semaine plus legere: rester facile, souffle propre et recuperation prioritaire.`
     });
   }
 
@@ -294,7 +294,7 @@ function applyGlobalDeloadToExercise(exercise: Exercise): Exercise {
     target: reduceTarget(exercise.target),
     plannedLoad: reduceLoad(exercise.plannedLoad, 10),
     rest: increaseRest(exercise.rest),
-    cue: `${exercise.cue} Deload global: garder 2-3 reps en reserve sur tout l'exercice.`
+    cue: `${exercise.cue} Semaine plus legere: garder 2-3 reps en reserve sur tout l'exercice.`
   });
 }
 

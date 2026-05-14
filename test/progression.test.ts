@@ -416,7 +416,7 @@ test("repeated hard history plus a new hard session triggers a local deload", ()
   assert.equal(result.decision, "baisser");
   assert.equal(result.nextLoad, "85,5 kg");
   assert.equal(result.nextTarget, "4 x 5");
-  assert.match(result.warning ?? "", /Deload local/i);
+  assert.match(result.warning ?? "", /Baisse temporaire/i);
 });
 
 test("summarizeProgressions groups progression, stable and watch decisions", () => {

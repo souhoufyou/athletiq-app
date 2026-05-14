@@ -109,7 +109,7 @@ export function PerformanceDashboard() {
           <div className="mt-2 flex items-end justify-between gap-3">
             <div>
               <h2 className="text-3xl font-black leading-tight">
-                {bench?.trend === "progresse" ? "Progression visible" : "Command center"}
+                {bench?.trend === "progresse" ? "Progression visible" : "Vue d'ensemble"}
               </h2>
               <p className="mt-2 text-sm font-semibold text-white/55">
                 {settings.athleteName} - {settings.mainGoal}
@@ -128,23 +128,12 @@ export function PerformanceDashboard() {
           </div>
           <div className="mt-3 rounded-2xl border border-coral/20 bg-coral/10 p-3">
             <p className="text-xs font-black uppercase text-coral">Prochaine cible</p>
-            <p className="mt-1 text-sm font-black text-white">{bench?.nextTarget ?? dashboard.nextTargets[0] ?? "Valider 2 seances pour calibrer les cibles."}</p>
+            <p className="mt-1 text-sm font-black text-white">{bench?.nextTarget ?? dashboard.nextTargets[0] ?? "Valider 2 seances pour definir les cibles."}</p>
           </div>
         </div>
       </section>
 
-      <section className="hidden">
-        <p className="text-sm font-black uppercase text-sky">Vue athlète</p>
-        <h2 className="mt-1 text-3xl font-black leading-tight">
-          {bench?.trend === "progresse" ? "Tu avances" : "Repères principaux"}
-        </h2>
-        <div className="mt-5 grid grid-cols-3 gap-2">
-          <HeroMetric label="Bench" value={bench?.latest ?? "-"} />
-          <HeroMetric label="Record" value={bench?.best ?? "127 kg x 1"} />
-          <HeroMetric label="Cible" value={bench?.nextTarget ?? "-"} />
-        </div>
-      </section>
-
+      <div className="grid gap-4 xl:grid-cols-2">
       <GoalsSection
         benchOneRepMaxKg={settings.benchOneRepMaxKg}
         judoDaysCount={settings.judoDays.length}
@@ -173,7 +162,9 @@ export function PerformanceDashboard() {
         tone="info"
       />
 
-      <CalibrationJournalSection events={settings.calibrationEvents ?? []} />
+      </div>
+
+      <LoadAdjustmentsSection events={settings.calibrationEvents ?? []} />
 
       <section className="space-y-3">
         <div>
@@ -288,13 +279,13 @@ function SignalSection({
   );
 }
 
-function CalibrationJournalSection({ events }: { events: CalibrationEvent[] }) {
+function LoadAdjustmentsSection({ events }: { events: CalibrationEvent[] }) {
   return (
     <section className="rounded-xl border border-white/10 bg-white/5 p-4 shadow-soft">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-black uppercase text-white/40">Adaptation</p>
-          <h2 className="mt-1 text-2xl font-black text-white">Journal de recalibrage</h2>
+          <p className="text-sm font-black uppercase text-white/40">Ajustements</p>
+          <h2 className="mt-1 text-2xl font-black text-white">Ajustements du coach</h2>
         </div>
         <span className="rounded-md bg-white/8 px-2 py-1 text-xs font-black text-white/55">
           {events.length}
@@ -320,7 +311,7 @@ function CalibrationJournalSection({ events }: { events: CalibrationEvent[] }) {
           ))
         ) : (
           <p className="rounded-md bg-white/8 p-3 text-sm font-semibold text-white/50">
-            Les ajustements de charge, reperes appris et verrouillages apparaitront ici.
+            Les changements de charge et de reperes apparaitront ici.
           </p>
         )}
       </div>

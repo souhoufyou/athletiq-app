@@ -31,7 +31,7 @@ export function getExerciseLoadInsight(exercise: Exercise, settings: UserSetting
   if (!isEstimate) {
     if (pattern === "chest-compound" && settings.benchOneRepMaxKg > 0) {
       return {
-        badge: "Calibree",
+        badge: "Repere",
         detail: "Charge construite depuis ton repere au developpe couche. Elle sert de base de travail, pas de test max.",
         tone: "info"
       };
@@ -39,7 +39,7 @@ export function getExerciseLoadInsight(exercise: Exercise, settings: UserSetting
 
     if (hasMatchingReference(pattern, settings)) {
       return {
-        badge: "Calibree",
+        badge: "Repere",
         detail: `Charge basee sur ton repere ${getReferenceLabel(pattern)}. Ajuste-la seulement si l'effort reel ne colle pas.`,
         tone: "info"
       };

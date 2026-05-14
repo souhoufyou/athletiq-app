@@ -38,7 +38,7 @@ export function buildStrengthReferenceFromSet(
 }
 
 export function formatEstimatedOneRepMax(value: number | undefined): string {
-  return value && value > 0 ? `${formatNumber(value)} kg estime` : "Non calibre";
+  return value && value > 0 ? `${formatNumber(value)} kg estime` : "Non renseigne";
 }
 
 function clamp(value: number, min: number, max: number): number {

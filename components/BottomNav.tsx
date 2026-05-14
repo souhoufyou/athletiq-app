@@ -16,8 +16,8 @@ export function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-30 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2">
-      <div className="mx-auto grid w-full max-w-[64rem] grid-cols-6 gap-1 rounded-[1.6rem] border border-white/10 bg-[#090a0d]/94 p-1.5 shadow-[0_20px_60px_rgba(0,0,0,0.62)] backdrop-blur-xl">
+    <nav className="fixed inset-x-0 bottom-0 z-30 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2 lg:inset-x-auto lg:bottom-auto lg:left-4 lg:top-28 lg:px-0 lg:pb-0 lg:pt-0">
+      <div className="mx-auto grid w-full max-w-[64rem] grid-cols-6 gap-1 rounded-[1.6rem] border border-white/10 bg-[#090a0d]/94 p-1.5 shadow-[0_20px_60px_rgba(0,0,0,0.62)] backdrop-blur-xl lg:w-[5.25rem] lg:max-w-none lg:grid-cols-1 lg:rounded-[1.4rem]">
         {items.map((item) => {
           const isActive = pathname === item.href;
 
@@ -25,7 +25,7 @@ export function BottomNav() {
             <Link
               aria-label={item.label}
               aria-current={isActive ? "page" : undefined}
-              className={`flex min-h-[3.85rem] flex-col items-center justify-center rounded-[1.2rem] px-0.5 text-[9px] font-black transition ${
+              className={`flex min-h-[3.85rem] flex-col items-center justify-center rounded-[1.2rem] px-0.5 text-[9px] font-black transition lg:min-h-[4.2rem] ${
                 isActive
                   ? "bg-gradient-to-b from-[#ff7a18] to-[#ff4d00] text-white shadow-[0_10px_26px_rgba(255,90,0,0.26)]"
                   : "text-white/45 hover:bg-white/5 hover:text-white/75"

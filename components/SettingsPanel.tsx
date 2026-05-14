@@ -2,12 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import {
-  appendCalibrationEvent,
-  createReferenceDeletedCalibrationEvent,
-  createReferenceLockCalibrationEvent
-} from "@/lib/calibrationEvents";
-import { buildStrengthReferenceFromSet, estimateOneRepMaxFromSet, formatEstimatedOneRepMax } from "@/lib/strengthCalibration";
+import { PROFILE_PRESETS } from "@/data/profilePresets";
+import { getActiveProgramTemplate } from "@/lib/activeProgram";
 import { useCoachStorage } from "@/lib/storage";
 import type {
   CautionLevel,
@@ -18,46 +14,49 @@ import type {
   PrimaryGoal,
   Profile,
   SessionDurationPreference,
-  StrengthReference,
   UserSex,
   UserSettings,
   Weekday,
   WeightEntry
 } from "@/types/training";
 
-const AVATAR_CHOICES = ["💪", "🏋️", "🥋", "🏃", "🤸", "🧘", "👤", "🦁", "🔥", "⚡"];
-
 const goalLabels: Record<PrimaryGoal, string> = {
   "perte-gras": "Perte de gras",
-  "prise-masse": "Prise de masse",
+  "prise-masse": "Prise de muscle",
   recomposition: "Recomposition",
-  performance: "Performance",
-  sante: "Santé"
+  performance: "Force",
+  sante: "Cardio / sante"
 };
 
 const equipmentLabels: Record<Equipment, string> = {
-  "salle-complete": "Salle complète",
-  "halteres-maison": "Maison équipée",
-  "poids-corps": "Poids du corps"
+  "salle-complete": "Salle equipee",
+  "halteres-maison": "Maison equipee",
+  "poids-corps": "Peu de materiel"
 };
 
 const experienceLabels: Record<ExperienceLevel, string> = {
-  debutant: "Débutant",
-  intermediaire: "Intermédiaire",
-  avance: "Avancé"
+  debutant: "Debutant",
+  intermediaire: "Intermediaire",
+  avance: "Avance"
 };
 
 const sexLabels: Record<UserSex, string> = {
   female: "Femme",
   male: "Homme",
   other: "Autre",
-  "prefer-not-to-say": "Non renseigné"
+  "prefer-not-to-say": "Non renseigne"
 };
 
 const durationLabels: Record<SessionDurationPreference, string> = {
   short: "35-45 min",
   standard: "50-65 min",
   long: "70-90 min"
+};
+
+const cautionLabels: Record<CautionLevel, string> = {
+  prudent: "Prudent",
+  normal: "Normal",
+  agressif: "Agressif"
 };
 
 const externalSportIntensityLabels: Record<ExternalSportIntensity, string> = {
@@ -76,415 +75,23 @@ const weekdays: Array<{ value: Weekday; label: string }> = [
   { value: "sunday", label: "Dimanche" }
 ];
 
+const avatarChoices = ["S", "A", "F", "P", "1", "2"];
+
 function getPrimaryGoalLabel(settings: UserSettings): string {
   return settings.primaryGoal ? goalLabels[settings.primaryGoal] : settings.mainGoal;
 }
 
-function LegacySettingsPanel() {
-  const [confirmReset, setConfirmReset] = useState(false);
-  const [confirmRegen, setConfirmRegen] = useState(false);
-  const {
-    activeProfileId,
-    createProfile,
-    deleteProfile,
-    history,
-    isReady,
-    profiles,
-    regenerateProgram,
-    renameProfile,
-    resetAll,
-    setSettings,
-    settings,
-    switchProfile
-  } = useCoachStorage();
-
-  if (!isReady) {
-    return <div className="rounded-lg bg-white p-5 font-bold shadow-soft">Chargement...</div>;
-  }
-
-  return (
-    <div className="space-y-4">
-      <ProfilesSection
-        activeProfileId={activeProfileId}
-        onCreate={createProfile}
-        onDelete={deleteProfile}
-        onRename={renameProfile}
-        onSwitch={switchProfile}
-        profiles={profiles}
-      />
-      <section className="overflow-hidden rounded-2xl border border-white/10 premium-gradient p-5 text-white shadow-soft">
-        <p className="text-xs font-black uppercase text-sky">Profil sportif</p>
-        <h2 className="mt-1 text-2xl font-black">{settings.athleteName}</h2>
-        <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
-          <ProfileTile label="Âge" value={`${settings.age} ans`} />
-          <ProfileTile label="Taille" value={`${settings.heightCm} cm`} />
-          <ProfileTile label="Poids actuel" value={`${settings.currentWeightKg} kg`} />
-          <ProfileTile label="Objectif" value={`~${settings.targetWeightKg} kg`} />
-        </div>
-        <p className="mt-4 text-sm font-semibold text-white/70">{settings.mainGoal}</p>
-        <p className="mt-2 text-sm font-semibold text-white/50">
-          {settings.gym ? `Salle ${settings.gym} · ` : ""}Judo {settings.judoDays.length > 0 ? `${settings.judoDays.length}x/semaine` : "non planifié"}
-        </p>
-      </section>
-
-      <section className="card-dark p-4">
-        <h2 className="text-xl font-black text-white">Mesures</h2>
-        <label className="mt-4 block">
-          <span className="text-sm font-bold text-white/60">Prénom</span>
-          <input
-            className="mt-1 h-12 w-full rounded-md border border-white/10 px-3 font-semibold outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
-            onChange={(event) => setSettings({ ...settings, athleteName: event.target.value })}
-            placeholder="Ton prénom"
-            value={settings.athleteName}
-          />
-        </label>
-        <label className="mt-4 block">
-          <span className="text-sm font-bold text-white/60">Profil biologique</span>
-          <select
-            className="mt-1 h-12 w-full rounded-md border border-white/10 bg-white/5 px-3 font-semibold text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
-            onChange={(event) => setSettings({ ...settings, sex: event.target.value as UserSex })}
-            value={settings.sex}
-          >
-            {(Object.entries(sexLabels) as Array<[UserSex, string]>).map(([value, label]) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-          </select>
-        </label>
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          <NumberField
-            label="Poids actuel"
-            onChange={(value) => setSettings({ ...settings, currentWeightKg: value })}
-            value={settings.currentWeightKg}
-          />
-          <NumberField
-            label="Objectif poids"
-            onChange={(value) => setSettings({ ...settings, targetWeightKg: value })}
-            value={settings.targetWeightKg}
-          />
-        </div>
-        <NumberField
-          className="mt-4"
-          label="1RM développé couché"
-          onChange={(value) => setSettings({ ...settings, benchOneRepMaxKg: value })}
-          value={settings.benchOneRepMaxKg}
-        />
-        <label className="mt-4 block">
-          <span className="text-sm font-bold text-ink/60">Unité de charge</span>
-          <select
-            className="mt-1 h-12 w-full rounded-md border border-black/10 bg-white px-3 font-semibold outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
-            onChange={(event) =>
-              setSettings({ ...settings, loadUnit: event.target.value === "lb" ? "lb" : "kg" })
-            }
-            value={settings.loadUnit}
-          >
-            <option value="kg">kg</option>
-            <option value="lb">lb</option>
-          </select>
-        </label>
-      </section>
-
-      <section className="card-dark p-4">
-        <h2 className="text-xl font-black text-white">Planification</h2>
-        <p className="mt-1 text-sm font-semibold text-white/55">Jours de judo</p>
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          {weekdays.map((day) => {
-            const checked = settings.judoDays.includes(day.value);
-
-            return (
-              <label
-                className={`flex min-h-12 items-center gap-2 rounded-md border px-3 font-bold ${
-                  checked ? "border-sky/40 bg-sky/10 text-sky" : "border-white/8 bg-white/5 text-white/60"
-                }`}
-                key={day.value}
-              >
-                <input
-                  checked={checked}
-                  onChange={(event) => {
-                    const nextDays = event.target.checked
-                      ? [...settings.judoDays, day.value]
-                      : settings.judoDays.filter((item) => item !== day.value);
-                    setSettings({ ...settings, judoDays: nextDays });
-                  }}
-                  type="checkbox"
-                />
-                {day.label}
-              </label>
-            );
-          })}
-        </div>
-
-        <p className="mt-5 text-sm font-semibold text-white/55">Jours disponibles pour la muscu</p>
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          {weekdays.map((day) => {
-            const checked = settings.availableDays.includes(day.value);
-
-            return (
-              <label
-                className={`flex min-h-12 items-center gap-2 rounded-md border px-3 font-bold ${
-                  checked ? "border-sea/40 bg-sea/10 text-sea" : "border-white/8 bg-white/5 text-white/60"
-                }`}
-                key={day.value}
-              >
-                <input
-                  checked={checked}
-                  onChange={(event) => {
-                    const nextDays = event.target.checked
-                      ? [...settings.availableDays, day.value]
-                      : settings.availableDays.filter((item) => item !== day.value);
-                    setSettings({ ...settings, availableDays: nextDays.length > 0 ? nextDays : settings.availableDays });
-                  }}
-                  type="checkbox"
-                />
-                {day.label}
-              </label>
-            );
-          })}
-        </div>
-
-        <label className="mt-4 block">
-          <span className="text-sm font-bold text-white/60">Durée préférée des séances</span>
-          <select
-            className="mt-1 h-12 w-full rounded-md border border-white/10 bg-white/5 px-3 font-semibold text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
-            onChange={(event) =>
-              setSettings({ ...settings, sessionDurationPreference: event.target.value as SessionDurationPreference })
-            }
-            value={settings.sessionDurationPreference}
-          >
-            {(Object.entries(durationLabels) as Array<[SessionDurationPreference, string]>).map(([value, label]) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-          </select>
-        </label>
-
-        <label className="mt-4 block">
-          <span className="text-sm font-bold text-white/60">Niveau de prudence</span>
-          <select
-            className="mt-1 h-12 w-full rounded-md border border-white/10 px-3 font-semibold outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
-            onChange={(event) => setSettings({ ...settings, cautionLevel: event.target.value as CautionLevel })}
-            value={settings.cautionLevel}
-          >
-            <option value="prudent">Prudent</option>
-            <option value="normal">Normal</option>
-            <option value="agressif">Agressif</option>
-          </select>
-        </label>
-
-        <ToggleRow
-          checked={settings.aiEnabled}
-          label="Activer l'IA coach"
-          onChange={(checked) => setSettings({ ...settings, aiEnabled: checked })}
-        />
-      </section>
-
-      <ExternalSportsSection
-        externalSports={settings.externalSports}
-        onChange={(externalSports) => setSettings({ ...settings, externalSports })}
-      />
-
-      <StrengthReferencesSection
-        loadUnit={settings.loadUnit}
-        onChange={(strengthReferences) => setSettings({ ...settings, strengthReferences })}
-        onSettingsChange={setSettings}
-        settings={settings}
-        strengthReferences={settings.strengthReferences}
-      />
-
-      <WeightLogSection
-        currentWeightKg={settings.currentWeightKg}
-        targetWeightKg={settings.targetWeightKg}
-        weightLog={settings.weightLog ?? []}
-        onLog={(entry) => {
-          const existing = settings.weightLog ?? [];
-          const sameDay = existing.find((e) => e.date === entry.date);
-          const nextLog = sameDay
-            ? existing.map((e) => (e.date === entry.date ? entry : e))
-            : [entry, ...existing].slice(0, 30);
-          setSettings({ ...settings, weightLog: nextLog, currentWeightKg: entry.kg });
-        }}
-      />
-
-      <section className="card-dark p-4">
-        <h2 className="text-xl font-black text-white">Préférences & contraintes</h2>
-        <p className="mt-1 text-sm font-semibold text-white/55">
-          Ces listes sont utilisées à la prochaine régénération du programme.
-        </p>
-        <TextListField
-          label="Points de vigilance"
-          onChange={(values) => setSettings({ ...settings, watchPoints: values })}
-          placeholder="ex. poignet droit, lombaires, genou gauche"
-          values={settings.watchPoints}
-        />
-        <TextListField
-          label="Préférences"
-          onChange={(values) => setSettings({ ...settings, preferences: values })}
-          placeholder="ex. machines, haltères, full body"
-          values={settings.preferences}
-        />
-        <TextListField
-          label="Exercices à éviter"
-          onChange={(values) => setSettings({ ...settings, avoid: values })}
-          placeholder="ex. dips, squat barre, course"
-          values={settings.avoid}
-        />
-      </section>
-
-      <section className="card-dark p-4">
-        <h2 className="text-xl font-black text-white">Programme & objectif</h2>
-        <p className="mt-1 text-sm font-semibold text-white/55">
-          Modifie ton objectif, ta fréquence ou ton équipement pour régénérer un programme adapté.
-        </p>
-
-        <div className="mt-4 space-y-3">
-          <div>
-            <p className="text-sm font-bold text-white/60">Objectif principal</p>
-            <select
-              className="mt-1 h-12 w-full rounded-md border border-white/10 bg-white/5 px-3 font-semibold text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
-              onChange={(e) => setSettings({ ...settings, primaryGoal: e.target.value as PrimaryGoal })}
-              value={settings.primaryGoal ?? "recomposition"}
-            >
-              {(Object.entries(goalLabels) as Array<[PrimaryGoal, string]>).map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <p className="text-sm font-bold text-white/60">Fréquence (séances/semaine)</p>
-            <div className="mt-1 grid grid-cols-5 gap-2">
-              {[2, 3, 4, 5, 6].map((freq) => (
-                <button
-                  className={`h-11 rounded-md border font-black transition ${
-                    (settings.weeklyFrequency ?? 4) === freq
-                      ? "border-sky/50 bg-sky/10 text-sky"
-                      : "border-white/10 bg-white/5 text-white/60"
-                  }`}
-                  key={freq}
-                  onClick={() => setSettings({ ...settings, weeklyFrequency: freq })}
-                  type="button"
-                >
-                  {freq}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <p className="text-sm font-bold text-white/60">Équipement</p>
-            <select
-              className="mt-1 h-12 w-full rounded-md border border-white/10 bg-white/5 px-3 font-semibold text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
-              onChange={(e) => setSettings({ ...settings, equipment: e.target.value as Equipment })}
-              value={settings.equipment ?? "salle-complete"}
-            >
-              {(Object.entries(equipmentLabels) as Array<[Equipment, string]>).map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <p className="text-sm font-bold text-white/60">Niveau d&apos;expérience</p>
-            <select
-              className="mt-1 h-12 w-full rounded-md border border-white/10 bg-white/5 px-3 font-semibold text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
-              onChange={(e) => setSettings({ ...settings, experienceLevel: e.target.value as ExperienceLevel })}
-              value={settings.experienceLevel ?? "intermediaire"}
-            >
-              {(Object.entries(experienceLabels) as Array<[ExperienceLevel, string]>).map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <button
-          className="mt-4 h-12 w-full rounded-md border border-sky/30 bg-sky/10 px-4 font-black text-sky transition hover:bg-sky/20"
-          onClick={() => setConfirmRegen(true)}
-          type="button"
-        >
-          Régénérer mon programme
-        </button>
-        {confirmRegen ? (
-          <div className="mt-3 rounded-lg border border-sky/20 bg-sky/10 p-3">
-            <p className="text-sm font-black text-sky">
-              Cela remplace le programme actuel par un nouveau basé sur tes paramètres ci-dessus. L&apos;historique des séances déjà validées est conservé.
-            </p>
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <button
-                className="h-11 rounded-md border border-white/10 bg-white/8 px-3 font-black text-white"
-                onClick={() => setConfirmRegen(false)}
-                type="button"
-              >
-                Annuler
-              </button>
-              <button
-                className="h-11 rounded-md bg-sky px-3 font-black text-white"
-                onClick={() => {
-                  regenerateProgram();
-                  setConfirmRegen(false);
-                }}
-                type="button"
-              >
-                Régénérer
-              </button>
-            </div>
-          </div>
-        ) : null}
-      </section>
-
-      <section className="card-dark p-4">
-        <h2 className="text-xl font-black text-white">Données locales</h2>
-        <p className="mt-2 text-sm font-semibold text-white/55">
-          {history.length} séance{history.length > 1 ? "s" : ""} enregistrée{history.length > 1 ? "s" : ""}.
-        </p>
-        <button
-          className="mt-4 h-12 w-full rounded-md border border-coral/30 bg-coral/10 px-4 font-black text-coral transition hover:bg-coral hover:text-white"
-          onClick={() => setConfirmReset(true)}
-          type="button"
-        >
-          Réinitialiser les données locales
-        </button>
-        {confirmReset ? (
-          <div className="mt-3 rounded-lg border border-coral/20 bg-coral/10 p-3">
-            <p className="text-sm font-black text-coral">Cette action efface l&apos;historique et le programme ajusté.</p>
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <button
-                className="h-11 rounded-md border border-white/10 bg-white/8 px-3 font-black text-white"
-                onClick={() => setConfirmReset(false)}
-                type="button"
-              >
-                Annuler
-              </button>
-              <button
-                className="h-11 rounded-md bg-coral px-3 font-black text-white"
-                onClick={() => {
-                  resetAll();
-                  setConfirmReset(false);
-                }}
-                type="button"
-              >
-                Confirmer
-              </button>
-            </div>
-          </div>
-        ) : null}
-      </section>
-    </div>
-  );
-}
-
-void LegacySettingsPanel;
-
 export function SettingsPanel() {
   const [confirmReset, setConfirmReset] = useState(false);
-  const [confirmRegen, setConfirmRegen] = useState(false);
   const {
     activeProfileId,
+    applyProfilePreset,
     createProfile,
     currentProgram,
     deleteProfile,
     history,
     isReady,
     profiles,
-    regenerateProgram,
     renameProfile,
     resetAll,
     setSettings,
@@ -493,16 +100,334 @@ export function SettingsPanel() {
   } = useCoachStorage();
 
   if (!isReady) {
-    return <div className="rounded-lg bg-white p-5 font-bold shadow-soft">Chargement...</div>;
+    return <div className="rounded-2xl border border-white/10 bg-white/8 p-5 font-black text-white shadow-soft">Chargement...</div>;
   }
 
+  const activeProgram = getActiveProgramTemplate(currentProgram);
   const goalLabel = getPrimaryGoalLabel(settings);
   const weeklyFrequency = settings.weeklyFrequency ?? Math.max(currentProgram.length, 3);
-  const restrictionsCount = settings.watchPoints.length + settings.avoid.length + (settings.medicalNotes.trim() ? 1 : 0);
-  const sportsSummary = settings.externalSports.length > 0 ? `${settings.externalSports.length} sport(s)` : "Aucun";
+  const activeSessionCount = currentProgram.length || weeklyFrequency;
+  const restrictionsCount = settings.watchPoints.length + settings.avoid.length + settings.preferences.length + (settings.medicalNotes.trim() ? 1 : 0);
+  const profileSummary = `${settings.age} ans - ${settings.heightCm} cm - ${settings.currentWeightKg} kg`;
+
+  const patchSettings = (patch: Partial<UserSettings>) => setSettings({ ...settings, ...patch });
+  const setGoal = (primaryGoal: PrimaryGoal) => patchSettings({ primaryGoal, mainGoal: goalLabels[primaryGoal] });
+  const toggleAvailableDay = (day: Weekday) => {
+    const nextDays = settings.availableDays.includes(day)
+      ? settings.availableDays.filter((item) => item !== day)
+      : [...settings.availableDays, day];
+    patchSettings({ availableDays: nextDays.length > 0 ? nextDays : settings.availableDays });
+  };
+  const toggleJudoDay = (day: Weekday) => {
+    const nextDays = settings.judoDays.includes(day)
+      ? settings.judoDays.filter((item) => item !== day)
+      : [...settings.judoDays, day];
+    patchSettings({ judoDays: nextDays });
+  };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-28">
+      <section className="relative -mx-4 overflow-hidden border-b border-white/10 bg-[#050607] p-5 text-white shadow-[0_30px_90px_rgba(0,0,0,0.55)] sm:-mx-6 sm:px-6">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_86%_0%,rgba(255,90,0,0.42),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.07),transparent_44%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.08)_0_1px,transparent_1px_18px)] opacity-25" />
+
+        <div className="relative">
+          <p className="text-xs font-black uppercase text-coral">Reglages coach</p>
+          <h1 className="mt-2 text-3xl font-black leading-[0.95] text-white">{settings.athleteName}</h1>
+          <p className="mt-3 text-sm font-semibold leading-relaxed text-white/65">
+            {activeProgram?.name ?? "Programme personnalise"} - {goalLabel.toLowerCase()} - {activeSessionCount} seance{activeSessionCount > 1 ? "s" : ""}/semaine
+          </p>
+
+          <div className="mt-5 grid grid-cols-3 gap-2">
+            <ProfileTile label="Age" value={`${settings.age} ans`} />
+            <ProfileTile label="Poids" value={`${settings.currentWeightKg} kg`} />
+            <ProfileTile label="Contraintes" value={`${restrictionsCount}`} />
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <Link
+              className="flex h-12 items-center justify-center rounded-2xl bg-coral px-4 text-sm font-black text-white shadow-[0_18px_46px_rgba(255,90,0,0.28)]"
+              href="/programme"
+            >
+              Programme
+            </Link>
+            <Link
+              className="flex h-12 items-center justify-center rounded-2xl border border-white/12 bg-white/10 px-4 text-sm font-black text-white"
+              href="/onboarding"
+            >
+              Refaire le choix
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-[24px] border border-white/10 bg-[#10131d] p-4 shadow-soft">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-black uppercase text-coral">Profils rapides</p>
+            <h2 className="mt-1 text-2xl font-black text-white">Sofiane / Alicia</h2>
+            <p className="mt-1 text-sm font-semibold leading-relaxed text-white/55">
+              Chaque profil garde son historique, ses performances, ses restrictions et son programme actif.
+            </p>
+          </div>
+          <span className="rounded-xl border border-white/10 bg-white/8 px-3 py-2 text-xs font-black text-white/55">
+            {profiles.length}
+          </span>
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          {PROFILE_PRESETS.map((preset) => {
+            const active =
+              activeProfileId === preset.profile.id ||
+              settings.athleteName.trim().toLowerCase() === preset.profile.name.trim().toLowerCase();
+
+            return (
+              <button
+                className={`rounded-2xl border p-3 text-left transition active:scale-[0.99] ${
+                  active ? "border-coral/45 bg-coral/12" : "border-white/10 bg-white/[0.04]"
+                }`}
+                key={preset.id}
+                onClick={() => applyProfilePreset(preset.id)}
+                type="button"
+              >
+                <span className="flex size-10 items-center justify-center rounded-xl bg-coral/15 text-lg font-black text-coral">
+                  {preset.profile.avatar}
+                </span>
+                <p className={`mt-3 font-black ${active ? "text-coral" : "text-white"}`}>{preset.profile.name}</p>
+                <p className="mt-1 text-xs font-semibold leading-relaxed text-white/50">
+                  {preset.id === "alicia" ? "Perte de poids + fessiers" : "Recomposition + force"}
+                </p>
+                <p className="mt-3 rounded-xl border border-white/8 bg-white/5 px-3 py-2 text-center text-xs font-black text-white/60">
+                  {active ? "Actif" : "Activer"}
+                </p>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="rounded-[24px] border border-white/10 bg-[#10131d] p-4 shadow-soft">
+        <p className="text-xs font-black uppercase text-sky">Actions utiles</p>
+        <h2 className="mt-1 text-2xl font-black text-white">Coach actif</h2>
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <ProfileTile label="Objectif" value={goalLabel} />
+          <ProfileTile label="Rythme" value={`${weeklyFrequency} j/sem.`} />
+          <ProfileTile label="Niveau" value={experienceLabels[settings.experienceLevel ?? "intermediaire"]} />
+          <ProfileTile label="Materiel" value={equipmentLabels[settings.equipment ?? "salle-complete"]} />
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <Link
+            className="flex h-12 items-center justify-center rounded-2xl bg-coral px-4 text-sm font-black text-white"
+            href="/programme"
+          >
+            Changer programme
+          </Link>
+          <Link
+            className="flex h-12 items-center justify-center rounded-2xl border border-white/10 bg-white/8 px-4 text-sm font-black text-white/70"
+            href="/onboarding"
+          >
+            Refaire profil
+          </Link>
+        </div>
+      </section>
+
+      <details className="rounded-[24px] border border-white/10 bg-[#10131d] p-4 shadow-soft">
+        <summary className="flex cursor-pointer list-none items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-black uppercase text-white/40">Reglages</p>
+            <h2 className="mt-1 text-xl font-black text-white">Objectif & rythme</h2>
+            <p className="mt-1 text-sm font-semibold leading-relaxed text-white/55">
+              {goalLabel} - {weeklyFrequency} seance{weeklyFrequency > 1 ? "s" : ""}/semaine.
+            </p>
+          </div>
+          <span className="rounded-xl border border-white/10 bg-white/8 px-3 py-2 text-xs font-black text-white/55">Ouvrir</span>
+        </summary>
+
+        <div className="mt-4 space-y-4">
+          <div>
+            <p className="text-sm font-black text-white/65">Objectif principal</p>
+            <div className="mt-2 grid grid-cols-1 gap-2">
+              {(Object.entries(goalLabels) as Array<[PrimaryGoal, string]>).map(([value, label]) => (
+                <button
+                  className={`min-h-12 rounded-2xl border px-3 text-left text-sm font-black transition ${
+                    (settings.primaryGoal ?? "recomposition") === value
+                      ? "border-coral/45 bg-coral/10 text-coral"
+                      : "border-white/10 bg-white/[0.04] text-white/70"
+                  }`}
+                  key={value}
+                  onClick={() => setGoal(value)}
+                  type="button"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <ButtonChoiceGroup
+            columns="grid-cols-5"
+            label="Seances par semaine"
+            options={[2, 3, 4, 5, 6].map((value) => ({ label: `${value}`, value }))}
+            selected={weeklyFrequency}
+            onSelect={(weeklyFrequency) => patchSettings({ weeklyFrequency })}
+          />
+
+          <ButtonChoiceGroup
+            columns="grid-cols-3"
+            label="Duree"
+            options={(Object.entries(durationLabels) as Array<[SessionDurationPreference, string]>).map(([value, label]) => ({ label, value }))}
+            selected={settings.sessionDurationPreference}
+            onSelect={(sessionDurationPreference) => patchSettings({ sessionDurationPreference })}
+          />
+
+          <ButtonChoiceGroup
+            columns="grid-cols-3"
+            label="Prudence progression"
+            options={(Object.entries(cautionLabels) as Array<[CautionLevel, string]>).map(([value, label]) => ({ label, value }))}
+            selected={settings.cautionLevel}
+            onSelect={(cautionLevel) => patchSettings({ cautionLevel })}
+          />
+
+          <div className="grid grid-cols-2 gap-2">
+            <SelectField
+              label="Materiel"
+              value={settings.equipment ?? "salle-complete"}
+              options={equipmentLabels}
+              onChange={(equipment) => patchSettings({ equipment })}
+            />
+            <SelectField
+              label="Niveau"
+              value={settings.experienceLevel ?? "intermediaire"}
+              options={experienceLabels}
+              onChange={(experienceLevel) => patchSettings({ experienceLevel })}
+            />
+          </div>
+
+          <Link
+            className="flex h-12 items-center justify-center rounded-2xl border border-coral/35 bg-coral/10 px-4 text-sm font-black text-coral"
+            href="/programme"
+          >
+            Voir ou changer le programme
+          </Link>
+        </div>
+      </details>
+
+      <details className="rounded-[24px] border border-white/10 bg-[#10131d] p-4 shadow-soft">
+        <summary className="flex cursor-pointer list-none items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-black uppercase text-white/40">Securite</p>
+            <h2 className="mt-1 text-xl font-black text-white">Contraintes utiles</h2>
+            <p className="mt-1 text-sm font-semibold leading-relaxed text-white/55">
+              {restrictionsCount} info{restrictionsCount > 1 ? "s" : ""} utilisee{restrictionsCount > 1 ? "s" : ""} par le coach.
+            </p>
+          </div>
+          <span className="rounded-xl border border-white/10 bg-white/8 px-3 py-2 text-xs font-black text-white/55">Ouvrir</span>
+        </summary>
+        <TextListField
+          label="Points de vigilance"
+          onChange={(values) => patchSettings({ watchPoints: values })}
+          placeholder="ex. poignet droit, dos fragile, genou gauche"
+          values={settings.watchPoints}
+        />
+        <TextListField
+          label="Exercices a eviter"
+          onChange={(values) => patchSettings({ avoid: values })}
+          placeholder="ex. course, burpees, pompes, squat barre"
+          values={settings.avoid}
+        />
+        <TextListField
+          label="Preferences"
+          onChange={(values) => patchSettings({ preferences: values })}
+          placeholder="ex. machines, poulies, tapis incline"
+          values={settings.preferences}
+        />
+        <label className="mt-4 block">
+          <span className="text-sm font-bold text-white/60">Notes sante importantes</span>
+          <textarea
+            className="mt-1 min-h-20 w-full resize-none rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-sm font-semibold text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
+            onChange={(event) => patchSettings({ medicalNotes: event.target.value })}
+            placeholder="ex. post-partum, diastasis, spondylarthrite, apnee..."
+            value={settings.medicalNotes}
+          />
+        </label>
+      </details>
+
+      <details className="rounded-[24px] border border-white/10 bg-[#10131d] p-4 shadow-soft">
+        <summary className="flex cursor-pointer list-none items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-black uppercase text-white/40">Profil</p>
+            <h2 className="mt-1 text-xl font-black text-white">Identite & mesures</h2>
+            <p className="mt-1 text-sm font-semibold text-white/55">{profileSummary}</p>
+          </div>
+          <span className="rounded-xl border border-white/10 bg-white/8 px-3 py-2 text-xs font-black text-white/55">Ouvrir</span>
+        </summary>
+
+        <label className="mt-4 block">
+          <span className="text-sm font-bold text-white/60">Prenom</span>
+          <input
+            className="mt-1 h-12 w-full rounded-2xl border border-white/10 bg-white/5 px-3 font-semibold text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
+            onChange={(event) => patchSettings({ athleteName: event.target.value })}
+            placeholder="Ton prenom"
+            value={settings.athleteName}
+          />
+        </label>
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <NumberField label="Age" onChange={(age) => patchSettings({ age })} value={settings.age} />
+          <NumberField label="Taille" onChange={(heightCm) => patchSettings({ heightCm })} value={settings.heightCm} />
+          <NumberField label="Poids actuel" onChange={(currentWeightKg) => patchSettings({ currentWeightKg })} value={settings.currentWeightKg} />
+          <NumberField label="Objectif poids" onChange={(targetWeightKg) => patchSettings({ targetWeightKg })} value={settings.targetWeightKg} />
+          <NumberField label="DC repere" onChange={(benchOneRepMaxKg) => patchSettings({ benchOneRepMaxKg })} value={settings.benchOneRepMaxKg} />
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <SelectField label="Profil" value={settings.sex} options={sexLabels} onChange={(sex) => patchSettings({ sex })} />
+          <SelectField
+            label="Unite"
+            value={settings.loadUnit}
+            options={{ kg: "kg", lb: "lb" }}
+            onChange={(loadUnit) => patchSettings({ loadUnit })}
+          />
+        </div>
+      </details>
+
+      <details className="rounded-[24px] border border-white/10 bg-[#10131d] p-4 shadow-soft">
+        <summary className="flex cursor-pointer list-none items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-black uppercase text-white/40">Semaine</p>
+            <h2 className="mt-1 text-xl font-black text-white">Disponibilites</h2>
+            <p className="mt-1 text-sm font-semibold text-white/55">
+              {settings.availableDays.length} jour{settings.availableDays.length > 1 ? "s" : ""} muscu - {settings.judoDays.length} jour{settings.judoDays.length > 1 ? "s" : ""} sport intense
+            </p>
+          </div>
+          <span className="rounded-xl border border-white/10 bg-white/8 px-3 py-2 text-xs font-black text-white/55">Ouvrir</span>
+        </summary>
+
+        <DayPicker label="Jours possibles pour la muscu" selected={settings.availableDays} tone="sea" onToggle={toggleAvailableDay} />
+        <DayPicker label="Jours sport intense / judo" selected={settings.judoDays} tone="sky" onToggle={toggleJudoDay} />
+        <ToggleRow
+          checked={settings.aiEnabled}
+          label="Activer l'analyse IA"
+          onChange={(aiEnabled) => patchSettings({ aiEnabled })}
+        />
+      </details>
+
+      <WeightLogPanel
+        currentWeightKg={settings.currentWeightKg}
+        targetWeightKg={settings.targetWeightKg}
+        weightLog={settings.weightLog ?? []}
+        onLog={(entry) => {
+          const existing = settings.weightLog ?? [];
+          const sameDay = existing.find((item) => item.date === entry.date);
+          const nextLog = sameDay
+            ? existing.map((item) => (item.date === entry.date ? entry : item))
+            : [entry, ...existing].slice(0, 30);
+          patchSettings({ weightLog: nextLog, currentWeightKg: entry.kg });
+        }}
+      />
+
+      <ExternalSportsEditor
+        externalSports={settings.externalSports}
+        onChange={(externalSports) => patchSettings({ externalSports })}
+      />
+
       <ProfilesSection
         activeProfileId={activeProfileId}
         onCreate={createProfile}
@@ -512,384 +437,38 @@ export function SettingsPanel() {
         profiles={profiles}
       />
 
-      <section className="overflow-hidden rounded-2xl border border-white/10 premium-gradient p-5 text-white shadow-soft">
-        <div className="flex items-start justify-between gap-3">
+      <details className="rounded-[24px] border border-coral/20 bg-coral/10 p-4 shadow-soft">
+        <summary className="flex cursor-pointer list-none items-start justify-between gap-3">
           <div>
-            <p className="text-xs font-black uppercase text-sky">Parametres essentiels</p>
-            <h2 className="mt-1 text-2xl font-black">{settings.athleteName}</h2>
-            <p className="mt-2 text-sm font-semibold text-white/70">
-              {goalLabel} · {weeklyFrequency} seance{weeklyFrequency > 1 ? "s" : ""}/semaine
-            </p>
-          </div>
-          <Link
-            className="inline-flex h-11 shrink-0 items-center rounded-md border border-white/15 bg-white/10 px-4 text-sm font-black text-white transition hover:bg-white/15"
-            href="/programme"
-          >
-            Voir le programme
-          </Link>
-        </div>
-
-        <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
-          <ProfileTile label="Programme" value={`${currentProgram.length} jours actifs`} />
-          <ProfileTile label="Disponibilite" value={`${settings.availableDays.length} j/sem`} />
-          <ProfileTile label="Contraintes" value={restrictionsCount > 0 ? `${restrictionsCount} point(s)` : "Aucune"} />
-          <ProfileTile label="Sports" value={sportsSummary} />
-        </div>
-
-        <p className="mt-2 text-sm font-semibold text-white/50">
-          {settings.gym ? `Salle ${settings.gym}` : "Profil libre"} · {history.length} seance{history.length > 1 ? "s" : ""} enregistree{history.length > 1 ? "s" : ""}
-        </p>
-      </section>
-
-      <section className="card-dark p-4">
-        <h2 className="text-xl font-black text-white">Programme & objectif</h2>
-        <p className="mt-1 text-sm font-semibold text-white/55">
-          Change l&apos;objectif, la frequence ou le materiel, puis regenere seulement quand tu veux vraiment changer de plan.
-        </p>
-
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <ProfileTile label="Objectif" value={goalLabel} />
-          <ProfileTile label="Frequence" value={`${weeklyFrequency} seances`} />
-          <ProfileTile label="Materiel" value={equipmentLabels[settings.equipment ?? "salle-complete"]} />
-          <ProfileTile label="Niveau" value={experienceLabels[settings.experienceLevel ?? "intermediaire"]} />
-        </div>
-
-        <div className="mt-4 space-y-3">
-          <div>
-            <p className="text-sm font-bold text-white/60">Objectif principal</p>
-            <select
-              className="mt-1 h-12 w-full rounded-md border border-white/10 bg-white/5 px-3 font-semibold text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
-              onChange={(e) => setSettings({ ...settings, primaryGoal: e.target.value as PrimaryGoal })}
-              value={settings.primaryGoal ?? "recomposition"}
-            >
-              {(Object.entries(goalLabels) as Array<[PrimaryGoal, string]>).map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <p className="text-sm font-bold text-white/60">Frequence (seances/semaine)</p>
-            <div className="mt-1 grid grid-cols-5 gap-2">
-              {[2, 3, 4, 5, 6].map((freq) => (
-                <button
-                  className={`h-11 rounded-md border font-black transition ${
-                    (settings.weeklyFrequency ?? 4) === freq
-                      ? "border-sky/50 bg-sky/10 text-sky"
-                      : "border-white/10 bg-white/5 text-white/60"
-                  }`}
-                  key={freq}
-                  onClick={() => setSettings({ ...settings, weeklyFrequency: freq })}
-                  type="button"
-                >
-                  {freq}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <p className="text-sm font-bold text-white/60">Materiel</p>
-            <select
-              className="mt-1 h-12 w-full rounded-md border border-white/10 bg-white/5 px-3 font-semibold text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
-              onChange={(e) => setSettings({ ...settings, equipment: e.target.value as Equipment })}
-              value={settings.equipment ?? "salle-complete"}
-            >
-              {(Object.entries(equipmentLabels) as Array<[Equipment, string]>).map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <p className="text-sm font-bold text-white/60">Niveau d&apos;experience</p>
-            <select
-              className="mt-1 h-12 w-full rounded-md border border-white/10 bg-white/5 px-3 font-semibold text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
-              onChange={(e) => setSettings({ ...settings, experienceLevel: e.target.value as ExperienceLevel })}
-              value={settings.experienceLevel ?? "intermediaire"}
-            >
-              {(Object.entries(experienceLabels) as Array<[ExperienceLevel, string]>).map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <button
-          className="mt-4 h-12 w-full rounded-md border border-sky/30 bg-sky/10 px-4 font-black text-sky transition hover:bg-sky/20"
-          onClick={() => setConfirmRegen(true)}
-          type="button"
-        >
-          Regenerer mon programme
-        </button>
-        {confirmRegen ? (
-          <div className="mt-3 rounded-lg border border-sky/20 bg-sky/10 p-3">
-            <p className="text-sm font-black text-sky">
-              Cela remplace le programme actuel par un nouveau base sur tes reglages. Ton historique reste conserve.
-            </p>
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <button
-                className="h-11 rounded-md border border-white/10 bg-white/8 px-3 font-black text-white"
-                onClick={() => setConfirmRegen(false)}
-                type="button"
-              >
-                Annuler
-              </button>
-              <button
-                className="h-11 rounded-md bg-sky px-3 font-black text-white"
-                onClick={() => {
-                  regenerateProgram();
-                  setConfirmRegen(false);
-                }}
-                type="button"
-              >
-                Regenerer
-              </button>
-            </div>
-          </div>
-        ) : null}
-      </section>
-
-      <section className="card-dark p-4">
-        <h2 className="text-xl font-black text-white">Preferences & contraintes</h2>
-        <p className="mt-1 text-sm font-semibold text-white/55">
-          Ces listes servent a ajuster le prochain programme sans te noyer dans les reglages.
-        </p>
-        <TextListField
-          label="Points de vigilance"
-          onChange={(values) => setSettings({ ...settings, watchPoints: values })}
-          placeholder="ex. poignet droit, lombaires, genou gauche"
-          values={settings.watchPoints}
-        />
-        <TextListField
-          label="Preferences"
-          onChange={(values) => setSettings({ ...settings, preferences: values })}
-          placeholder="ex. machines, halteres, full body"
-          values={settings.preferences}
-        />
-        <TextListField
-          label="Exercices a eviter"
-          onChange={(values) => setSettings({ ...settings, avoid: values })}
-          placeholder="ex. dips, squat barre, course"
-          values={settings.avoid}
-        />
-      </section>
-
-      <details className="card-dark group p-4" open>
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
-          <div>
-            <h2 className="text-xl font-black text-white">Profil & rythme</h2>
-            <p className="mt-1 text-sm font-semibold text-white/55">
-              Identite, poids, jours disponibles et reglages de seance.
-            </p>
-          </div>
-          <span className="rounded-md bg-white/8 px-3 py-2 text-xs font-black text-white/55 group-open:bg-sky/10 group-open:text-sky">
-            Ouvrir
-          </span>
-        </summary>
-
-        <label className="mt-4 block">
-          <span className="text-sm font-bold text-white/60">Prenom</span>
-          <input
-            className="mt-1 h-12 w-full rounded-md border border-white/10 px-3 font-semibold outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
-            onChange={(event) => setSettings({ ...settings, athleteName: event.target.value })}
-            placeholder="Ton prenom"
-            value={settings.athleteName}
-          />
-        </label>
-        <label className="mt-4 block">
-          <span className="text-sm font-bold text-white/60">Profil biologique</span>
-          <select
-            className="mt-1 h-12 w-full rounded-md border border-white/10 bg-white/5 px-3 font-semibold text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
-            onChange={(event) => setSettings({ ...settings, sex: event.target.value as UserSex })}
-            value={settings.sex}
-          >
-            {(Object.entries(sexLabels) as Array<[UserSex, string]>).map(([value, label]) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-          </select>
-        </label>
-
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          <NumberField
-            label="Poids actuel"
-            onChange={(value) => setSettings({ ...settings, currentWeightKg: value })}
-            value={settings.currentWeightKg}
-          />
-          <NumberField
-            label="Objectif poids"
-            onChange={(value) => setSettings({ ...settings, targetWeightKg: value })}
-            value={settings.targetWeightKg}
-          />
-        </div>
-        <NumberField
-          className="mt-4"
-          label="1RM developpe couche"
-          onChange={(value) => setSettings({ ...settings, benchOneRepMaxKg: value })}
-          value={settings.benchOneRepMaxKg}
-        />
-        <label className="mt-4 block">
-          <span className="text-sm font-bold text-white/60">Unite de charge</span>
-          <select
-            className="mt-1 h-12 w-full rounded-md border border-white/10 bg-white/5 px-3 font-semibold text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
-            onChange={(event) => setSettings({ ...settings, loadUnit: event.target.value === "lb" ? "lb" : "kg" })}
-            value={settings.loadUnit}
-          >
-            <option value="kg">kg</option>
-            <option value="lb">lb</option>
-          </select>
-        </label>
-
-        <p className="mt-5 text-sm font-semibold text-white/55">Jours de judo</p>
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          {weekdays.map((day) => {
-            const checked = settings.judoDays.includes(day.value);
-
-            return (
-              <label
-                className={`flex min-h-12 items-center gap-2 rounded-md border px-3 font-bold ${
-                  checked ? "border-sky/40 bg-sky/10 text-sky" : "border-white/8 bg-white/5 text-white/60"
-                }`}
-                key={day.value}
-              >
-                <input
-                  checked={checked}
-                  onChange={(event) => {
-                    const nextDays = event.target.checked
-                      ? [...settings.judoDays, day.value]
-                      : settings.judoDays.filter((item) => item !== day.value);
-                    setSettings({ ...settings, judoDays: nextDays });
-                  }}
-                  type="checkbox"
-                />
-                {day.label}
-              </label>
-            );
-          })}
-        </div>
-
-        <p className="mt-5 text-sm font-semibold text-white/55">Jours disponibles pour la muscu</p>
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          {weekdays.map((day) => {
-            const checked = settings.availableDays.includes(day.value);
-
-            return (
-              <label
-                className={`flex min-h-12 items-center gap-2 rounded-md border px-3 font-bold ${
-                  checked ? "border-sea/40 bg-sea/10 text-sea" : "border-white/8 bg-white/5 text-white/60"
-                }`}
-                key={day.value}
-              >
-                <input
-                  checked={checked}
-                  onChange={(event) => {
-                    const nextDays = event.target.checked
-                      ? [...settings.availableDays, day.value]
-                      : settings.availableDays.filter((item) => item !== day.value);
-                    setSettings({ ...settings, availableDays: nextDays.length > 0 ? nextDays : settings.availableDays });
-                  }}
-                  type="checkbox"
-                />
-                {day.label}
-              </label>
-            );
-          })}
-        </div>
-
-        <label className="mt-4 block">
-          <span className="text-sm font-bold text-white/60">Duree preferee des seances</span>
-          <select
-            className="mt-1 h-12 w-full rounded-md border border-white/10 bg-white/5 px-3 font-semibold text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
-            onChange={(event) =>
-              setSettings({ ...settings, sessionDurationPreference: event.target.value as SessionDurationPreference })
-            }
-            value={settings.sessionDurationPreference}
-          >
-            {(Object.entries(durationLabels) as Array<[SessionDurationPreference, string]>).map(([value, label]) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-          </select>
-        </label>
-
-        <label className="mt-4 block">
-          <span className="text-sm font-bold text-white/60">Niveau de prudence</span>
-          <select
-            className="mt-1 h-12 w-full rounded-md border border-white/10 bg-white/5 px-3 font-semibold text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
-            onChange={(event) => setSettings({ ...settings, cautionLevel: event.target.value as CautionLevel })}
-            value={settings.cautionLevel}
-          >
-            <option value="prudent">Prudent</option>
-            <option value="normal">Normal</option>
-            <option value="agressif">Agressif</option>
-          </select>
-        </label>
-
-        <ToggleRow
-          checked={settings.aiEnabled}
-          label="Activer l'IA coach"
-          onChange={(checked) => setSettings({ ...settings, aiEnabled: checked })}
-        />
-      </details>
-
-      <WeightLogSection
-        currentWeightKg={settings.currentWeightKg}
-        targetWeightKg={settings.targetWeightKg}
-        weightLog={settings.weightLog ?? []}
-        onLog={(entry) => {
-          const existing = settings.weightLog ?? [];
-          const sameDay = existing.find((e) => e.date === entry.date);
-          const nextLog = sameDay
-            ? existing.map((e) => (e.date === entry.date ? entry : e))
-            : [entry, ...existing].slice(0, 30);
-          setSettings({ ...settings, weightLog: nextLog, currentWeightKg: entry.kg });
-        }}
-      />
-
-      <ExternalSportsSection
-        externalSports={settings.externalSports}
-        onChange={(externalSports) => setSettings({ ...settings, externalSports })}
-      />
-
-      <StrengthReferencesSection
-        loadUnit={settings.loadUnit}
-        onChange={(strengthReferences) => setSettings({ ...settings, strengthReferences })}
-        onSettingsChange={setSettings}
-        settings={settings}
-        strengthReferences={settings.strengthReferences}
-      />
-
-      <details className="card-dark group p-4">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
-          <div>
-            <h2 className="text-xl font-black text-white">Donnees locales</h2>
+            <p className="text-xs font-black uppercase text-coral">Donnees</p>
+            <h2 className="mt-1 text-xl font-black text-white">Reset local</h2>
             <p className="mt-1 text-sm font-semibold text-white/55">
               {history.length} seance{history.length > 1 ? "s" : ""} enregistree{history.length > 1 ? "s" : ""}.
             </p>
           </div>
-          <span className="rounded-md bg-white/8 px-3 py-2 text-xs font-black text-white/55 group-open:bg-coral/10 group-open:text-coral">
-            Ouvrir
-          </span>
+          <span className="rounded-xl border border-coral/25 bg-coral/10 px-3 py-2 text-xs font-black text-coral">Ouvrir</span>
         </summary>
+
         <button
-          className="mt-4 h-12 w-full rounded-md border border-coral/30 bg-coral/10 px-4 font-black text-coral transition hover:bg-coral hover:text-white"
+          className="mt-4 h-12 w-full rounded-2xl border border-coral/30 bg-coral/10 px-4 font-black text-coral transition hover:bg-coral hover:text-white"
           onClick={() => setConfirmReset(true)}
           type="button"
         >
           Reinitialiser les donnees locales
         </button>
         {confirmReset ? (
-          <div className="mt-3 rounded-lg border border-coral/20 bg-coral/10 p-3">
+          <div className="mt-3 rounded-2xl border border-coral/20 bg-coral/10 p-3">
             <p className="text-sm font-black text-coral">Cette action efface l&apos;historique et le programme ajuste.</p>
             <div className="mt-3 grid grid-cols-2 gap-2">
               <button
-                className="h-11 rounded-md border border-white/10 bg-white/8 px-3 font-black text-white"
+                className="h-11 rounded-2xl border border-white/10 bg-white/8 px-3 font-black text-white"
                 onClick={() => setConfirmReset(false)}
                 type="button"
               >
                 Annuler
               </button>
               <button
-                className="h-11 rounded-md bg-coral px-3 font-black text-white"
+                className="h-11 rounded-2xl bg-coral px-3 font-black text-white"
                 onClick={() => {
                   resetAll();
                   setConfirmReset(false);
@@ -908,35 +487,134 @@ export function SettingsPanel() {
 
 function ProfileTile({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md bg-white/10 p-3">
-      <p className="text-xs font-bold text-white/55">{label}</p>
-      <p className="mt-1 font-black text-white">{value}</p>
+    <div className="rounded-2xl border border-white/10 bg-white/8 p-3">
+      <p className="text-[10px] font-black uppercase text-white/45">{label}</p>
+      <p className="mt-1 truncate text-sm font-black text-white">{value}</p>
     </div>
   );
 }
 
 function NumberField({
-  className = "",
   label,
   onChange,
   value
 }: {
-  className?: string;
   label: string;
   onChange: (value: number) => void;
   value: number;
 }) {
   return (
-    <label className={`block ${className}`}>
+    <label className="block">
       <span className="text-sm font-bold text-white/60">{label}</span>
       <input
-        className="mt-1 h-12 w-full rounded-md border border-white/10 px-3 font-semibold outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
+        className="mt-1 h-12 w-full rounded-2xl border border-white/10 bg-white/5 px-3 font-semibold text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
         inputMode="decimal"
         onChange={(event) => onChange(Number(event.target.value))}
         type="number"
         value={value}
       />
     </label>
+  );
+}
+
+function SelectField<T extends string>({
+  label,
+  onChange,
+  options,
+  value
+}: {
+  label: string;
+  onChange: (value: T) => void;
+  options: Record<T, string>;
+  value: T;
+}) {
+  return (
+    <label className="block">
+      <span className="text-sm font-bold text-white/60">{label}</span>
+      <select
+        className="mt-1 h-12 w-full rounded-2xl border border-white/10 bg-white/5 px-3 text-sm font-black text-white outline-none focus:border-coral"
+        onChange={(event) => onChange(event.target.value as T)}
+        value={value}
+      >
+        {(Object.entries(options) as Array<[T, string]>).map(([optionValue, optionLabel]) => (
+          <option key={optionValue} value={optionValue}>{optionLabel}</option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function ButtonChoiceGroup<T extends string | number>({
+  columns,
+  label,
+  onSelect,
+  options,
+  selected
+}: {
+  columns: string;
+  label: string;
+  onSelect: (value: T) => void;
+  options: Array<{ label: string; value: T }>;
+  selected: T;
+}) {
+  return (
+    <div>
+      <p className="text-sm font-black text-white/65">{label}</p>
+      <div className={`mt-2 grid ${columns} gap-2`}>
+        {options.map((option) => (
+          <button
+            className={`min-h-12 rounded-2xl border px-2 text-xs font-black transition ${
+              selected === option.value
+                ? "border-coral/45 bg-coral/10 text-coral"
+                : "border-white/10 bg-white/[0.04] text-white/60"
+            }`}
+            key={String(option.value)}
+            onClick={() => onSelect(option.value)}
+            type="button"
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DayPicker({
+  label,
+  onToggle,
+  selected,
+  tone
+}: {
+  label: string;
+  onToggle: (day: Weekday) => void;
+  selected: Weekday[];
+  tone: "sea" | "sky";
+}) {
+  const activeClass = tone === "sea" ? "border-sea/45 bg-sea/10 text-sea" : "border-sky/45 bg-sky/10 text-sky";
+
+  return (
+    <div className="mt-4">
+      <p className="text-sm font-black text-white/65">{label}</p>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        {weekdays.map((day) => {
+          const checked = selected.includes(day.value);
+
+          return (
+            <button
+              className={`min-h-12 rounded-2xl border px-3 text-left text-sm font-black transition ${
+                checked ? activeClass : "border-white/10 bg-white/[0.04] text-white/55"
+              }`}
+              key={day.value}
+              onClick={() => onToggle(day.value)}
+              type="button"
+            >
+              {checked ? "Oui - " : "Non - "}{day.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -950,14 +628,108 @@ function ToggleRow({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <label className="mt-3 flex min-h-12 items-center justify-between gap-3 rounded-md border border-white/8 bg-white/5 px-3 font-bold text-white">
+    <label className="mt-4 flex min-h-12 items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-3 font-bold text-white">
       <span>{label}</span>
       <input checked={checked} onChange={(event) => onChange(event.target.checked)} type="checkbox" />
     </label>
   );
 }
 
-function ExternalSportsSection({
+function TextListField({
+  label,
+  onChange,
+  placeholder,
+  values
+}: {
+  label: string;
+  onChange: (values: string[]) => void;
+  placeholder?: string;
+  values: string[];
+}) {
+  return (
+    <label className="mt-4 block">
+      <span className="text-sm font-bold text-white/60">{label}</span>
+      <textarea
+        className="mt-1 min-h-20 w-full resize-none rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-sm font-semibold text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
+        onChange={(event) => onChange(parseListInput(event.target.value))}
+        placeholder={placeholder}
+        value={values.join("\n")}
+      />
+    </label>
+  );
+}
+
+function parseListInput(value: string): string[] {
+  return Array.from(
+    new Set(
+      value
+        .split(/[\n,;]+/)
+        .map((item) => item.trim())
+        .filter(Boolean)
+    )
+  );
+}
+
+function WeightLogPanel({
+  currentWeightKg,
+  onLog,
+  targetWeightKg,
+  weightLog
+}: {
+  currentWeightKg: number;
+  onLog: (entry: WeightEntry) => void;
+  targetWeightKg: number;
+  weightLog: WeightEntry[];
+}) {
+  const [draftKg, setDraftKg] = useState(currentWeightKg);
+  const today = new Date().toISOString().slice(0, 10);
+  const toGoKg = +(currentWeightKg - targetWeightKg).toFixed(1);
+
+  return (
+    <details className="rounded-[24px] border border-white/10 bg-[#10131d] p-4 shadow-soft">
+      <summary className="flex cursor-pointer list-none items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-black uppercase text-white/40">Poids</p>
+          <h2 className="mt-1 text-xl font-black text-white">Suivi rapide</h2>
+          <p className="mt-1 text-sm font-semibold text-white/55">{currentWeightKg} kg actuel - objectif {targetWeightKg} kg</p>
+        </div>
+        <span className="rounded-xl border border-white/10 bg-white/8 px-3 py-2 text-xs font-black text-white/55">Ouvrir</span>
+      </summary>
+
+      <div className="mt-4 flex gap-2">
+        <input
+          className="h-12 min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/5 px-3 text-base font-semibold text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
+          inputMode="decimal"
+          onChange={(event) => setDraftKg(Number(event.target.value))}
+          step="0.1"
+          type="number"
+          value={draftKg}
+        />
+        <button className="h-12 rounded-2xl bg-sky px-4 font-black text-white" onClick={() => onLog({ date: today, kg: draftKg })} type="button">
+          OK
+        </button>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <ProfileTile label="Actuel" value={`${currentWeightKg} kg`} />
+        <ProfileTile label="Ecart" value={`${toGoKg > 0 ? "-" : "+"}${Math.abs(toGoKg)} kg`} />
+      </div>
+
+      {weightLog.length > 0 ? (
+        <div className="mt-4 space-y-1.5">
+          {weightLog.slice(0, 5).map((entry) => (
+            <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-white/[0.04] px-3 py-2" key={entry.date}>
+              <span className="text-xs font-semibold text-white/55">{entry.date}</span>
+              <span className="font-black text-white">{entry.kg} kg</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </details>
+  );
+}
+
+function ExternalSportsEditor({
   externalSports,
   onChange
 }: {
@@ -982,532 +754,61 @@ function ExternalSportsSection({
   };
 
   return (
-    <details className="card-dark group p-4">
+    <details className="rounded-[24px] border border-white/10 bg-[#10131d] p-4 shadow-soft">
       <summary className="flex cursor-pointer list-none items-start justify-between gap-3">
         <div>
-          <h2 className="text-xl font-black text-white">Sports externes</h2>
+          <p className="text-xs font-black uppercase text-white/40">Recuperation</p>
+          <h2 className="mt-1 text-xl font-black text-white">Sports externes</h2>
           <p className="mt-1 text-sm font-semibold text-white/55">
-            L&apos;app evite les semaines trop chargees quand ces sports sont renseignes.
+            {externalSports.length > 0 ? `${externalSports.length} sport(s) renseignes` : "Aucun sport externe"}
           </p>
         </div>
-        <span className="rounded-md bg-white/8 px-3 py-2 text-xs font-black text-white/55 group-open:bg-sky/10 group-open:text-sky">
-          {externalSports.length > 0 ? `${externalSports.length} sport(s)` : "Ouvrir"}
-        </span>
+        <span className="rounded-xl border border-white/10 bg-white/8 px-3 py-2 text-xs font-black text-white/55">Ouvrir</span>
       </summary>
 
-      <button
-        className="mt-4 h-10 rounded-md bg-sky px-3 text-sm font-black text-white transition hover:bg-sky/80"
-        onClick={addSport}
-        type="button"
-      >
-        + Sport
+      <button className="mt-4 h-11 rounded-2xl bg-sky px-4 text-sm font-black text-white" onClick={addSport} type="button">
+        Ajouter un sport
       </button>
 
-      {externalSports.length === 0 ? (
-        <p className="mt-4 rounded-md bg-white/5 p-3 text-sm font-semibold text-white/50">
-          Aucun sport externe renseigne.
-        </p>
-      ) : (
-        <div className="mt-4 space-y-3">
-          {externalSports.map((sport) => (
-            <div className="rounded-xl border border-white/10 bg-white/5 p-3" key={sport.id}>
-              <div className="flex items-center gap-2">
-                <input
-                  className="h-11 flex-1 rounded-md border border-white/10 bg-white/5 px-3 font-semibold text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
-                  onChange={(event) => updateSport(sport.id, { name: event.target.value })}
-                  placeholder="Nom du sport"
-                  value={sport.name}
-                />
-                <button
-                  aria-label="Supprimer le sport"
-                  className="flex size-11 shrink-0 items-center justify-center rounded-md border border-coral/20 bg-coral/10 font-black text-coral"
-                  onClick={() => onChange(externalSports.filter((item) => item.id !== sport.id))}
-                  type="button"
-                >
-                  x
-                </button>
-              </div>
-
-              <select
-                className="mt-3 h-11 w-full rounded-md border border-white/10 bg-white/5 px-3 font-semibold text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
-                onChange={(event) => updateSport(sport.id, { intensity: event.target.value as ExternalSportIntensity })}
-                value={sport.intensity}
-              >
-                {(Object.entries(externalSportIntensityLabels) as Array<[ExternalSportIntensity, string]>).map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
-                ))}
-              </select>
-
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                {weekdays.map((day) => {
-                  const checked = sport.days.includes(day.value);
-
-                  return (
-                    <label
-                      className={`flex min-h-10 items-center gap-2 rounded-md border px-3 text-sm font-bold ${
-                        checked ? "border-amber/40 bg-amber/10 text-amber" : "border-white/8 bg-white/5 text-white/60"
-                      }`}
-                      key={day.value}
-                    >
-                      <input
-                        checked={checked}
-                        onChange={(event) => {
-                          const days = event.target.checked
-                            ? [...sport.days, day.value]
-                            : sport.days.filter((item) => item !== day.value);
-                          updateSport(sport.id, { days });
-                        }}
-                        type="checkbox"
-                      />
-                      {day.label}
-                    </label>
-                  );
-                })}
-              </div>
-
+      <div className="mt-4 space-y-3">
+        {externalSports.map((sport) => (
+          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3" key={sport.id}>
+            <div className="flex items-center gap-2">
               <input
-                className="mt-3 h-11 w-full rounded-md border border-white/10 bg-white/5 px-3 text-sm font-semibold text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
-                onChange={(event) => updateSport(sport.id, { notes: event.target.value })}
-                placeholder="Note optionnelle"
-                value={sport.notes ?? ""}
+                className="h-11 min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm font-semibold text-white outline-none focus:border-sky"
+                onChange={(event) => updateSport(sport.id, { name: event.target.value })}
+                value={sport.name}
+              />
+              <button
+                className="h-11 rounded-2xl border border-coral/30 bg-coral/10 px-3 text-sm font-black text-coral"
+                onClick={() => onChange(externalSports.filter((item) => item.id !== sport.id))}
+                type="button"
+              >
+                Suppr.
+              </button>
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <SelectField
+                label="Intensite"
+                value={sport.intensity}
+                options={externalSportIntensityLabels}
+                onChange={(intensity) => updateSport(sport.id, { intensity })}
               />
             </div>
-          ))}
-        </div>
-      )}
-    </details>
-  );
-}
-
-function StrengthReferencesSection({
-  loadUnit,
-  onChange,
-  onSettingsChange,
-  settings,
-  strengthReferences
-}: {
-  loadUnit: "kg" | "lb";
-  onChange: (references: StrengthReference[]) => void;
-  onSettingsChange: (settings: UserSettings) => void;
-  settings: UserSettings;
-  strengthReferences: StrengthReference[];
-}) {
-  const commitWithEvent = (references: StrengthReference[], reference: StrengthReference, eventType: "delete" | "toggle-lock") => {
-    const event = eventType === "delete"
-      ? createReferenceDeletedCalibrationEvent(reference)
-      : createReferenceLockCalibrationEvent(reference, !(reference.locked ?? false));
-
-    onSettingsChange(
-      appendCalibrationEvent(
-        {
-          ...settings,
-          strengthReferences: references
-        },
-        event
-      )
-    );
-  };
-
-  const addReference = () => {
-    onChange([
-      ...strengthReferences,
-      {
-        lift: "Nouvel exercice",
-        value: `0 ${loadUnit} x 5`,
-        loadKg: 0,
-        reps: 5,
-        estimatedOneRepMaxKg: 0,
-        confidence: "estimated",
-        origin: "manual",
-        locked: false
-      }
-    ]);
-  };
-
-  const updateReference = (index: number, patch: Partial<StrengthReference>) => {
-    onChange(strengthReferences.map((reference, itemIndex) => (
-      itemIndex === index ? { ...reference, ...patch } : reference
-    )));
-  };
-
-  const updateReferenceSet = (index: number, load: number, reps: number) => {
-    const current = strengthReferences[index];
-    const next = buildStrengthReferenceFromSet(current.lift, load, reps, loadUnit) ?? {
-      ...current,
-      value: `${load || 0} ${loadUnit} x ${reps || 1}`,
-      loadKg: loadUnit === "kg" ? load : undefined,
-      reps: reps || 1,
-      estimatedOneRepMaxKg: estimateOneRepMaxFromSet(load, reps, loadUnit),
-      confidence: reps === 1 ? "declared" as const : "estimated" as const
-    };
-
-    updateReference(index, {
-      ...next,
-      lift: current.lift,
-      note: current.note ?? next.note,
-      lastTestedAt: current.lastTestedAt,
-      origin: current.origin ?? "manual",
-      locked: current.locked ?? false
-    });
-  };
-
-  const learnedReferences = strengthReferences
-    .map((reference, index) => ({ reference, index }))
-    .filter((item) => item.reference.origin === "learned");
-  const editableReferences = strengthReferences
-    .map((reference, index) => ({ reference, index }))
-    .filter((item) => item.reference.origin !== "learned");
-
-  return (
-    <details className="card-dark group p-4">
-      <summary className="flex cursor-pointer list-none items-start justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-black text-white">Reperes de force</h2>
-          <p className="mt-1 text-sm font-semibold text-white/55">
-            Renseigne une serie propre, par exemple 100 kg x 5. L&apos;app estime ensuite ton 1RM.
-          </p>
-        </div>
-        <span className="rounded-md bg-white/8 px-3 py-2 text-xs font-black text-white/55 group-open:bg-sky/10 group-open:text-sky">
-          {strengthReferences.length > 0 ? `${strengthReferences.length} repere(s)` : "Ouvrir"}
-        </span>
-      </summary>
-
-      <button
-        className="mt-4 h-10 rounded-md bg-sky px-3 text-sm font-black text-white transition hover:bg-sky/80"
-        onClick={addReference}
-        type="button"
-      >
-        + Repere
-      </button>
-
-      {strengthReferences.length === 0 ? (
-        <p className="mt-4 rounded-md bg-white/5 p-3 text-sm font-semibold text-white/50">
-          Aucun repere renseigne. L&apos;app utilisera une estimation prudente.
-        </p>
-      ) : (
-        <div className="mt-4 space-y-4">
-          {learnedReferences.length > 0 ? (
-            <div className="rounded-xl border border-amber/20 bg-amber/5 p-3">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-black text-amber">Reperes appris automatiquement</h3>
-                  <p className="mt-1 text-xs font-semibold text-white/55">
-                    Construits depuis tes seances valides. Verrouille un repere si tu ne veux plus qu&apos;il bouge.
-                  </p>
-                </div>
-                <span className="rounded-md bg-amber/15 px-2 py-1 text-xs font-black text-amber">
-                  {learnedReferences.length}
-                </span>
-              </div>
-
-              <div className="mt-3 space-y-3">
-                {learnedReferences.map(({ reference, index }) => (
-                  <div className="rounded-xl border border-white/10 bg-white/5 p-3" key={`${reference.lift}-${index}`}>
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="flex flex-wrap gap-2">
-                          <ReferenceBadge tone="warn">Appris</ReferenceBadge>
-                          <ReferenceBadge tone={reference.locked ? "info" : "muted"}>
-                            {reference.locked ? "Verrouille" : "Auto"}
-                          </ReferenceBadge>
-                        </div>
-                        <p className="mt-2 font-black text-white">{reference.lift}</p>
-                        <p className="mt-1 text-xs font-semibold text-white/55">
-                          {reference.lastTestedAt ? `Mis a jour le ${formatReferenceDate(reference.lastTestedAt)}` : "Date inconnue"}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xs font-bold text-white/45">{reference.value}</p>
-                        <p className="mt-1 text-sm font-black text-sky">
-                          {formatEstimatedOneRepMax(reference.estimatedOneRepMaxKg)}
-                        </p>
-                      </div>
-                    </div>
-                    {reference.note ? (
-                      <p className="mt-3 rounded-md bg-white/5 px-3 py-2 text-xs font-semibold text-white/65">
-                        {reference.note}
-                      </p>
-                    ) : null}
-                    <div className="mt-3 grid grid-cols-2 gap-2">
-                      <button
-                        className={`h-10 rounded-md border text-xs font-black transition ${
-                          reference.locked
-                            ? "border-sky/30 bg-sky/15 text-sky"
-                            : "border-white/10 bg-white/8 text-white/70"
-                        }`}
-                        onClick={() => {
-                          const nextReferences = strengthReferences.map((item, itemIndex) => (
-                            itemIndex === index ? { ...item, locked: !reference.locked } : item
-                          ));
-                          commitWithEvent(nextReferences, reference, "toggle-lock");
-                        }}
-                        type="button"
-                      >
-                        {reference.locked ? "Deverrouiller" : "Verrouiller"}
-                      </button>
-                      <button
-                        className="h-10 rounded-md border border-coral/20 bg-coral/10 text-xs font-black text-coral transition hover:bg-coral/15"
-                        onClick={() => {
-                          const nextReferences = strengthReferences.filter((_item, itemIndex) => itemIndex !== index);
-                          commitWithEvent(nextReferences, reference, "delete");
-                        }}
-                        type="button"
-                      >
-                        Supprimer
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
-
-          {editableReferences.length > 0 ? (
-            <div className="space-y-3">
-              <div>
-                <h3 className="text-sm font-black text-white">Reperes manuels</h3>
-                <p className="mt-1 text-xs font-semibold text-white/55">
-                  Ceux-ci viennent de l&apos;onboarding ou de tes reglages manuels.
-                </p>
-              </div>
-              {editableReferences.map(({ reference, index }) => (
-                <div className="rounded-xl border border-white/10 bg-white/5 p-3" key={`${reference.lift}-${index}`}>
-                  <div className="flex items-center gap-2">
-                    <input
-                      className="h-11 flex-1 rounded-md border border-white/10 bg-white/5 px-3 text-sm font-semibold text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
-                      onChange={(event) => updateReference(index, { lift: event.target.value, origin: reference.origin ?? "manual" })}
-                      placeholder="Exercice"
-                      value={reference.lift}
-                    />
-                    <button
-                      aria-label="Supprimer le repere"
-                      className="flex size-11 shrink-0 items-center justify-center rounded-md border border-coral/20 bg-coral/10 font-black text-coral"
-                      onClick={() => {
-                        const nextReferences = strengthReferences.filter((_item, itemIndex) => itemIndex !== index);
-                        commitWithEvent(nextReferences, reference, "delete");
-                      }}
-                      type="button"
-                    >
-                      x
-                    </button>
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <ReferenceBadge tone={reference.origin === "onboarding" ? "muted" : "info"}>
-                      {reference.origin === "onboarding" ? "Onboarding" : "Manuel"}
-                    </ReferenceBadge>
-                    {reference.locked ? <ReferenceBadge tone="info">Verrouille</ReferenceBadge> : null}
-                  </div>
-                  <div className="mt-3 grid grid-cols-2 gap-2">
-                    <label>
-                      <span className="text-xs font-bold text-white/45">Charge {loadUnit}</span>
-                      <input
-                        className="mt-1 h-11 w-full rounded-md border border-white/10 bg-white/5 px-3 text-sm font-semibold text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
-                        inputMode="decimal"
-                        onChange={(event) => updateReferenceSet(index, Number(event.target.value), reference.reps ?? 5)}
-                        placeholder={`Charge ${loadUnit}`}
-                        step={2.5}
-                        type="number"
-                        value={getDisplayedReferenceLoad(reference, loadUnit)}
-                      />
-                    </label>
-                    <label>
-                      <span className="text-xs font-bold text-white/45">Reps</span>
-                      <input
-                        className="mt-1 h-11 w-full rounded-md border border-white/10 bg-white/5 px-3 text-sm font-semibold text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
-                        inputMode="numeric"
-                        max={12}
-                        min={1}
-                        onChange={(event) => updateReferenceSet(index, getDisplayedReferenceLoad(reference, loadUnit), Number(event.target.value))}
-                        placeholder="Reps"
-                        type="number"
-                        value={reference.reps ?? 1}
-                      />
-                    </label>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between gap-3 rounded-md bg-white/5 px-3 py-2">
-                    <p className="text-xs font-bold text-white/45">{reference.value}</p>
-                    <p className="text-xs font-black text-sky">
-                      {formatEstimatedOneRepMax(reference.estimatedOneRepMaxKg)}
-                    </p>
-                  </div>
-                  <div className="mt-3 grid grid-cols-1 gap-2">
-                    <select
-                      className="h-11 rounded-md border border-white/10 bg-white/5 px-3 text-sm font-semibold text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
-                      onChange={(event) => updateReference(index, { confidence: event.target.value as StrengthReference["confidence"] })}
-                      value={reference.confidence ?? "declared"}
-                    >
-                      <option value="declared">Declare</option>
-                      <option value="estimated">Estime</option>
-                      <option value="measured">Mesure</option>
-                    </select>
-                  </div>
-                  <input
-                    className="mt-3 h-11 w-full rounded-md border border-white/10 bg-white/5 px-3 text-sm font-semibold text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
-                    onChange={(event) => updateReference(index, { note: event.target.value })}
-                    placeholder="Note optionnelle"
-                    value={reference.note ?? ""}
-                  />
-                </div>
-              ))}
-            </div>
-          ) : null}
-        </div>
-      )}
-    </details>
-  );
-}
-
-function getDisplayedReferenceLoad(reference: StrengthReference, loadUnit: "kg" | "lb"): number {
-  const loadKg = reference.loadKg ?? reference.estimatedOneRepMaxKg ?? 0;
-  if (loadUnit === "lb") return Math.round((loadKg / 0.45359237) * 10) / 10;
-  return loadKg;
-}
-
-function ReferenceBadge({
-  children,
-  tone
-}: {
-  children: string;
-  tone: "info" | "muted" | "warn";
-}) {
-  const toneClass = {
-    info: "bg-sky/10 text-sky",
-    muted: "bg-white/8 text-white/60",
-    warn: "bg-amber/10 text-amber"
-  }[tone];
-
-  return <span className={`rounded-md px-2 py-1 text-[10px] font-black uppercase ${toneClass}`}>{children}</span>;
-}
-
-function formatReferenceDate(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "date inconnue";
-
-  return new Intl.DateTimeFormat("fr-FR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric"
-  }).format(date);
-}
-
-function TextListField({
-  label,
-  onChange,
-  placeholder,
-  values
-}: {
-  label: string;
-  onChange: (values: string[]) => void;
-  placeholder?: string;
-  values: string[];
-}) {
-  return (
-    <label className="mt-4 block">
-      <span className="text-sm font-bold text-white/60">{label}</span>
-      <textarea
-        className="mt-1 min-h-20 w-full resize-none rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
-        onChange={(event) => onChange(parseListInput(event.target.value))}
-        placeholder={placeholder}
-        value={values.join("\n")}
-      />
-    </label>
-  );
-}
-
-function parseListInput(value: string): string[] {
-  return Array.from(
-    new Set(
-      value
-        .split(/[\n,;]+/)
-        .map((item) => item.trim())
-        .filter(Boolean)
-    )
-  );
-}
-
-function WeightLogSection({
-  currentWeightKg,
-  onLog,
-  targetWeightKg,
-  weightLog
-}: {
-  currentWeightKg: number;
-  onLog: (entry: WeightEntry) => void;
-  targetWeightKg: number;
-  weightLog: WeightEntry[];
-}) {
-  const [draftKg, setDraftKg] = useState(currentWeightKg);
-  const today = new Date().toISOString().slice(0, 10);
-  const delta = weightLog.length >= 2
-    ? weightLog[0].kg - weightLog[weightLog.length - 1].kg
-    : undefined;
-  const toGoKg = +(currentWeightKg - targetWeightKg).toFixed(1);
-
-  return (
-    <details className="card-dark group p-4">
-      <summary className="flex cursor-pointer list-none items-start justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-black text-white">Suivi du poids</h2>
-          <p className="mt-1 text-sm font-semibold text-white/55">
-            Journal rapide du poids actuel, de l&apos;objectif et de la tendance recente.
-          </p>
-        </div>
-        <span className="rounded-md bg-white/8 px-3 py-2 text-xs font-black text-white/55 group-open:bg-sky/10 group-open:text-sky">
-          {weightLog.length > 0 ? `${weightLog.length} entree(s)` : "Ouvrir"}
-        </span>
-      </summary>
-
-      <div className="mt-4 flex gap-2">
-        <input
-          className="h-12 flex-1 rounded-md border border-white/10 px-3 text-base font-semibold outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
-          inputMode="decimal"
-          onChange={(e) => setDraftKg(Number(e.target.value))}
-          placeholder="kg aujourd'hui"
-          step="0.1"
-          type="number"
-          value={draftKg}
-        />
-        <button
-          className="h-12 rounded-md bg-sky px-4 font-black text-white transition hover:bg-sky/80"
-          onClick={() => onLog({ date: today, kg: draftKg })}
-          type="button"
-        >
-          Enregistrer
-        </button>
+            <DayPicker
+              label="Jours"
+              selected={sport.days}
+              tone="sky"
+              onToggle={(day) => {
+                const days = sport.days.includes(day)
+                  ? sport.days.filter((item) => item !== day)
+                  : [...sport.days, day];
+                updateSport(sport.id, { days });
+              }}
+            />
+          </div>
+        ))}
       </div>
-
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <div className="rounded-md bg-white/8 p-3 text-center">
-          <p className="text-lg font-black text-white">{currentWeightKg} kg</p>
-          <p className="mt-1 text-[10px] font-black uppercase text-white/45">Actuel</p>
-        </div>
-        <div className={`rounded-md p-3 text-center ${toGoKg > 0 ? "bg-amber/10" : "bg-sea/10"}`}>
-          <p className={`text-lg font-black ${toGoKg > 0 ? "text-amber" : "text-sea"}`}>
-            {toGoKg > 0 ? `-${toGoKg}` : `+${Math.abs(toGoKg)}`} kg
-          </p>
-          <p className="mt-1 text-[10px] font-black uppercase text-white/45">Vers objectif</p>
-        </div>
-      </div>
-
-      {delta !== undefined ? (
-        <p className={`mt-3 text-sm font-black ${delta > 0 ? "text-sea" : delta < 0 ? "text-coral" : "text-white/55"}`}>
-          {delta > 0 ? `−${delta.toFixed(1)} kg depuis le début du suivi` : delta < 0 ? `+${Math.abs(delta).toFixed(1)} kg depuis le début` : "Poids stable"}
-        </p>
-      ) : null}
-
-      {weightLog.length > 0 ? (
-        <div className="mt-4 space-y-1.5">
-          <p className="text-xs font-black uppercase text-white/40">Historique récent</p>
-          {weightLog.slice(0, 8).map((entry) => (
-            <div className="flex items-center justify-between rounded-md bg-white/5 px-3 py-2" key={entry.date}>
-              <span className="text-xs font-semibold text-white/55">
-                {new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "2-digit" }).format(new Date(entry.date))}
-              </span>
-              <span className="font-black text-white">{entry.kg} kg</span>
-            </div>
-          ))}
-        </div>
-      ) : null}
     </details>
   );
 }
@@ -1529,146 +830,63 @@ function ProfilesSection({
 }) {
   const [creating, setCreating] = useState(false);
   const [draftName, setDraftName] = useState("");
-  const [draftAvatar, setDraftAvatar] = useState(AVATAR_CHOICES[0]);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editName, setEditName] = useState("");
-  const [editAvatar, setEditAvatar] = useState(AVATAR_CHOICES[0]);
-
-  const submitCreate = () => {
-    if (!draftName.trim()) return;
-    onCreate(draftName, draftAvatar);
-    setDraftName("");
-    setDraftAvatar(AVATAR_CHOICES[0]);
-    setCreating(false);
-  };
 
   return (
-    <section className="card-dark p-4">
-      <div className="flex items-start justify-between gap-3">
+    <details className="rounded-[24px] border border-white/10 bg-[#10131d] p-4 shadow-soft">
+      <summary className="flex cursor-pointer list-none items-start justify-between gap-3">
         <div>
-          <h2 className="text-xl font-black text-white">Profils</h2>
-          <p className="mt-1 text-sm font-semibold text-white/55">
-            Chaque profil a son propre programme et historique.
-          </p>
+          <p className="text-xs font-black uppercase text-white/40">Multi-profils</p>
+          <h2 className="mt-1 text-xl font-black text-white">Profils</h2>
+          <p className="mt-1 text-sm font-semibold text-white/55">{profiles.length} profil{profiles.length > 1 ? "s" : ""}</p>
         </div>
-        {!creating ? (
-          <button
-            className="h-10 shrink-0 rounded-md bg-sky px-3 text-sm font-black text-white transition hover:bg-sky/80"
-            onClick={() => setCreating(true)}
-            type="button"
-          >
-            + Ajouter
-          </button>
-        ) : null}
-      </div>
+        <span className="rounded-xl border border-white/10 bg-white/8 px-3 py-2 text-xs font-black text-white/55">Ouvrir</span>
+      </summary>
 
       <div className="mt-4 space-y-2">
         {profiles.map((profile) => {
-          const isActive = profile.id === activeProfileId;
-          const isEditing = editingId === profile.id;
-
-          if (isEditing) {
-            return (
-              <div className="rounded-xl border border-sky/30 bg-sky/5 p-3" key={profile.id}>
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl">{editAvatar}</span>
-                  <input
-                    className="h-11 flex-1 rounded-md border border-white/10 bg-white/5 px-3 font-semibold text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
-                    onChange={(e) => setEditName(e.target.value)}
-                    placeholder="Nom du profil"
-                    value={editName}
-                  />
-                </div>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {AVATAR_CHOICES.map((avatar) => (
-                    <button
-                      className={`flex size-9 items-center justify-center rounded-md border text-lg transition ${
-                        avatar === editAvatar ? "border-sky bg-sky/20" : "border-white/10 bg-white/5 hover:bg-white/10"
-                      }`}
-                      key={avatar}
-                      onClick={() => setEditAvatar(avatar)}
-                      type="button"
-                    >
-                      {avatar}
-                    </button>
-                  ))}
-                </div>
-                <div className="mt-3 flex gap-2">
-                  <button
-                    className="h-10 flex-1 rounded-md border border-white/10 bg-white/8 text-sm font-black text-white"
-                    onClick={() => setEditingId(null)}
-                    type="button"
-                  >
-                    Annuler
-                  </button>
-                  <button
-                    className="h-10 flex-1 rounded-md bg-sky text-sm font-black text-white"
-                    onClick={() => {
-                      onRename(profile.id, editName, editAvatar);
-                      setEditingId(null);
-                    }}
-                    type="button"
-                  >
-                    Enregistrer
-                  </button>
-                </div>
-              </div>
-            );
-          }
+          const active = profile.id === activeProfileId;
 
           return (
-            <div
-              className={`flex items-center gap-3 rounded-xl border p-3 transition ${
-                isActive
-                  ? "border-sky/40 bg-sky/10"
-                  : "border-white/10 bg-white/5 hover:bg-white/10"
-              }`}
-              key={profile.id}
-            >
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-white/10 text-2xl">
-                {profile.avatar}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-black text-white">{profile.name}</p>
-                {isActive ? (
-                  <p className="text-xs font-black uppercase text-sky">Profil actif</p>
+            <div className={`rounded-2xl border p-3 ${active ? "border-coral/45 bg-coral/10" : "border-white/10 bg-white/[0.04]"}`} key={profile.id}>
+              <div className="flex items-center gap-2">
+                <input
+                  className="h-11 min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/5 px-3 text-sm font-black text-white outline-none focus:border-sky"
+                  onChange={(event) => onRename(profile.id, event.target.value, profile.avatar)}
+                  value={profile.name}
+                />
+                {!active ? (
+                  <button className="h-11 rounded-2xl bg-sky px-3 text-xs font-black text-white" onClick={() => onSwitch(profile.id)} type="button">
+                    Activer
+                  </button>
                 ) : (
-                  <p className="text-xs font-semibold text-white/45">Touche pour basculer</p>
+                  <span className="rounded-2xl border border-coral/30 bg-coral/10 px-3 py-3 text-xs font-black text-coral">Actif</span>
                 )}
               </div>
-              {!isActive ? (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {avatarChoices.map((avatar) => (
+                  <button
+                    className={`flex size-9 items-center justify-center rounded-xl border text-sm font-black ${
+                      profile.avatar === avatar ? "border-sky bg-sky/20 text-sky" : "border-white/10 bg-white/5 text-white/60"
+                    }`}
+                    key={avatar}
+                    onClick={() => onRename(profile.id, profile.name, avatar)}
+                    type="button"
+                  >
+                    {avatar}
+                  </button>
+                ))}
+              </div>
+              {!active && profiles.length > 1 ? (
                 <button
-                  className="h-9 shrink-0 rounded-md bg-sky/15 px-3 text-xs font-black text-sky transition hover:bg-sky/25"
-                  onClick={() => onSwitch(profile.id)}
-                  type="button"
-                >
-                  Activer
-                </button>
-              ) : null}
-              <button
-                aria-label="Modifier"
-                className="flex size-9 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/5 text-white/60 transition hover:bg-white/10"
-                onClick={() => {
-                  setEditingId(profile.id);
-                  setEditName(profile.name);
-                  setEditAvatar(profile.avatar);
-                }}
-                type="button"
-              >
-                ✎
-              </button>
-              {profiles.length > 1 ? (
-                <button
-                  aria-label="Supprimer"
-                  className="flex size-9 shrink-0 items-center justify-center rounded-md border border-coral/20 bg-coral/10 text-coral transition hover:bg-coral/20"
+                  className="mt-2 h-10 w-full rounded-2xl border border-coral/30 bg-coral/10 text-sm font-black text-coral"
                   onClick={() => {
-                    if (window.confirm(`Supprimer le profil ${profile.name} ? Cette action est définitive.`)) {
+                    if (window.confirm(`Supprimer le profil ${profile.name} ?`)) {
                       onDelete(profile.id);
                     }
                   }}
                   type="button"
                 >
-                  ✕
+                  Supprimer
                 </button>
               ) : null}
             </div>
@@ -1677,54 +895,36 @@ function ProfilesSection({
       </div>
 
       {creating ? (
-        <div className="mt-4 rounded-xl border border-sky/30 bg-sky/5 p-3">
-          <p className="text-sm font-black text-sky">Nouveau profil</p>
-          <div className="mt-3 flex items-center gap-2">
-            <span className="text-2xl">{draftAvatar}</span>
-            <input
-              autoFocus
-              className="h-11 flex-1 rounded-md border border-white/10 bg-white/5 px-3 font-semibold text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
-              onChange={(e) => setDraftName(e.target.value)}
-              placeholder="Prénom"
-              value={draftName}
-            />
-          </div>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {AVATAR_CHOICES.map((avatar) => (
-              <button
-                className={`flex size-9 items-center justify-center rounded-md border text-lg transition ${
-                  avatar === draftAvatar ? "border-sky bg-sky/20" : "border-white/10 bg-white/5 hover:bg-white/10"
-                }`}
-                key={avatar}
-                onClick={() => setDraftAvatar(avatar)}
-                type="button"
-              >
-                {avatar}
-              </button>
-            ))}
-          </div>
-          <div className="mt-3 flex gap-2">
-            <button
-              className="h-10 flex-1 rounded-md border border-white/10 bg-white/8 text-sm font-black text-white"
-              onClick={() => {
-                setCreating(false);
-                setDraftName("");
-              }}
-              type="button"
-            >
+        <div className="mt-3 rounded-2xl border border-sky/30 bg-sky/10 p-3">
+          <input
+            className="h-11 w-full rounded-2xl border border-white/10 bg-white/5 px-3 text-sm font-black text-white outline-none focus:border-sky"
+            onChange={(event) => setDraftName(event.target.value)}
+            placeholder="Prenom"
+            value={draftName}
+          />
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button className="h-11 rounded-2xl border border-white/10 bg-white/8 font-black text-white" onClick={() => setCreating(false)} type="button">
               Annuler
             </button>
             <button
-              className="h-10 flex-1 rounded-md bg-sky text-sm font-black text-white disabled:opacity-50"
+              className="h-11 rounded-2xl bg-sky font-black text-white disabled:opacity-40"
               disabled={!draftName.trim()}
-              onClick={submitCreate}
+              onClick={() => {
+                onCreate(draftName.trim(), avatarChoices[0]);
+                setDraftName("");
+                setCreating(false);
+              }}
               type="button"
             >
-              Créer le profil
+              Creer
             </button>
           </div>
         </div>
-      ) : null}
-    </section>
+      ) : (
+        <button className="mt-3 h-11 w-full rounded-2xl bg-sky px-4 text-sm font-black text-white" onClick={() => setCreating(true)} type="button">
+          Ajouter un profil
+        </button>
+      )}
+    </details>
   );
 }

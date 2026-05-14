@@ -92,6 +92,7 @@ export function HistoryList() {
           </div>
         </div>
       </section>
+      <div className="grid gap-4 xl:grid-cols-2">
       {visibleHistory.map((session) => {
         const durationText =
           typeof session.totalDurationMs === "number" ? formatDurationLong(session.totalDurationMs) : undefined;
@@ -265,6 +266,7 @@ export function HistoryList() {
           </article>
         );
       })}
+      </div>
       {!showAllHistory && history.length > visibleHistory.length ? (
         <button
           className="h-12 w-full rounded-md border border-white/10 bg-white/8 px-4 font-black text-white/70"

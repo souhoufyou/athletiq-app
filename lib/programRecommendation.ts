@@ -1,5 +1,5 @@
 import { PROGRAM_CATALOG } from "@/data/programCatalog";
-import type { ProgramRecommendation, ProgramTemplate, UserSettings } from "@/types/training";
+import type { ProgramObjective, ProgramRecommendation, ProgramTemplate, UserSettings } from "@/types/training";
 
 export function recommendPrograms(
   settings: UserSettings,
@@ -32,6 +32,7 @@ function scoreProgram(program: ProgramTemplate, settings: UserSettings): Program
     token.includes("perinee") ||
     token.includes("pelvien")
   );
+  const primaryGoal = settings.primaryGoal;
 
   if (program.tags.includes("femme") && settings.sex === "male") {
     return blockedRecommendation(program, "Programme specifique femme, non pertinent pour ce profil.");
@@ -45,45 +46,59 @@ function scoreProgram(program: ProgramTemplate, settings: UserSettings): Program
     return blockedRecommendation(program, "Programme post-partum sans signal correspondant dans le profil.");
   }
 
-  if (settings.primaryGoal && program.primaryObjective === settings.primaryGoal) {
+  if (primaryGoal && isGoalMatch(program.primaryObjective, primaryGoal)) {
     score += 40;
-    reasons.push("Objectif principal aligne.");
+    reasons.push(`Adapte a ton objectif ${formatObjective(primaryGoal)}.`);
   }
 
-  if (settings.primaryGoal && program.secondaryObjectives.includes(settings.primaryGoal)) {
+  if (primaryGoal && program.secondaryObjectives.some((objective) => isGoalMatch(objective, primaryGoal))) {
     score += 18;
-    reasons.push("Objectif present en objectif secondaire.");
+    reasons.push(`Couvre aussi ton objectif ${formatObjective(primaryGoal)}.`);
   }
 
   if (settings.experienceLevel && program.level === settings.experienceLevel) {
     score += 18;
-    reasons.push("Niveau sportif compatible.");
+    reasons.push(`Compatible avec ton niveau ${formatLevel(settings.experienceLevel)}.`);
   }
 
   if (settings.weeklyFrequency && program.frequency === settings.weeklyFrequency) {
     score += 14;
-    reasons.push("Frequence demandee respectee.");
+    reasons.push(`Compatible avec ${settings.weeklyFrequency} seances par semaine.`);
   } else if (settings.weeklyFrequency && Math.abs(program.frequency - settings.weeklyFrequency) === 1) {
     score += 6;
-    reasons.push("Frequence proche de la demande.");
+    reasons.push(`Frequence proche de tes ${settings.weeklyFrequency} seances demandees.`);
   }
 
   const equipment = settings.equipment;
   if (equipment && program.requiredEquipment.includes(equipment)) {
     score += 12;
-    reasons.push("Materiel disponible compatible.");
+    reasons.push(`Compatible avec ton materiel: ${formatEquipment(equipment)}.`);
   }
 
   if (settings.judoDays.length > 0 || settings.externalSports.some((sport) => /judo|combat/i.test(sport.name))) {
     if (program.tags.includes("judo") || program.primaryObjective === "judo" || program.secondaryObjectives.includes("judo")) {
       score += 20;
-      reasons.push("Sport de combat pris en compte.");
+      reasons.push("Tient compte d'un sport intense dans la semaine.");
     }
   }
 
   if (settings.sex === "female" && program.tags.includes("femme")) {
     score += 8;
-    reasons.push("Programme pense pour profil femme.");
+    reasons.push("Adapte a un profil femme.");
+  }
+
+  if (settings.sex === "male" && program.tags.includes("homme")) {
+    score += 8;
+    reasons.push("Adapte a un profil homme avance.");
+  }
+
+  if (primaryGoal && program.tags.some((tag) => isGoalMatch(tag as ProgramObjective, primaryGoal))) {
+    score += 6;
+  }
+
+  if (settings.preferences.some((preference) => program.tags.some((tag) => normalize(preference).includes(normalize(tag))))) {
+    score += 4;
+    reasons.push("Respecte une partie de tes preferences.");
   }
 
   const contraindicationHits = program.contraindications.filter((item) =>
@@ -106,7 +121,7 @@ function scoreProgram(program: ProgramTemplate, settings: UserSettings): Program
 
   if (hasPostpartumSignal && program.tags.includes("post-partum")) {
     score += 20;
-    reasons.push("Contraintes post-partum prises en compte.");
+    reasons.push("Prend en compte post-partum, perinee ou diastasis.");
   }
 
   if (hasPostpartumSignal && !program.tags.includes("post-partum")) {
@@ -116,7 +131,11 @@ function scoreProgram(program: ProgramTemplate, settings: UserSettings): Program
 
   if (reasons.length === 0) {
     score += 1;
-    reasons.push("Option generale disponible.");
+    reasons.push("Option simple disponible pour demarrer.");
+  }
+
+  if (settings.avoid.length > 0 && contraindicationHits.length === 0) {
+    reasons.push("Tes exercices refuses seront filtres si le programme en contient.");
   }
 
   return {
@@ -126,6 +145,50 @@ function scoreProgram(program: ProgramTemplate, settings: UserSettings): Program
     reasons,
     warnings
   };
+}
+
+function isGoalMatch(programObjective: ProgramObjective | string, userGoal: ProgramObjective | string): boolean {
+  if (programObjective === userGoal) return true;
+  if (userGoal === "sante" && programObjective === "cardio-sante") return true;
+  if (userGoal === "performance" && programObjective === "force") return true;
+  if (userGoal === "prise-masse" && programObjective === "fessiers") return true;
+  return false;
+}
+
+function formatObjective(objective: ProgramObjective | string): string {
+  const labels: Record<string, string> = {
+    "cardio-sante": "cardio / sante",
+    fessiers: "fessiers",
+    force: "force",
+    judo: "judo",
+    performance: "force",
+    "perte-gras": "perte de gras",
+    "prise-masse": "prise de muscle",
+    recomposition: "recomposition",
+    sante: "cardio / sante"
+  };
+
+  return labels[objective] ?? objective;
+}
+
+function formatLevel(level: string): string {
+  const labels: Record<string, string> = {
+    avance: "avance",
+    debutant: "debutant",
+    intermediaire: "intermediaire"
+  };
+
+  return labels[level] ?? level;
+}
+
+function formatEquipment(equipment: string): string {
+  const labels: Record<string, string> = {
+    "halteres-maison": "maison equipee",
+    "poids-corps": "peu de materiel",
+    "salle-complete": "salle equipee"
+  };
+
+  return labels[equipment] ?? equipment;
 }
 
 function blockedRecommendation(program: ProgramTemplate, warning: string): ProgramRecommendation {

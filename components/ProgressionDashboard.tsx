@@ -356,7 +356,7 @@ function InsightCard({
 function formatTrendAction(action: TrainingTrend["action"]): string {
   const labels: Record<TrainingTrend["action"], string> = {
     adjust_goal: "objectif",
-    deload_next_week: "deload",
+    deload_next_week: "alleger",
     increase_progression: "progresser",
     keep_learning: "observer",
     protect_recovery: "recuperer",

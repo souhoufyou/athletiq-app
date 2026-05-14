@@ -271,7 +271,7 @@ function applyAdaptiveMemory(
 
   if ((deloadWindow || recoveryLimited || recentHardCount >= 2) && next.decision === "augmenter") {
     const reason = deloadWindow
-      ? "Semaine de deload programmee: consolidation avant nouvelle hausse."
+      ? "Semaine plus legere programmee: consolidation avant nouvelle hausse."
       : "Fatigue repetee sur cet exercice: consolidation avant nouvelle hausse.";
     next = {
       ...next,
@@ -292,10 +292,10 @@ function applyAdaptiveMemory(
       nextLoad: reduceLoad(load, 5),
       nextTarget: reduceTarget(input.plannedExercise.target),
       decision: "baisser",
-      reason: `${next.reason} Historique difficile repete sur cet exercice: deload local avant de reconstruire.`,
+      reason: `${next.reason} Historique difficile repete sur cet exercice: baisse temporaire avant de reconstruire.`,
       warning: appendWarning(
         next.warning,
-        "Deload local: baisser legerement la charge ou le volume sur cet exercice pendant 1 a 2 expositions."
+        "Baisse temporaire: baisser legerement la charge ou le volume sur cet exercice pendant 1 a 2 expositions."
       )
     };
   }
@@ -464,7 +464,7 @@ function applyProfileCaps(
           nextLoad: formatLoad(load),
           decision: "maintenir",
           reason: `${next.reason} Plafond 1RM atteint: pas de hausse au-dessus de ${Math.round(capRatio * 100)}% du 1RM connu.`,
-          warning: appendWarning(next.warning, "Recalibrer le 1RM si cette charge est devenue trop facile.")
+          warning: appendWarning(next.warning, "Mettre a jour le 1RM si cette charge est devenue trop facile.")
         };
       } else {
         next = {

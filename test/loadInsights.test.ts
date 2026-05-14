@@ -38,7 +38,7 @@ const baseSettings: UserSettings = {
   weeklyFrequency: 4
 };
 
-test("direct chest reference is explained as calibrated", () => {
+test("direct chest reference is explained as a user reference", () => {
   const exercise: Exercise = {
     id: "ex-bench-barbell",
     name: "Developpe couche barre",
@@ -50,7 +50,7 @@ test("direct chest reference is explained as calibrated", () => {
   };
 
   const insight = getExerciseLoadInsight(exercise, baseSettings);
-  assert.equal(insight?.badge, "Calibree");
+  assert.equal(insight?.badge, "Repere");
 });
 
 test("estimated shoulder load is explained as derived from bench", () => {

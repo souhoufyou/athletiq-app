@@ -1,11 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react";
+import { PROFILE_PRESETS } from "@/data/profilePresets";
 import { athleteProfile, weeklyProgram } from "@/data/program";
 import { getDateKey } from "@/lib/date";
 import { adaptProgramAfterSession } from "@/lib/programAdaptation";
 import { adaptSettingsAfterSession } from "@/lib/profileAdaptation";
 import { buildProgram } from "@/lib/programBuilder";
+import { instantiateProgramTemplate } from "@/lib/programInstantiation";
+import { recommendPrograms } from "@/lib/programRecommendation";
 import { normalizeExerciseV2, normalizeProgramV2 } from "@/lib/programSchema";
 import { calculateProgression, type ProgressionSessionContext } from "@/lib/progression";
 import { CURRENT_SETTINGS_SCHEMA_VERSION, normalizeUserSettings } from "@/lib/settingsSchema";
@@ -640,10 +643,11 @@ function completeSessionAction(session: PlannedSession): CompletedSession | unde
   return completed;
 }
 
-function completeOnboardingAction(next: UserSettings) {
+function completeOnboardingAction(next: UserSettings, selectedProgram?: PlannedSession[]) {
   const normalizedSettings = normalizeUserSettings(next, defaultSettings);
-  // Generate a tailored program from the captured goals/equipment/frequency
-  const program = normalizeProgramV2(buildProgram(normalizedSettings));
+  const program = selectedProgram
+    ? normalizeProgramV2(selectedProgram)
+    : normalizeProgramV2(buildProgram(normalizedSettings));
   writeJson(settingsKeyFor(store.activeProfileId), normalizedSettings);
   writeJson(programKeyFor(store.activeProfileId), program);
   writeJson(onboardingKeyFor(store.activeProfileId), true);
@@ -736,6 +740,48 @@ function createProfileAction(name: string, avatar: string = "🏋️"): Profile 
   };
   emit();
   return next;
+}
+
+function applyProfilePresetAction(presetId: "sofiane" | "alicia") {
+  const preset = PROFILE_PRESETS.find((item) => item.id === presetId);
+  if (!preset) return;
+
+  const existing = store.profiles.find(
+    (profile) =>
+      profile.id === preset.profile.id ||
+      profile.name.trim().toLowerCase() === preset.profile.name.trim().toLowerCase()
+  );
+  const targetProfile = existing ?? preset.profile;
+  const nextProfiles = existing ? store.profiles : [...store.profiles, targetProfile];
+  const normalizedSettings = normalizeUserSettings(preset.settings, defaultSettings);
+  const recommended = recommendPrograms(normalizedSettings)[0];
+  const nextProgram = normalizeProgramV2(
+    recommended
+      ? instantiateProgramTemplate(recommended.program, normalizedSettings)
+      : buildProgram(normalizedSettings)
+  );
+  const nextHistory = readJson<CompletedSession[]>(historyKeyFor(targetProfile.id), []);
+
+  writeJson<ProfilesState>(PROFILES_KEY, {
+    profiles: nextProfiles,
+    activeProfileId: targetProfile.id
+  });
+  writeJson(settingsKeyFor(targetProfile.id), normalizedSettings);
+  writeJson(programKeyFor(targetProfile.id), nextProgram);
+  writeJson(onboardingKeyFor(targetProfile.id), true);
+  removeStoredJson(activeSessionKeyFor(targetProfile.id));
+
+  store = {
+    ...store,
+    activeProfileId: targetProfile.id,
+    activeSession: null,
+    currentProgram: nextProgram,
+    history: nextHistory,
+    isOnboardingDone: true,
+    profiles: nextProfiles,
+    settings: normalizedSettings
+  };
+  emit();
 }
 
 function renameProfileAction(profileId: string, name: string, avatar?: string) {
@@ -833,6 +879,7 @@ export function useCoachStorage() {
     activeProfileId,
     activeSession,
     attachAiCoachResponse: attachAiCoachResponseAction,
+    applyProfilePreset: applyProfilePresetAction,
     cancelActiveSession: cancelActiveSessionAction,
     clearReplacement: clearReplacementAction,
     completeOnboarding: completeOnboardingAction,

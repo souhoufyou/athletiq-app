@@ -189,7 +189,7 @@ function normalizeCalibrationEvents(
           ? item.kind
           : "load-feedback",
       tone: item.tone === "info" || item.tone === "progress" || item.tone === "warn" ? item.tone : "info",
-      title: normalizeString(item.title, "Calibration"),
+      title: normalizeString(item.title, "Ajustement"),
       subject: normalizeString(item.subject, "Programme"),
       detail: normalizeString(item.detail, "")
     }))

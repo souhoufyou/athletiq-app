@@ -1,8 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BrandLogo } from "@/components/BrandLogo";
+import { PROFILE_PRESETS, type ProfilePreset } from "@/data/profilePresets";
+import { instantiateProgramTemplate } from "@/lib/programInstantiation";
+import { recommendPrograms } from "@/lib/programRecommendation";
 import { buildStrengthReferenceFromSet, estimateOneRepMaxFromSet, formatEstimatedOneRepMax } from "@/lib/strengthCalibration";
 import { useCoachStorage } from "@/lib/storage";
 import type {
@@ -12,7 +15,7 @@ import type {
   ExternalSportIntensity,
   LoadUnit,
   PrimaryGoal,
-  SessionDurationPreference,
+  ProgramRecommendation,
   StrengthReference,
   TrainingConstraint,
   UserSex,
@@ -20,7 +23,7 @@ import type {
   Weekday
 } from "@/types/training";
 
-const TOTAL_STEPS = 10;
+const TOTAL_STEPS = 5;
 
 const weekdayOptions: Array<{ value: Weekday; label: string }> = [
   { value: "monday", label: "Lundi" },
@@ -33,52 +36,48 @@ const weekdayOptions: Array<{ value: Weekday; label: string }> = [
 ];
 
 const goalOptions: Array<{ value: PrimaryGoal; mainGoalText: string; label: string; desc: string }> = [
-  { value: "recomposition", mainGoalText: "Recomposition physique : perdre du gras, garder et prendre du muscle.", label: "Recomposition", desc: "Perdre du gras + préserver le muscle" },
-  { value: "prise-masse", mainGoalText: "Prise de masse : gagner du muscle en priorité.", label: "Prise de masse", desc: "Prioriser le gain musculaire" },
-  { value: "perte-gras", mainGoalText: "Perte de gras : déficit contrôlé.", label: "Perte de gras", desc: "Brûler les graisses en douceur" },
-  { value: "performance", mainGoalText: "Performance : force et endurance.", label: "Performance", desc: "Devenir plus fort et endurant" },
-  { value: "sante", mainGoalText: "Santé générale : bouger mieux, récupérer.", label: "Santé", desc: "Bien-être et récupération" }
+  { value: "perte-gras", mainGoalText: "Perte de gras : perdre du poids sans sacrifier le muscle.", label: "Perdre du poids", desc: "Plus de marche/cardio doux, muscu maintenue" },
+  { value: "recomposition", mainGoalText: "Recomposition : perdre du gras, garder et construire du muscle.", label: "Recomposition", desc: "Equilibre force, volume et cardio" },
+  { value: "prise-masse", mainGoalText: "Prise de muscle : construire du volume proprement.", label: "Prendre du muscle", desc: "Plus de volume, progression double" },
+  { value: "performance", mainGoalText: "Force : progresser sur les mouvements principaux.", label: "Force", desc: "Charges prioritaires, repos plus longs" },
+  { value: "sante", mainGoalText: "Remise en forme : bouger mieux, progresser sans se cramer.", label: "Cardio / sante", desc: "Simple, progressif, durable" }
 ];
 
 const equipmentOptions: Array<{ value: Equipment; label: string; desc: string }> = [
-  { value: "salle-complete", label: "Salle complète", desc: "Machines, barres, haltères, poulies" },
-  { value: "halteres-maison", label: "Maison équipée", desc: "Haltères, élastiques, banc" },
-  { value: "poids-corps", label: "Poids du corps", desc: "Sans matériel ou très peu" }
+  { value: "salle-complete", label: "Salle equipee", desc: "Machines, barres, halteres, poulies" },
+  { value: "halteres-maison", label: "Maison equipee", desc: "Halteres, elastiques, banc" },
+  { value: "poids-corps", label: "Peu de materiel", desc: "Poids du corps ou tres simple" }
 ];
 
 const experienceOptions: Array<{ value: ExperienceLevel; label: string; desc: string }> = [
-  { value: "debutant", label: "Débutant", desc: "Moins d'1 an de muscu régulière" },
-  { value: "intermediaire", label: "Intermédiaire", desc: "1 à 3 ans, technique solide" },
-  { value: "avance", label: "Avancé", desc: "3+ ans, charges et volume importants" }
+  { value: "debutant", label: "Debutant", desc: "Reprise ou moins d'1 an regulier" },
+  { value: "intermediaire", label: "Intermediaire", desc: "Technique correcte, routine deja installee" },
+  { value: "avance", label: "Avance", desc: "Charges lourdes, volume plus haut" }
 ];
 
-const frequencyOptions: number[] = [2, 3, 4, 5, 6];
-
-const sexOptions: Array<{ value: UserSex; label: string; desc: string }> = [
-  { value: "female", label: "Femme", desc: "Repere utile pour adapter les charges de depart" },
-  { value: "male", label: "Homme", desc: "Repere utile pour adapter les charges de depart" },
-  { value: "other", label: "Autre", desc: "Profil personnalise sans categorie stricte" },
-  { value: "prefer-not-to-say", label: "Ne pas dire", desc: "On utilisera surtout tes retours terrain" }
+const sexOptions: Array<{ value: UserSex; label: string }> = [
+  { value: "female", label: "Femme" },
+  { value: "male", label: "Homme" },
+  { value: "other", label: "Autre" },
+  { value: "prefer-not-to-say", label: "Ne pas dire" }
 ];
 
-const durationOptions: Array<{ value: SessionDurationPreference; label: string; desc: string }> = [
-  { value: "short", label: "35-45 min", desc: "Seances courtes, priorite aux essentiels" },
-  { value: "standard", label: "50-65 min", desc: "Equilibre volume / recuperation" },
-  { value: "long", label: "70-90 min", desc: "Plus de volume si tu recuperes bien" }
+const durationOptions: Array<{ value: UserSettings["sessionDurationPreference"]; label: string }> = [
+  { value: "short", label: "35-45 min" },
+  { value: "standard", label: "50-65 min" },
+  { value: "long", label: "70-90 min" }
 ];
 
-const sportIntensityOptions: Array<{ value: ExternalSportIntensity; label: string; desc: string }> = [
-  { value: "low", label: "Leger", desc: "Marche, mobilite, activite douce" },
-  { value: "moderate", label: "Modere", desc: "Cardio, sport technique, intensite moyenne" },
-  { value: "high", label: "Intense", desc: "Judo, foot, combat, fractionne ou competition" }
+const sportIntensityOptions: Array<{ value: ExternalSportIntensity; label: string }> = [
+  { value: "low", label: "Leger" },
+  { value: "moderate", label: "Modere" },
+  { value: "high", label: "Intense" }
 ];
 
-const cardioOptions = ["Faible", "Modere", "Bon", "Excellent"];
-const sleepOptions = ["Regulier", "Irregulier", "Mauvais"];
-const cautionOptions: Array<{ value: CautionLevel; label: string; desc: string }> = [
-  { value: "prudent", label: "Prudent", desc: "Progressions lentes, priorité à la sécurité" },
-  { value: "normal", label: "Normal", desc: "Équilibre progression / récupération" },
-  { value: "agressif", label: "Agressif", desc: "Progressions rapides, haut volume" }
+const cautionOptions: Array<{ value: CautionLevel; label: string }> = [
+  { value: "prudent", label: "Prudent" },
+  { value: "normal", label: "Normal" },
+  { value: "agressif", label: "Agressif controle" }
 ];
 
 type OnboardingData = {
@@ -93,19 +92,13 @@ type OnboardingData = {
   equipment: Equipment;
   weeklyFrequency: number;
   availableDays: Weekday[];
-  sessionDurationPreference: SessionDurationPreference;
-  hasEveningSport: boolean;
+  sessionDurationPreference: UserSettings["sessionDurationPreference"];
+  hasExternalSport: boolean;
   externalSportName: string;
   externalSportIntensity: ExternalSportIntensity;
-  judoDays: Weekday[];
-  benchOneRepMaxKg: number;
-  benchReferenceReps: number;
-  legReferenceKg: number;
-  legReferenceReps: number;
-  pullReferenceKg: number;
-  pullReferenceReps: number;
-  hingeReferenceKg: number;
-  hingeReferenceReps: number;
+  externalSportDays: Weekday[];
+  benchLoadKg: number;
+  benchReps: number;
   loadUnit: LoadUnit;
   cardioLevel: string;
   sleepQuality: string;
@@ -113,7 +106,6 @@ type OnboardingData = {
   watchPointsText: string;
   preferencesText: string;
   avoidText: string;
-  gym: string;
   cautionLevel: CautionLevel;
   aiEnabled: boolean;
 };
@@ -131,18 +123,12 @@ const initialData: OnboardingData = {
   weeklyFrequency: 4,
   availableDays: ["monday", "tuesday", "wednesday", "thursday", "friday"],
   sessionDurationPreference: "standard",
-  hasEveningSport: false,
+  hasExternalSport: false,
   externalSportName: "",
   externalSportIntensity: "high",
-  judoDays: [],
-  benchOneRepMaxKg: 0,
-  benchReferenceReps: 5,
-  legReferenceKg: 0,
-  legReferenceReps: 8,
-  pullReferenceKg: 0,
-  pullReferenceReps: 8,
-  hingeReferenceKg: 0,
-  hingeReferenceReps: 8,
+  externalSportDays: [],
+  benchLoadKg: 0,
+  benchReps: 5,
   loadUnit: "kg",
   cardioLevel: "Modere",
   sleepQuality: "Regulier",
@@ -150,7 +136,6 @@ const initialData: OnboardingData = {
   watchPointsText: "",
   preferencesText: "",
   avoidText: "",
-  gym: "",
   cautionLevel: "normal",
   aiEnabled: false
 };
@@ -158,676 +143,822 @@ const initialData: OnboardingData = {
 export function OnboardingFlow() {
   const [step, setStep] = useState(1);
   const [data, setData] = useState<OnboardingData>(initialData);
-  const { completeOnboarding, settings } = useCoachStorage();
+  const [selectedPresetId, setSelectedPresetId] = useState<ProfilePreset["id"] | undefined>();
+  const [selectedProgramId, setSelectedProgramId] = useState<string | undefined>();
+  const [hasManualProgramSelection, setHasManualProgramSelection] = useState(false);
+  const { applyProfilePreset, completeOnboarding, setCurrentProgram, settings } = useCoachStorage();
   const router = useRouter();
 
-  const patch = (partial: Partial<OnboardingData>) => setData((d) => ({ ...d, ...partial }));
+  const patch = (partial: Partial<OnboardingData>) => {
+    setSelectedPresetId(undefined);
+    setData((current) => ({ ...current, ...partial }));
+  };
+  const draftSettings = useMemo(() => buildSettings(settings, data), [data, settings]);
+  const recommendations = useMemo(() => recommendPrograms(draftSettings), [draftSettings]);
+  const selectedRecommendation =
+    recommendations.find((recommendation) => recommendation.program.id === selectedProgramId) ?? recommendations[0];
+
+  useEffect(() => {
+    const topProgramId = recommendations[0]?.program.id;
+    if (!topProgramId) return;
+
+    const selectedProgramStillRecommended = recommendations.some(
+      (recommendation) => recommendation.program.id === selectedProgramId
+    );
+
+    if ((!hasManualProgramSelection || !selectedProgramStillRecommended) && selectedProgramId !== topProgramId) {
+      setSelectedProgramId(topProgramId);
+    }
+  }, [hasManualProgramSelection, recommendations, selectedProgramId]);
+
+  const selectProgram = (programId: string) => {
+    setHasManualProgramSelection(true);
+    setSelectedProgramId(programId);
+  };
+
+  const applyPreset = (preset: ProfilePreset) => {
+    setSelectedPresetId(preset.id);
+    setData(presetToOnboardingData(preset));
+    setHasManualProgramSelection(false);
+    setSelectedProgramId(undefined);
+    setStep(TOTAL_STEPS);
+  };
 
   const canAdvance = () => {
-    if (step === 1) return data.athleteName.trim().length > 0 && data.age > 0 && data.heightCm > 0;
-    if (step === 2) return data.currentWeightKg > 0 && data.targetWeightKg > 0;
-    if (step === 4) return data.availableDays.length > 0;
-    if (step === 6) return !data.hasEveningSport || data.judoDays.length > 0;
+    if (step === 1) {
+      return data.athleteName.trim().length > 0 && data.age > 0 && data.heightCm > 0 && data.currentWeightKg > 0;
+    }
+    if (step === 3) {
+      return data.availableDays.length > 0;
+    }
+    if (step === 4) {
+      return !data.hasExternalSport || data.externalSportDays.length > 0;
+    }
     return true;
   };
 
-  const next = () => {
-    if (step < TOTAL_STEPS) setStep(step + 1);
-  };
-
-  const back = () => {
-    if (step > 1) setStep(step - 1);
-  };
-
   const finish = () => {
-    const goalText = goalOptions.find((g) => g.value === data.primaryGoal)?.mainGoalText
-      ?? "Programme personnalisé";
-    const medicalNotes = data.medicalNotes.trim();
-    const watchPoints = parseTextList(data.watchPointsText);
-    const preferences = parseTextList(data.preferencesText);
-    const avoid = parseTextList(data.avoidText);
-    const externalSports = buildExternalSports(data);
-    const strengthReferences = buildStrengthReferences(data);
-    const benchEstimatedOneRepMaxKg = estimateOneRepMaxFromSet(
-      data.benchOneRepMaxKg,
-      data.benchReferenceReps,
-      data.loadUnit
-    );
-    const constraints = buildConstraints(medicalNotes, watchPoints, avoid);
-    const nextSettings: UserSettings = {
-      ...settings,
-      athleteName: data.athleteName,
-      sex: data.sex,
-      age: data.age,
-      heightCm: data.heightCm,
-      currentWeightKg: data.currentWeightKg,
-      targetWeightKg: data.targetWeightKg,
-      mainGoal: goalText,
-      primaryGoal: data.primaryGoal,
-      experienceLevel: data.experienceLevel,
-      equipment: data.equipment,
-      weeklyFrequency: data.weeklyFrequency,
-      availableDays: data.availableDays,
-      sessionDurationPreference: data.sessionDurationPreference,
-      judoDays: data.judoDays,
-      benchOneRepMaxKg: benchEstimatedOneRepMaxKg ?? 0,
-      loadUnit: data.loadUnit,
-      gym: data.gym,
-      cautionLevel: data.cautionLevel,
-      aiEnabled: data.aiEnabled,
-      cardioLevel: data.cardioLevel,
-      sleepQuality: data.sleepQuality,
-      recoveryProfile: mapSleepToRecovery(data.sleepQuality),
-      medicalNotes,
-      watchPoints,
-      preferences,
-      avoid,
-      externalSports,
-      constraints,
-      strengthReferences,
-      darkMode: false
-    };
-    completeOnboarding(nextSettings);
+    const selectedProgram = selectedRecommendation
+      ? instantiateProgramTemplate(selectedRecommendation.program, draftSettings)
+      : undefined;
+
+    if (selectedPresetId) {
+      applyProfilePreset(selectedPresetId);
+      if (selectedProgram) {
+        setCurrentProgram(selectedProgram);
+      }
+      router.replace("/");
+      return;
+    }
+
+    completeOnboarding(draftSettings, selectedProgram);
+
     router.replace("/");
   };
 
   const progress = Math.round((step / TOTAL_STEPS) * 100);
 
   return (
-    <div className="app-shell mx-auto min-h-screen w-full max-w-xl px-4 pt-8 pb-10 sm:px-6">
-      {/* Header */}
-      <div className="mb-6 flex items-center gap-3">
+    <div className="app-shell mx-auto min-h-screen w-full max-w-[44rem] px-4 pb-10 pt-6 sm:px-6">
+      <div className="mb-5 flex items-center justify-between gap-3">
         <BrandLogo className="h-10" priority variant="wordmark" />
-        <div>
-          <p className="text-[13px] font-black text-white/70">Configuration initiale</p>
-        </div>
+        <span className="rounded-xl border border-white/10 bg-white/8 px-3 py-2 text-xs font-black text-white/55">
+          {step}/{TOTAL_STEPS}
+        </span>
       </div>
 
-      {/* Progress */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-2">
-          <p className="text-xs font-black uppercase text-white/40">Étape {step} / {TOTAL_STEPS}</p>
+      <div className="mb-5">
+        <div className="mb-2 flex items-center justify-between">
+          <p className="text-xs font-black uppercase text-white/40">Questionnaire utile</p>
           <p className="text-xs font-bold text-white/40">{progress}%</p>
         </div>
         <div className="h-2 overflow-hidden rounded-full bg-white/10">
-          <div className="h-full rounded-full bg-sky transition-all duration-300" style={{ width: `${progress}%` }} />
+          <div className="h-full rounded-full bg-coral transition-all duration-300" style={{ width: `${progress}%` }} />
         </div>
       </div>
 
-      <OnboardingCoachPreview data={data} progress={progress} step={step} />
+      <section className="mb-4 rounded-[24px] border border-coral/20 bg-coral/10 p-4 shadow-soft">
+        <p className="text-xs font-black uppercase text-coral">Creer mon profil</p>
+        <h2 className="mt-1 text-xl font-black text-white">Chaque reponse doit servir au programme.</h2>
+        <p className="mt-1 text-sm font-semibold leading-relaxed text-white/60">
+          Objectif, niveau, temps, materiel et contraintes alimentent la recommandation puis le programme actif.
+        </p>
+      </section>
 
-      {/* Steps */}
-      <div className="mt-5 space-y-4 rounded-[28px] border border-white/10 bg-[#11131a]/90 p-4 shadow-soft">
-        {step === 1 && (
-          <StepWrapper subtitle="Quelques infos pour personnaliser ton programme." title="Bienvenue 👋">
-            <TextField
-              label="Ton prénom"
-              onChange={(v) => patch({ athleteName: v })}
-              placeholder="ex. Alex"
-              value={data.athleteName}
-            />
-            <div className="grid grid-cols-2 gap-3">
-              <NumberField label="Âge" max={80} min={14} onChange={(v) => patch({ age: v })} value={data.age} />
-              <NumberField label="Taille (cm)" max={230} min={140} onChange={(v) => patch({ heightCm: v })} value={data.heightCm} />
-            </div>
-            <div>
-              <p className="mb-2 text-sm font-bold text-white/60">Profil biologique <span className="text-white/35">(optionnel)</span></p>
-              <div className="grid grid-cols-2 gap-2">
-                {sexOptions.map((opt) => (
-                  <button
-                    className={`rounded-md border p-3 text-left transition ${
-                      data.sex === opt.value ? "border-sky/50 bg-sky/10" : "border-white/10 bg-white/5"
-                    }`}
-                    key={opt.value}
-                    onClick={() => patch({ sex: opt.value })}
-                    type="button"
-                  >
-                    <p className={`text-sm font-black ${data.sex === opt.value ? "text-sky" : "text-white"}`}>
-                      {opt.label}
-                    </p>
-                    <p className="mt-0.5 text-[11px] font-semibold leading-snug text-white/45">{opt.desc}</p>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </StepWrapper>
-        )}
+      {step === 1 ? (
+        <details className="mb-4 rounded-[20px] border border-white/10 bg-white/[0.04] p-3 shadow-soft">
+          <summary className="cursor-pointer list-none text-sm font-black text-white">
+            Profils rapides Sofiane / Alicia <span className="font-semibold text-white/45">(optionnel)</span>
+          </summary>
+          <p className="mt-2 text-xs font-semibold leading-relaxed text-white/50">
+            Utile pour tester l&apos;app avec des profils separes. Ton profil perso reste le parcours principal.
+          </p>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            {PROFILE_PRESETS.map((preset) => (
+              <button
+                className="rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-left transition active:scale-[0.99]"
+                key={preset.id}
+                onClick={() => applyPreset(preset)}
+                type="button"
+              >
+                <span className="flex size-9 items-center justify-center rounded-xl bg-coral/15 text-base font-black text-coral">
+                  {preset.profile.avatar}
+                </span>
+                <p className="mt-2 font-black text-white">{preset.profile.name}</p>
+                <p className="mt-1 text-xs font-semibold leading-relaxed text-white/50">
+                  {preset.settings.primaryGoal === "perte-gras" ? "Perte de poids + fessiers" : "Force + recomposition"}
+                </p>
+              </button>
+            ))}
+          </div>
+        </details>
+      ) : null}
 
-        {step === 2 && (
-          <StepWrapper subtitle="On calibre les objectifs corporels." title="Ton poids">
-            <div className="grid grid-cols-2 gap-3">
-              <NumberField
-                label="Poids actuel (kg)"
-                max={250}
-                min={30}
-                onChange={(v) => patch({ currentWeightKg: v })}
-                step={0.5}
-                value={data.currentWeightKg}
-              />
-              <NumberField
-                label="Objectif poids (kg)"
-                max={250}
-                min={30}
-                onChange={(v) => patch({ targetWeightKg: v })}
-                step={0.5}
-                value={data.targetWeightKg}
-              />
-            </div>
-          </StepWrapper>
-        )}
+      <section className="rounded-[28px] border border-white/10 bg-[#11131a]/92 p-4 shadow-soft">
+        {step === 1 ? <ProfileStep data={data} patch={patch} /> : null}
+        {step === 2 ? <GoalStep data={data} patch={patch} /> : null}
+        {step === 3 ? <TrainingStep data={data} patch={patch} /> : null}
+        {step === 4 ? <ConstraintsStep data={data} patch={patch} /> : null}
+        {step === 5 ? (
+          <RecommendationStep
+            data={data}
+            onFinish={finish}
+            onSelect={selectProgram}
+            recommendations={recommendations}
+            selectedProgramId={selectedRecommendation?.program.id}
+          />
+        ) : null}
+      </section>
 
-        {step === 3 && (
-          <StepWrapper subtitle="Ça oriente les priorités de ton programme." title="Ton objectif">
-            <div className="space-y-2">
-              {goalOptions.map((goal) => (
-                <button
-                  className={`w-full rounded-xl border p-4 text-left transition ${
-                    data.primaryGoal === goal.value
-                      ? "border-sky/50 bg-sky/10"
-                      : "border-white/10 bg-white/5"
-                  }`}
-                  key={goal.value}
-                  onClick={() => patch({ primaryGoal: goal.value })}
-                  type="button"
-                >
-                  <p className={`font-black ${data.primaryGoal === goal.value ? "text-sky" : "text-white"}`}>
-                    {goal.label}
-                  </p>
-                  <p className="mt-0.5 text-sm font-semibold text-white/50">{goal.desc}</p>
-                </button>
-              ))}
-            </div>
-          </StepWrapper>
-        )}
-
-        {step === 4 && (
-          <StepWrapper subtitle="On place les seances la ou elles ont une chance de tenir." title="Disponibilites">
-            <div>
-              <p className="mb-2 text-sm font-bold text-white/60">Combien de seances par semaine ?</p>
-              <div className="grid grid-cols-5 gap-2">
-                {frequencyOptions.map((freq) => (
-                  <button
-                    className={`h-12 rounded-md border font-black transition ${
-                      data.weeklyFrequency === freq
-                        ? "border-sky/50 bg-sky/10 text-sky"
-                        : "border-white/10 bg-white/5 text-white/60"
-                    }`}
-                    key={freq}
-                    onClick={() => patch({ weeklyFrequency: freq })}
-                    type="button"
-                  >
-                    {freq}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <p className="mb-2 text-sm font-bold text-white/60">Jours possibles pour la muscu</p>
-              <div className="grid grid-cols-2 gap-2">
-                {weekdayOptions.map((day) => {
-                  const checked = data.availableDays.includes(day.value);
-                  return (
-                    <button
-                      className={`flex min-h-11 items-center gap-2 rounded-md border px-3 font-bold transition ${
-                        checked ? "border-sky/40 bg-sky/10 text-sky" : "border-white/8 bg-white/5 text-white/60"
-                      }`}
-                      key={day.value}
-                      onClick={() => {
-                        const next = checked
-                          ? data.availableDays.filter((d) => d !== day.value)
-                          : [...data.availableDays, day.value];
-                        patch({ availableDays: next });
-                      }}
-                      type="button"
-                    >
-                      {checked ? "Oui" : "Non"} {day.label}
-                    </button>
-                  );
-                })}
-              </div>
-              <p className="mt-2 text-xs font-semibold text-white/40">
-                {data.availableDays.length} jour{data.availableDays.length > 1 ? "s" : ""} disponible{data.availableDays.length > 1 ? "s" : ""}.
-              </p>
-            </div>
-            <div>
-              <p className="mb-2 text-sm font-bold text-white/60">Duree preferee</p>
-              <div className="space-y-2">
-                {durationOptions.map((opt) => (
-                  <button
-                    className={`w-full rounded-xl border p-3 text-left transition ${
-                      data.sessionDurationPreference === opt.value
-                        ? "border-sky/50 bg-sky/10"
-                        : "border-white/10 bg-white/5"
-                    }`}
-                    key={opt.value}
-                    onClick={() => patch({ sessionDurationPreference: opt.value })}
-                    type="button"
-                  >
-                    <p className={`font-black ${data.sessionDurationPreference === opt.value ? "text-sky" : "text-white"}`}>
-                      {opt.label}
-                    </p>
-                    <p className="mt-0.5 text-xs font-semibold text-white/50">{opt.desc}</p>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </StepWrapper>
-        )}
-
-        {step === 5 && (
-          <StepWrapper subtitle="On adapte les exercices au materiel et a ton experience." title="Materiel & niveau">
-            <div>
-              <p className="mb-2 text-sm font-bold text-white/60">Equipement disponible</p>
-              <div className="space-y-2">
-                {equipmentOptions.map((opt) => (
-                  <button
-                    className={`w-full rounded-xl border p-3 text-left transition ${
-                      data.equipment === opt.value
-                        ? "border-sky/50 bg-sky/10"
-                        : "border-white/10 bg-white/5"
-                    }`}
-                    key={opt.value}
-                    onClick={() => patch({ equipment: opt.value })}
-                    type="button"
-                  >
-                    <p className={`font-black ${data.equipment === opt.value ? "text-sky" : "text-white"}`}>
-                      {opt.label}
-                    </p>
-                    <p className="mt-0.5 text-xs font-semibold text-white/50">{opt.desc}</p>
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <p className="mb-2 text-sm font-bold text-white/60">Niveau d&apos;experience</p>
-              <div className="space-y-2">
-                {experienceOptions.map((opt) => (
-                  <button
-                    className={`w-full rounded-xl border p-3 text-left transition ${
-                      data.experienceLevel === opt.value
-                        ? "border-sky/50 bg-sky/10"
-                        : "border-white/10 bg-white/5"
-                    }`}
-                    key={opt.value}
-                    onClick={() => patch({ experienceLevel: opt.value })}
-                    type="button"
-                  >
-                    <p className={`font-black ${data.experienceLevel === opt.value ? "text-sky" : "text-white"}`}>
-                      {opt.label}
-                    </p>
-                    <p className="mt-0.5 text-xs font-semibold text-white/50">{opt.desc}</p>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </StepWrapper>
-        )}
-
-        {step === 6 && (
-          <StepWrapper subtitle="Un sport externe change la fatigue, donc il doit compter." title="Sport externe">
-            <div className="space-y-3">
-              <ToggleCard
-                checked={data.hasEveningSport}
-                desc="Judo, foot, course, sport de combat, cours collectifs..."
-                label="Tu pratiques un autre sport ?"
-                onChange={(v) => patch({ hasEveningSport: v, judoDays: v ? data.judoDays : [] })}
-              />
-              {data.hasEveningSport && (
-                <>
-                  <TextField
-                    label="Nom du sport"
-                    onChange={(v) => patch({ externalSportName: v })}
-                    placeholder="ex. Judo, football, course..."
-                    value={data.externalSportName}
-                  />
-                  <div>
-                    <p className="mb-2 text-sm font-bold text-white/60">Intensite moyenne</p>
-                    <div className="space-y-2">
-                      {sportIntensityOptions.map((opt) => (
-                        <button
-                          className={`w-full rounded-xl border p-3 text-left transition ${
-                            data.externalSportIntensity === opt.value
-                              ? "border-sky/50 bg-sky/10"
-                              : "border-white/10 bg-white/5"
-                          }`}
-                          key={opt.value}
-                          onClick={() => patch({ externalSportIntensity: opt.value })}
-                          type="button"
-                        >
-                          <p className={`font-black ${data.externalSportIntensity === opt.value ? "text-sky" : "text-white"}`}>
-                            {opt.label}
-                          </p>
-                          <p className="mt-0.5 text-xs font-semibold text-white/50">{opt.desc}</p>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <p className="mb-2 text-sm font-bold text-white/60">Quels jours ?</p>
-                    <div className="grid grid-cols-2 gap-2">
-                      {weekdayOptions.map((day) => {
-                        const checked = data.judoDays.includes(day.value);
-                        return (
-                          <button
-                            className={`flex min-h-11 items-center gap-2 rounded-md border px-3 font-bold transition ${
-                              checked ? "border-sky/40 bg-sky/10 text-sky" : "border-white/8 bg-white/5 text-white/60"
-                            }`}
-                            key={day.value}
-                            onClick={() => {
-                              const next = checked
-                                ? data.judoDays.filter((d) => d !== day.value)
-                                : [...data.judoDays, day.value];
-                              patch({ judoDays: next });
-                            }}
-                            type="button"
-                          >
-                            {checked ? "Oui" : "Non"} {day.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-          </StepWrapper>
-        )}
-
-        {step === 7 && (
-          <StepWrapper
-            subtitle="Mets une vraie serie propre, pas forcement ton max. Exemple: 100 kg x 5 au DC."
-            title="Reperes de force"
-          >
-            <div className="space-y-3">
-              <StrengthReferenceField
-                estimatedOneRepMaxKg={estimateOneRepMaxFromSet(data.benchOneRepMaxKg, data.benchReferenceReps, data.loadUnit)}
-                label="Developpe couche"
-                load={data.benchOneRepMaxKg}
-                maxLoad={350}
-                onLoadChange={(v) => patch({ benchOneRepMaxKg: v })}
-                onRepsChange={(v) => patch({ benchReferenceReps: v })}
-                reps={data.benchReferenceReps}
-                unit={data.loadUnit}
-              />
-              <StrengthReferenceField
-                estimatedOneRepMaxKg={estimateOneRepMaxFromSet(data.legReferenceKg, data.legReferenceReps, data.loadUnit)}
-                label="Squat / presse"
-                load={data.legReferenceKg}
-                maxLoad={600}
-                onLoadChange={(v) => patch({ legReferenceKg: v })}
-                onRepsChange={(v) => patch({ legReferenceReps: v })}
-                reps={data.legReferenceReps}
-                unit={data.loadUnit}
-              />
-              <StrengthReferenceField
-                estimatedOneRepMaxKg={estimateOneRepMaxFromSet(data.pullReferenceKg, data.pullReferenceReps, data.loadUnit)}
-                label="Tirage / rowing"
-                load={data.pullReferenceKg}
-                maxLoad={350}
-                onLoadChange={(v) => patch({ pullReferenceKg: v })}
-                onRepsChange={(v) => patch({ pullReferenceReps: v })}
-                reps={data.pullReferenceReps}
-                unit={data.loadUnit}
-              />
-              <StrengthReferenceField
-                estimatedOneRepMaxKg={estimateOneRepMaxFromSet(data.hingeReferenceKg, data.hingeReferenceReps, data.loadUnit)}
-                label="Hip thrust / hinge"
-                load={data.hingeReferenceKg}
-                maxLoad={600}
-                onLoadChange={(v) => patch({ hingeReferenceKg: v })}
-                onRepsChange={(v) => patch({ hingeReferenceReps: v })}
-                reps={data.hingeReferenceReps}
-                unit={data.loadUnit}
-              />
-            </div>
-            <p className="rounded-md bg-white/5 p-3 text-xs font-semibold leading-relaxed text-white/45">
-              Si tu mets 100 kg x 5, l&apos;app calcule un max estime avant de proposer une charge de travail.
-              Si c&apos;est vraiment ton max sur 1 rep, mets simplement 1 repetition.
-            </p>
-            <div>
-              <p className="mb-2 text-sm font-bold text-white/60">Unite de charge</p>
-              <div className="grid grid-cols-2 gap-2">
-                {(["kg", "lb"] as LoadUnit[]).map((unit) => (
-                  <button
-                    className={`h-12 rounded-md border font-black transition ${
-                      data.loadUnit === unit
-                        ? "border-sky/50 bg-sky/10 text-sky"
-                        : "border-white/10 bg-white/5 text-white/60"
-                    }`}
-                    key={unit}
-                    onClick={() => patch({ loadUnit: unit })}
-                    type="button"
-                  >
-                    {unit}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </StepWrapper>
-        )}
-
-        {step === 8 && (
-          <StepWrapper subtitle="C'est ce qui permet d'ajuster sans casser la recuperation." title="Recuperation">
-            <div>
-              <p className="mb-2 text-sm font-bold text-white/60">Niveau cardio</p>
-              <div className="grid grid-cols-2 gap-2">
-                {cardioOptions.map((opt) => (
-                  <button
-                    className={`h-12 rounded-md border font-black transition ${
-                      data.cardioLevel === opt
-                        ? "border-sky/50 bg-sky/10 text-sky"
-                        : "border-white/10 bg-white/5 text-white/60"
-                    }`}
-                    key={opt}
-                    onClick={() => patch({ cardioLevel: opt })}
-                    type="button"
-                  >
-                    {opt}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <p className="mb-2 text-sm font-bold text-white/60">Qualite du sommeil</p>
-              <div className="grid grid-cols-3 gap-2">
-                {sleepOptions.map((opt) => (
-                  <button
-                    className={`h-12 rounded-md border text-sm font-black transition ${
-                      data.sleepQuality === opt
-                        ? "border-sky/50 bg-sky/10 text-sky"
-                        : "border-white/10 bg-white/5 text-white/60"
-                    }`}
-                    key={opt}
-                    onClick={() => patch({ sleepQuality: opt })}
-                    type="button"
-                  >
-                    {opt}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <TextAreaField
-              label="Blessures ou infos medicales"
-              onChange={(v) => patch({ medicalNotes: v })}
-              placeholder="ex. tendinite poignet droit, genou gauche fragile..."
-              value={data.medicalNotes}
-            />
-            <TextAreaField
-              label="Points de vigilance"
-              onChange={(v) => patch({ watchPointsText: v })}
-              placeholder="ex. eviter les dips lourds, attention lombaires..."
-              value={data.watchPointsText}
-            />
-          </StepWrapper>
-        )}
-
-        {step === 9 && (
-          <StepWrapper subtitle="On tient compte de ce que tu aimes et de ce qui ne te convient pas." title="Preferences">
-            <TextField
-              label={`Nom de ta salle ${String.fromCharCode(40)}optionnel${String.fromCharCode(41)}`}
-              onChange={(v) => patch({ gym: v })}
-              placeholder="ex. One Air, Basic Fit..."
-              value={data.gym}
-            />
-            <TextAreaField
-              label="Exercices ou styles que tu preferes"
-              onChange={(v) => patch({ preferencesText: v })}
-              placeholder="ex. machines, haltères, full body, supersets..."
-              value={data.preferencesText}
-            />
-            <TextAreaField
-              label="Exercices a eviter"
-              onChange={(v) => patch({ avoidText: v })}
-              placeholder="ex. dips, squat barre, course..."
-              value={data.avoidText}
-            />
-            <div>
-              <p className="mb-2 text-sm font-bold text-white/60">Niveau de prudence</p>
-              <div className="space-y-2">
-                {cautionOptions.map((opt) => (
-                  <button
-                    className={`w-full rounded-xl border p-3 text-left transition ${
-                      data.cautionLevel === opt.value
-                        ? "border-sky/50 bg-sky/10"
-                        : "border-white/10 bg-white/5"
-                    }`}
-                    key={opt.value}
-                    onClick={() => patch({ cautionLevel: opt.value })}
-                    type="button"
-                  >
-                    <p className={`font-black ${data.cautionLevel === opt.value ? "text-sky" : "text-white"}`}>
-                      {opt.label}
-                    </p>
-                    <p className="mt-0.5 text-xs font-semibold text-white/50">{opt.desc}</p>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </StepWrapper>
-        )}
-
-        {step === 10 && (
-          <StepWrapper subtitle="Tu pourras tout modifier dans les parametres." title="Presque pret !">
-            <div className="space-y-2 rounded-xl border border-white/10 bg-white/5 p-4">
-              <SummaryRow label="Nom" value={data.athleteName} />
-              <SummaryRow label="Profil" value={`${sexOptions.find((s) => s.value === data.sex)?.label ?? "-"} · ${data.age} ans · ${data.heightCm} cm`} />
-              <SummaryRow label="Poids" value={`${data.currentWeightKg} kg -> ${data.targetWeightKg} kg`} />
-              <SummaryRow label="Objectif" value={goalOptions.find((g) => g.value === data.primaryGoal)?.label ?? "-"} />
-              <SummaryRow label="Frequence" value={`${data.weeklyFrequency} seances/semaine`} />
-              <SummaryRow label="Jours muscu" value={`${data.availableDays.length} jour${data.availableDays.length > 1 ? "s" : ""} possible${data.availableDays.length > 1 ? "s" : ""}`} />
-              <SummaryRow label="Duree" value={durationOptions.find((d) => d.value === data.sessionDurationPreference)?.label ?? "-"} />
-              <SummaryRow label="Equipement" value={equipmentOptions.find((e) => e.value === data.equipment)?.label ?? "-"} />
-              <SummaryRow label="Niveau" value={experienceOptions.find((e) => e.value === data.experienceLevel)?.label ?? "-"} />
-              <SummaryRow label="Sport externe" value={data.judoDays.length > 0 ? `${data.externalSportName.trim() || "Sport"} · ${data.judoDays.length} jour${data.judoDays.length > 1 ? "s" : ""}/sem.` : "Non"} />
-              <SummaryRow label="Contraintes" value={`${parseTextList(data.watchPointsText).length + parseTextList(data.avoidText).length + (data.medicalNotes.trim() ? 1 : 0)}`} />
-              <SummaryRow label="Prudence" value={data.cautionLevel} />
-            </div>
-
-            <ToggleCard
-              checked={data.aiEnabled}
-              desc="Analyse tes seances et genere des conseils personnalises."
-              label="Activer l'analyse IA"
-              onChange={(v) => patch({ aiEnabled: v })}
-            />
-
-            <button
-              className="h-14 w-full rounded-md bg-coral px-4 text-base font-black text-white shadow-soft transition hover:bg-coral/90"
-              onClick={finish}
-              type="button"
-            >
-              Commencer avec AthletIQ
-            </button>
-          </StepWrapper>
-        )}
-      </div>
-
-      {/* Navigation */}
-      {step < TOTAL_STEPS && (
-        <div className="mt-6 grid grid-cols-2 gap-3">
+      <div className={`mt-4 grid gap-3 ${step < TOTAL_STEPS ? "grid-cols-2" : "grid-cols-1"}`}>
+        <button
+          className="h-12 rounded-xl border border-white/10 bg-white/8 font-black text-white disabled:opacity-30"
+          disabled={step === 1}
+          onClick={() => setStep((current) => Math.max(1, current - 1))}
+          type="button"
+        >
+          {step === TOTAL_STEPS ? "Modifier mes reponses" : "Retour"}
+        </button>
+        {step < TOTAL_STEPS ? (
           <button
-            className="h-12 rounded-md border border-white/10 bg-white/8 font-black text-white disabled:opacity-30"
-            disabled={step === 1}
-            onClick={back}
-            type="button"
-          >
-            Retour
-          </button>
-          <button
-            className="h-12 rounded-md bg-sky px-4 font-black text-white disabled:opacity-40"
+            className="h-12 rounded-xl bg-coral px-4 font-black text-white disabled:opacity-40"
             disabled={!canAdvance()}
-            onClick={next}
+            onClick={() => setStep((current) => Math.min(TOTAL_STEPS, current + 1))}
             type="button"
           >
             Continuer
           </button>
-        </div>
-      )}
-      {step === TOTAL_STEPS && (
-        <button
-          className="mt-4 h-11 w-full rounded-md border border-white/10 bg-white/8 font-black text-white/60"
-          onClick={back}
-          type="button"
-        >
-          Retour
-        </button>
-      )}
+        ) : null}
+      </div>
     </div>
   );
 }
 
-function OnboardingCoachPreview({ data, progress, step }: { data: OnboardingData; progress: number; step: number }) {
-  const goal = goalOptions.find((option) => option.value === data.primaryGoal)?.label ?? "Objectif";
-  const level = experienceOptions.find((option) => option.value === data.experienceLevel)?.label ?? "Niveau";
-  const equipment = equipmentOptions.find((option) => option.value === data.equipment)?.label ?? "Materiel";
-  const constraintsCount =
-    parseTextList(data.watchPointsText).length +
-    parseTextList(data.avoidText).length +
-    (data.medicalNotes.trim() ? 1 : 0);
+function ProfileStep({ data, patch }: { data: OnboardingData; patch: (partial: Partial<OnboardingData>) => void }) {
+  return (
+    <StepShell subtitle="On garde seulement les infos qui servent au programme." title="Profil rapide">
+      <TextField label="Prenom" onChange={(value) => patch({ athleteName: value })} placeholder="ex. Sofiane" value={data.athleteName} />
+      <div className="grid grid-cols-2 gap-3">
+        <NumberField label="Age" max={80} min={14} onChange={(value) => patch({ age: value })} value={data.age} />
+        <NumberField label="Taille" max={230} min={140} onChange={(value) => patch({ heightCm: value })} suffix="cm" value={data.heightCm} />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <NumberField label="Poids actuel" max={250} min={30} onChange={(value) => patch({ currentWeightKg: value })} step={0.5} suffix="kg" value={data.currentWeightKg} />
+        <NumberField label="Poids vise" max={250} min={30} onChange={(value) => patch({ targetWeightKg: value })} step={0.5} suffix="kg" value={data.targetWeightKg} />
+      </div>
+      <OptionGrid
+        label="Profil"
+        options={sexOptions}
+        selected={data.sex}
+        onSelect={(sex) => patch({ sex })}
+      />
+    </StepShell>
+  );
+}
+
+function GoalStep({ data, patch }: { data: OnboardingData; patch: (partial: Partial<OnboardingData>) => void }) {
+  return (
+    <StepShell subtitle="Cette réponse choisit la famille de programme et le dosage cardio/muscu." title="Objectif">
+      <div className="space-y-2">
+        {goalOptions.map((goal) => (
+          <OptionCard
+            desc={goal.desc}
+            key={goal.value}
+            label={goal.label}
+            selected={data.primaryGoal === goal.value}
+            onClick={() => patch({ primaryGoal: goal.value })}
+          />
+        ))}
+      </div>
+    </StepShell>
+  );
+}
+
+function TrainingStep({ data, patch }: { data: OnboardingData; patch: (partial: Partial<OnboardingData>) => void }) {
+  return (
+    <StepShell subtitle="Ces réponses déterminent la fréquence, la durée et les exercices possibles." title="Niveau & disponibilite">
+      <div>
+        <p className="mb-2 text-sm font-bold text-white/60">Nombre de seances par semaine</p>
+        <div className="grid grid-cols-5 gap-2">
+          {[2, 3, 4, 5, 6].map((frequency) => (
+            <button
+              className={`h-12 rounded-xl border font-black transition ${
+                data.weeklyFrequency === frequency ? "border-coral/50 bg-coral/15 text-coral" : "border-white/10 bg-white/5 text-white/60"
+              }`}
+              key={frequency}
+              onClick={() => patch({ weeklyFrequency: frequency })}
+              type="button"
+            >
+              {frequency}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <OptionGrid
+        label="Duree par seance"
+        options={durationOptions}
+        selected={data.sessionDurationPreference}
+        onSelect={(sessionDurationPreference) => patch({ sessionDurationPreference })}
+      />
+
+      <div>
+        <p className="mb-2 text-sm font-bold text-white/60">Jours possibles</p>
+        <div className="grid grid-cols-2 gap-2">
+          {weekdayOptions.map((day) => {
+            const checked = data.availableDays.includes(day.value);
+            return (
+              <button
+                className={`min-h-11 rounded-xl border px-3 text-left text-sm font-black transition ${
+                  checked ? "border-coral/45 bg-coral/12 text-coral" : "border-white/8 bg-white/5 text-white/55"
+                }`}
+                key={day.value}
+                onClick={() => {
+                  const next = checked
+                    ? data.availableDays.filter((value) => value !== day.value)
+                    : [...data.availableDays, day.value];
+                  patch({ availableDays: next });
+                }}
+                type="button"
+              >
+                {checked ? "Oui" : "Non"} - {day.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div>
+        <p className="mb-2 text-sm font-bold text-white/60">Niveau</p>
+        <div className="space-y-2">
+          {experienceOptions.map((option) => (
+            <OptionCard
+              desc={option.desc}
+              key={option.value}
+              label={option.label}
+              selected={data.experienceLevel === option.value}
+              onClick={() => patch({ experienceLevel: option.value })}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <p className="mb-2 text-sm font-bold text-white/60">Materiel</p>
+        <div className="space-y-2">
+          {equipmentOptions.map((option) => (
+            <OptionCard
+              desc={option.desc}
+              key={option.value}
+              label={option.label}
+              selected={data.equipment === option.value}
+              onClick={() => patch({ equipment: option.value })}
+            />
+          ))}
+        </div>
+      </div>
+    </StepShell>
+  );
+}
+
+function ConstraintsStep({ data, patch }: { data: OnboardingData; patch: (partial: Partial<OnboardingData>) => void }) {
+  const estimatedBench = estimateOneRepMaxFromSet(data.benchLoadKg, data.benchReps, data.loadUnit);
 
   return (
-    <section className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#11131a] p-4 text-white shadow-soft">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_90%_0%,rgba(255,91,0,0.30),transparent_34%),linear-gradient(135deg,rgba(255,255,255,0.08),transparent_45%)]" />
-      <div className="relative">
+    <StepShell subtitle="Ce bloc sert aux garde-fous, aux remplacements et aux charges de depart." title="Contraintes">
+      <ToggleCard
+        checked={data.hasExternalSport}
+        desc="Judo, foot, sport de combat, cardio intense..."
+        label="Autre sport dans la semaine"
+        onChange={(hasExternalSport) => patch({ hasExternalSport, externalSportDays: hasExternalSport ? data.externalSportDays : [] })}
+      />
+
+      {data.hasExternalSport ? (
+        <div className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-3">
+          <TextField label="Sport pratique" onChange={(value) => patch({ externalSportName: value })} placeholder="ex. Judo" value={data.externalSportName} />
+          <OptionGrid
+            label="Intensite"
+            options={sportIntensityOptions}
+            selected={data.externalSportIntensity}
+            onSelect={(externalSportIntensity) => patch({ externalSportIntensity })}
+          />
+          <div>
+            <p className="mb-2 text-sm font-bold text-white/60">Jours du sport</p>
+            <div className="grid grid-cols-2 gap-2">
+              {weekdayOptions.map((day) => {
+                const checked = data.externalSportDays.includes(day.value);
+                return (
+                  <button
+                    className={`min-h-11 rounded-xl border px-3 text-left text-sm font-black transition ${
+                      checked ? "border-coral/45 bg-coral/12 text-coral" : "border-white/8 bg-white/5 text-white/55"
+                    }`}
+                    key={day.value}
+                    onClick={() => {
+                      const next = checked
+                        ? data.externalSportDays.filter((value) => value !== day.value)
+                        : [...data.externalSportDays, day.value];
+                      patch({ externalSportDays: next });
+                    }}
+                    type="button"
+                  >
+                    {checked ? "Oui" : "Non"} - {day.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-coral">Coach setup</p>
-            <h2 className="mt-1 text-2xl font-black leading-tight">
-              {data.athleteName.trim() ? `Plan pour ${data.athleteName.trim()}` : "On construit ton plan"}
-            </h2>
+            <p className="text-sm font-black text-white">Repere developpe couche</p>
+            <p className="mt-1 text-xs font-semibold text-white/45">Optionnel. Exemple : 100 kg x 5, pas forcement un max.</p>
           </div>
-          <div className="shrink-0 text-right">
-            <p className="text-3xl font-black leading-none text-coral">{progress}%</p>
-            <p className="text-[10px] font-black uppercase text-white/45">etape {step}</p>
-          </div>
+          <p className="shrink-0 text-xs font-black text-sky">{formatEstimatedOneRepMax(estimatedBench)}</p>
         </div>
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <PreviewPill label="Objectif" value={goal} />
-          <PreviewPill label="Frequence" value={`${data.weeklyFrequency}x/sem.`} />
-          <PreviewPill label="Niveau" value={level} />
-          <PreviewPill label="Materiel" value={equipment} />
+        <div className="mt-3 grid grid-cols-[minmax(0,1fr)_5rem] gap-2">
+          <NumberField label="Charge" max={350} min={0} onChange={(value) => patch({ benchLoadKg: value })} step={2.5} suffix={data.loadUnit} value={data.benchLoadKg} />
+          <NumberField label="Reps" max={12} min={1} onChange={(value) => patch({ benchReps: value })} value={data.benchReps} />
         </div>
-        <p className="mt-3 rounded-2xl border border-white/10 bg-white/8 p-3 text-xs font-semibold text-white/60">
-          Contraintes prises en compte : {constraintsCount}. Sport externe : {data.hasEveningSport ? data.externalSportName || "oui" : "non"}.
-        </p>
       </div>
-    </section>
+
+      <TextAreaField label="Douleurs / blessures" onChange={(value) => patch({ medicalNotes: value })} placeholder="ex. poignet droit, diastasis, dos fragile..." value={data.medicalNotes} />
+      <TextAreaField label="Exercices refuses" onChange={(value) => patch({ avoidText: value })} placeholder="ex. course, burpees, pompes, squat barre..." value={data.avoidText} />
+      <TextAreaField label="Preferences" onChange={(value) => patch({ preferencesText: value })} placeholder="ex. machines, poulies, tapis incline..." value={data.preferencesText} />
+
+      <div className="grid grid-cols-2 gap-3">
+        <OptionGrid
+          label="Cardio"
+          options={["Faible", "Modere", "Bon", "Excellent"].map((value) => ({ value, label: value }))}
+          selected={data.cardioLevel}
+          onSelect={(cardioLevel) => patch({ cardioLevel })}
+        />
+        <OptionGrid
+          label="Prudence"
+          options={cautionOptions}
+          selected={data.cautionLevel}
+          onSelect={(cautionLevel) => patch({ cautionLevel })}
+        />
+      </div>
+    </StepShell>
   );
 }
 
-function PreviewPill({ label, value }: { label: string; value: string }) {
+function RecommendationStep({
+  data,
+  onFinish,
+  onSelect,
+  recommendations,
+  selectedProgramId
+}: {
+  data: OnboardingData;
+  onFinish: () => void;
+  onSelect: (programId: string) => void;
+  recommendations: ProgramRecommendation[];
+  selectedProgramId?: string;
+}) {
+  const selected = recommendations.find((recommendation) => recommendation.program.id === selectedProgramId) ?? recommendations[0];
+  const adaptationBullets = buildAdaptationBullets(data);
+
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/10 p-3">
-      <p className="text-[10px] font-black uppercase text-white/45">{label}</p>
-      <p className="mt-1 truncate text-sm font-black text-white">{value}</p>
+    <StepShell subtitle="Ton programme actif part de tes reponses. Tu peux garder le choix recommande ou prendre une alternative." title="Programme recommande">
+      {selected ? (
+        <div className="rounded-[24px] border border-coral/30 bg-coral/10 p-4">
+          <p className="text-xs font-black uppercase text-coral">Recommande pour {data.athleteName || "toi"}</p>
+          <h2 className="mt-2 text-2xl font-black leading-tight text-white">{selected.program.name}</h2>
+          <p className="mt-2 text-sm font-semibold leading-relaxed text-white/65">{selected.program.description}</p>
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            <SummaryTile label="Niveau" value={selected.program.level} />
+            <SummaryTile label="Frequence" value={`${selected.program.frequency}j/sem.`} />
+            <SummaryTile label="Duree" value={selected.program.averageDuration} />
+          </div>
+          <div className="mt-3 space-y-2">
+            {selected.reasons.slice(0, 3).map((reason) => (
+              <p className="rounded-xl border border-white/8 bg-white/8 px-3 py-2 text-xs font-semibold text-white/70" key={reason}>
+                {reason}
+              </p>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+        <p className="text-sm font-black text-white">Ce qui a ete adapte</p>
+        <div className="mt-2 space-y-2">
+          {adaptationBullets.map((item) => (
+            <p className="rounded-xl border border-white/8 bg-white/5 px-3 py-2 text-xs font-semibold leading-relaxed text-white/65" key={item}>
+              {item}
+            </p>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {recommendations.slice(0, 3).map((recommendation) => {
+          const checked = selectedProgramId === recommendation.program.id;
+          return (
+            <button
+              className={`w-full rounded-2xl border p-3 text-left transition ${
+                checked ? "border-coral/45 bg-coral/12" : "border-white/10 bg-white/5"
+              }`}
+              key={recommendation.program.id}
+              onClick={() => onSelect(recommendation.program.id)}
+              type="button"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className={`font-black ${checked ? "text-coral" : "text-white"}`}>
+                    {recommendation.rank === 1 ? "Recommande" : `Alternative ${recommendation.rank - 1}`} - {recommendation.program.name}
+                  </p>
+                  <p className="mt-1 text-xs font-semibold text-white/50">
+                    {formatGoalForUi(String(recommendation.program.primaryObjective))} - {recommendation.program.frequency} j/sem.
+                  </p>
+                  <p className="mt-2 text-xs font-semibold leading-relaxed text-white/60">
+                    {recommendation.reasons[0] ?? "Option disponible pour ton profil."}
+                  </p>
+                </div>
+                <span className={`shrink-0 rounded-lg px-2 py-1 text-xs font-black ${
+                  checked ? "bg-coral/15 text-coral" : "bg-white/8 text-white/55"
+                }`}>
+                  {checked ? "Choisi" : "Voir"}
+                </span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      <button className="h-14 w-full rounded-xl bg-coral px-4 text-base font-black text-white shadow-soft" onClick={onFinish} type="button">
+        Commencer avec ce programme
+      </button>
+    </StepShell>
+  );
+}
+
+function buildAdaptationBullets(data: OnboardingData): string[] {
+  const bullets = [
+    `Objectif: ${formatGoalForUi(data.primaryGoal)}.`,
+    `Frequence: ${data.weeklyFrequency} seances placees sur tes jours disponibles.`,
+    `Duree: format ${formatDurationPreference(data.sessionDurationPreference)}.`,
+    `Niveau: programme calibre pour un profil ${formatExperienceForUi(data.experienceLevel)}.`,
+    `Materiel: exercices compatibles avec ${formatEquipmentForUi(data.equipment)}.`
+  ];
+
+  if (data.hasExternalSport) {
+    bullets.push(`${data.externalSportName || "Sport externe"} pris en compte dans le placement des seances.`);
+  }
+
+  if (data.medicalNotes.trim() || data.avoidText.trim()) {
+    bullets.push("Douleurs, blessures et exercices refuses servent aux garde-fous et remplacements.");
+  }
+
+  if (data.benchLoadKg > 0) {
+    bullets.push("Repere developpe couche utilise pour calibrer les charges de depart.");
+  }
+
+  return bullets;
+}
+
+function formatGoalForUi(goal: string): string {
+  const labels: Record<string, string> = {
+    "cardio-sante": "cardio / sante",
+    fessiers: "fessiers",
+    force: "force",
+    performance: "force",
+    "perte-gras": "perte de poids",
+    "prise-masse": "prise de muscle",
+    recomposition: "recomposition",
+    sante: "cardio / sante"
+  };
+
+  return labels[goal] ?? goal;
+}
+
+function formatDurationPreference(value: UserSettings["sessionDurationPreference"]): string {
+  const labels: Record<UserSettings["sessionDurationPreference"], string> = {
+    long: "70-90 min",
+    short: "35-45 min",
+    standard: "50-65 min"
+  };
+
+  return labels[value];
+}
+
+function formatExperienceForUi(value: ExperienceLevel): string {
+  const labels: Record<ExperienceLevel, string> = {
+    avance: "avance",
+    debutant: "debutant",
+    intermediaire: "intermediaire"
+  };
+
+  return labels[value];
+}
+
+function formatEquipmentForUi(value: Equipment): string {
+  const labels: Record<Equipment, string> = {
+    "halteres-maison": "maison equipee",
+    "poids-corps": "peu de materiel",
+    "salle-complete": "salle equipee"
+  };
+
+  return labels[value];
+}
+
+function StepShell({ children, subtitle, title }: { children: React.ReactNode; subtitle: string; title: string }) {
+  return (
+    <div className="space-y-4">
+      <div>
+        <h1 className="text-2xl font-black leading-tight text-white">{title}</h1>
+        <p className="mt-1 text-sm font-semibold leading-relaxed text-white/55">{subtitle}</p>
+      </div>
+      {children}
     </div>
   );
 }
 
-function mapSleepToRecovery(sleepQuality: string): UserSettings["recoveryProfile"] {
-  if (/mauvais/i.test(sleepQuality)) return "poor";
-  if (/irr/i.test(sleepQuality)) return "irregular";
-  if (/excellent|bon/i.test(sleepQuality)) return "good";
-  return "regular";
+function OptionCard({
+  desc,
+  label,
+  onClick,
+  selected
+}: {
+  desc?: string;
+  label: string;
+  onClick: () => void;
+  selected: boolean;
+}) {
+  return (
+    <button
+      className={`w-full rounded-2xl border p-3 text-left transition ${
+        selected ? "border-coral/45 bg-coral/12" : "border-white/10 bg-white/5"
+      }`}
+      onClick={onClick}
+      type="button"
+    >
+      <p className={`font-black ${selected ? "text-coral" : "text-white"}`}>{label}</p>
+      {desc ? <p className="mt-1 text-xs font-semibold leading-relaxed text-white/50">{desc}</p> : null}
+    </button>
+  );
+}
+
+function OptionGrid<T extends string>({
+  label,
+  onSelect,
+  options,
+  selected
+}: {
+  label: string;
+  onSelect: (value: T) => void;
+  options: Array<{ value: T; label: string }>;
+  selected: T;
+}) {
+  return (
+    <div>
+      <p className="mb-2 text-sm font-bold text-white/60">{label}</p>
+      <div className="grid grid-cols-2 gap-2">
+        {options.map((option) => (
+          <button
+            className={`min-h-11 rounded-xl border px-3 text-sm font-black transition ${
+              selected === option.value ? "border-coral/45 bg-coral/12 text-coral" : "border-white/10 bg-white/5 text-white/60"
+            }`}
+            key={option.value}
+            onClick={() => onSelect(option.value)}
+            type="button"
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ToggleCard({
+  checked,
+  desc,
+  label,
+  onChange
+}: {
+  checked: boolean;
+  desc: string;
+  label: string;
+  onChange: (value: boolean) => void;
+}) {
+  return (
+    <button
+      className={`w-full rounded-2xl border p-3 text-left transition ${
+        checked ? "border-coral/45 bg-coral/12" : "border-white/10 bg-white/5"
+      }`}
+      onClick={() => onChange(!checked)}
+      type="button"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <p className={`font-black ${checked ? "text-coral" : "text-white"}`}>{label}</p>
+        <span className={`h-6 w-10 rounded-full transition ${checked ? "bg-coral" : "bg-white/20"}`} />
+      </div>
+      <p className="mt-1 text-xs font-semibold leading-relaxed text-white/50">{desc}</p>
+    </button>
+  );
+}
+
+function TextField({
+  label,
+  onChange,
+  placeholder,
+  value
+}: {
+  label: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  value: string;
+}) {
+  return (
+    <label className="block">
+      <span className="text-sm font-bold text-white/60">{label}</span>
+      <input
+        className="mt-1 h-12 w-full rounded-xl border border-white/10 bg-white/5 px-3 font-semibold text-white outline-none focus:border-coral focus:ring-2 focus:ring-coral/20"
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        type="text"
+        value={value}
+      />
+    </label>
+  );
+}
+
+function NumberField({
+  label,
+  max,
+  min,
+  onChange,
+  step = 1,
+  suffix,
+  value
+}: {
+  label: string;
+  max?: number;
+  min?: number;
+  onChange: (value: number) => void;
+  step?: number;
+  suffix?: string;
+  value: number;
+}) {
+  return (
+    <label className="block">
+      <span className="text-sm font-bold text-white/60">{label}</span>
+      <div className="mt-1 flex h-12 overflow-hidden rounded-xl border border-white/10 bg-white/5 focus-within:border-coral focus-within:ring-2 focus-within:ring-coral/20">
+        <input
+          className="min-w-0 flex-1 bg-transparent px-3 font-semibold text-white outline-none"
+          inputMode="decimal"
+          max={max}
+          min={min}
+          onChange={(event) => onChange(Number(event.target.value))}
+          step={step}
+          type="number"
+          value={value}
+        />
+        {suffix ? <span className="flex items-center px-3 text-xs font-black text-white/40">{suffix}</span> : null}
+      </div>
+    </label>
+  );
+}
+
+function TextAreaField({
+  label,
+  onChange,
+  placeholder,
+  value
+}: {
+  label: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  value: string;
+}) {
+  return (
+    <label className="block">
+      <span className="text-sm font-bold text-white/60">{label} <span className="text-white/35">(optionnel)</span></span>
+      <textarea
+        className="mt-1 min-h-20 w-full resize-none rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-white outline-none focus:border-coral focus:ring-2 focus:ring-coral/20"
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        value={value}
+      />
+    </label>
+  );
+}
+
+function SummaryTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-2xl border border-white/8 bg-white/8 p-3 text-center">
+      <p className="truncate text-sm font-black text-white">{value}</p>
+      <p className="mt-1 text-[10px] font-black uppercase text-white/45">{label}</p>
+    </div>
+  );
+}
+
+function buildSettings(settings: UserSettings, data: OnboardingData): UserSettings {
+  const goalText = goalOptions.find((goal) => goal.value === data.primaryGoal)?.mainGoalText ?? "Programme personnalise";
+  const medicalNotes = data.medicalNotes.trim();
+  const watchPoints = parseTextList(data.watchPointsText);
+  const preferences = parseTextList(data.preferencesText);
+  const avoid = parseTextList(data.avoidText);
+  const strengthReferences = buildStrengthReferences(data);
+  const benchEstimatedOneRepMaxKg = estimateOneRepMaxFromSet(data.benchLoadKg, data.benchReps, data.loadUnit);
+  const externalSports = buildExternalSports(data);
+
+  return {
+    ...settings,
+    athleteName: data.athleteName,
+    sex: data.sex,
+    age: data.age,
+    heightCm: data.heightCm,
+    currentWeightKg: data.currentWeightKg,
+    targetWeightKg: data.targetWeightKg,
+    mainGoal: goalText,
+    primaryGoal: data.primaryGoal,
+    experienceLevel: data.experienceLevel,
+    equipment: data.equipment,
+    weeklyFrequency: data.weeklyFrequency,
+    availableDays: data.availableDays,
+    sessionDurationPreference: data.sessionDurationPreference,
+    judoDays: data.externalSportName.toLowerCase().includes("judo") ? data.externalSportDays : [],
+    benchOneRepMaxKg: benchEstimatedOneRepMaxKg ?? 0,
+    loadUnit: data.loadUnit,
+    cardioLevel: data.cardioLevel,
+    sleepQuality: data.sleepQuality,
+    recoveryProfile: mapSleepToRecovery(data.sleepQuality),
+    medicalNotes,
+    watchPoints,
+    preferences,
+    avoid,
+    externalSports,
+    constraints: buildConstraints(medicalNotes, watchPoints, avoid),
+    strengthReferences,
+    cautionLevel: data.cautionLevel,
+    aiEnabled: data.aiEnabled,
+    darkMode: false
+  };
+}
+
+function presetToOnboardingData(preset: ProfilePreset): OnboardingData {
+  const settings = preset.settings;
+  const primarySport = settings.externalSports[0];
+  const benchReference = settings.strengthReferences.find((reference) =>
+    normalizeForMatch(reference.lift).includes("developpe") && normalizeForMatch(reference.lift).includes("couche")
+  );
+
+  return {
+    ...initialData,
+    athleteName: settings.athleteName,
+    sex: settings.sex,
+    age: settings.age,
+    heightCm: settings.heightCm,
+    currentWeightKg: settings.currentWeightKg,
+    targetWeightKg: settings.targetWeightKg,
+    primaryGoal: settings.primaryGoal ?? "recomposition",
+    experienceLevel: settings.experienceLevel ?? "intermediaire",
+    equipment: settings.equipment ?? "salle-complete",
+    weeklyFrequency: settings.weeklyFrequency ?? 4,
+    availableDays: settings.availableDays,
+    sessionDurationPreference: settings.sessionDurationPreference,
+    hasExternalSport: Boolean(primarySport),
+    externalSportName: primarySport?.name ?? "",
+    externalSportIntensity: primarySport?.intensity ?? "moderate",
+    externalSportDays: primarySport?.days ?? [],
+    benchLoadKg: benchReference?.loadKg ?? settings.benchOneRepMaxKg ?? 0,
+    benchReps: benchReference?.reps ?? (settings.benchOneRepMaxKg ? 1 : 5),
+    loadUnit: settings.loadUnit,
+    cardioLevel: settings.cardioLevel,
+    sleepQuality: settings.sleepQuality,
+    medicalNotes: settings.medicalNotes,
+    watchPointsText: settings.watchPoints.join("\n"),
+    preferencesText: settings.preferences.join("\n"),
+    avoidText: settings.avoid.join("\n"),
+    cautionLevel: settings.cautionLevel,
+    aiEnabled: settings.aiEnabled
+  };
 }
 
 function parseTextList(value: string): string[] {
@@ -840,7 +971,7 @@ function parseTextList(value: string): string[] {
 }
 
 function buildExternalSports(data: OnboardingData): UserSettings["externalSports"] {
-  if (!data.hasEveningSport || data.judoDays.length === 0) {
+  if (!data.hasExternalSport || data.externalSportDays.length === 0) {
     return [];
   }
 
@@ -850,19 +981,16 @@ function buildExternalSports(data: OnboardingData): UserSettings["externalSports
     {
       id: slugify(name) || "sport-externe",
       name,
-      days: data.judoDays,
+      days: data.externalSportDays,
       intensity: data.externalSportIntensity,
-      notes: "Activite externe a prendre en compte dans la fatigue et la recuperation."
+      notes: "Activite externe prise en compte dans la fatigue et la recuperation."
     }
   ];
 }
 
 function buildStrengthReferences(data: OnboardingData): StrengthReference[] {
   const references = [
-    buildStrengthReferenceFromSet("Developpe couche", data.benchOneRepMaxKg, data.benchReferenceReps, data.loadUnit),
-    buildStrengthReferenceFromSet("Squat ou presse", data.legReferenceKg, data.legReferenceReps, data.loadUnit),
-    buildStrengthReferenceFromSet("Tirage ou rowing", data.pullReferenceKg, data.pullReferenceReps, data.loadUnit),
-    buildStrengthReferenceFromSet("Hip thrust ou souleve roumain", data.hingeReferenceKg, data.hingeReferenceReps, data.loadUnit)
+    buildStrengthReferenceFromSet("Developpe couche", data.benchLoadKg, data.benchReps, data.loadUnit)
   ];
 
   return references
@@ -917,6 +1045,12 @@ function inferConstraintArea(value: string): TrainingConstraint["area"] {
   return "other";
 }
 
+function mapSleepToRecovery(sleepQuality: string): UserSettings["recoveryProfile"] {
+  if (/mauvais/i.test(sleepQuality)) return "poor";
+  if (/irr/i.test(sleepQuality)) return "irregular";
+  return "regular";
+}
+
 function normalizeForMatch(value: string): string {
   return value
     .toLowerCase()
@@ -928,181 +1062,4 @@ function slugify(value: string): string {
   return normalizeForMatch(value)
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
-}
-
-function StepWrapper({ children, subtitle, title }: { children: React.ReactNode; subtitle?: string; title: string }) {
-  return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-black leading-tight text-white">{title}</h1>
-        {subtitle ? <p className="mt-1 text-sm font-semibold text-white/55">{subtitle}</p> : null}
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function TextField({
-  label,
-  onChange,
-  placeholder,
-  value
-}: {
-  label: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  value: string;
-}) {
-  return (
-    <label className="block">
-      <span className="text-sm font-bold text-white/60">{label}</span>
-      <input
-        className="mt-1 h-12 w-full rounded-md border border-white/10 bg-white/5 px-3 font-semibold text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        type="text"
-        value={value}
-      />
-    </label>
-  );
-}
-
-function TextAreaField({
-  label,
-  onChange,
-  placeholder,
-  value
-}: {
-  label: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  value: string;
-}) {
-  return (
-    <label className="block">
-      <span className="text-sm font-bold text-white/60">{label} <span className="text-white/35">(optionnel)</span></span>
-      <textarea
-        className="mt-1 min-h-20 w-full resize-none rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm font-semibold text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        value={value}
-      />
-    </label>
-  );
-}
-
-function NumberField({
-  label,
-  max,
-  min,
-  onChange,
-  step = 1,
-  value
-}: {
-  label: string;
-  max?: number;
-  min?: number;
-  onChange: (v: number) => void;
-  step?: number;
-  value: number;
-}) {
-  return (
-    <label className="block">
-      <span className="text-sm font-bold text-white/60">{label}</span>
-      <input
-        className="mt-1 h-12 w-full rounded-md border border-white/10 bg-white/5 px-3 font-semibold text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
-        inputMode="decimal"
-        max={max}
-        min={min}
-        onChange={(e) => onChange(Number(e.target.value))}
-        step={step}
-        type="number"
-        value={value}
-      />
-    </label>
-  );
-}
-
-function StrengthReferenceField({
-  estimatedOneRepMaxKg,
-  label,
-  load,
-  maxLoad,
-  onLoadChange,
-  onRepsChange,
-  reps,
-  unit
-}: {
-  estimatedOneRepMaxKg?: number;
-  label: string;
-  load: number;
-  maxLoad: number;
-  onLoadChange: (v: number) => void;
-  onRepsChange: (v: number) => void;
-  reps: number;
-  unit: LoadUnit;
-}) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-      <div className="flex items-start justify-between gap-3">
-        <p className="text-sm font-black text-white">{label}</p>
-        <p className="shrink-0 text-xs font-black text-sky">{formatEstimatedOneRepMax(estimatedOneRepMaxKg)}</p>
-      </div>
-      <div className="mt-3 grid grid-cols-[minmax(0,1fr)_5.5rem] gap-2">
-        <NumberField
-          label={`Charge ${unit}`}
-          max={maxLoad}
-          min={0}
-          onChange={onLoadChange}
-          step={2.5}
-          value={load}
-        />
-        <NumberField
-          label="Reps"
-          max={12}
-          min={1}
-          onChange={onRepsChange}
-          step={1}
-          value={reps}
-        />
-      </div>
-    </div>
-  );
-}
-
-function ToggleCard({
-  checked,
-  desc,
-  label,
-  onChange
-}: {
-  checked: boolean;
-  desc: string;
-  label: string;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <button
-      className={`w-full rounded-xl border p-4 text-left transition ${
-        checked ? "border-sky/50 bg-sky/10" : "border-white/10 bg-white/5"
-      }`}
-      onClick={() => onChange(!checked)}
-      type="button"
-    >
-      <div className="flex items-center justify-between gap-3">
-        <p className={`font-black ${checked ? "text-sky" : "text-white"}`}>{label}</p>
-        <span className={`h-6 w-10 rounded-full transition ${checked ? "bg-sky" : "bg-white/20"}`} />
-      </div>
-      <p className="mt-0.5 text-sm font-semibold text-white/50">{desc}</p>
-    </button>
-  );
-}
-
-function SummaryRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-start justify-between gap-3 border-b border-white/8 py-1.5 last:border-b-0">
-      <p className="text-sm font-bold text-white/50">{label}</p>
-      <p className="max-w-[65%] text-right text-sm font-black text-white">{value}</p>
-    </div>
-  );
 }

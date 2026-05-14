@@ -128,7 +128,7 @@ test("repeated hard sessions trigger a stronger trend deload", () => {
 
   assert.notEqual(adapted[1].intensity, "Soutenue");
   assert.equal(adapted[1].exercises[0].plannedLoad, "70,5 kg");
-  assert.match(adapted[1].notes?.join(" ") ?? "", /fatigue repetee|Deload local/i);
+  assert.match(adapted[1].notes?.join(" ") ?? "", /fatigue repetee|Seance allegee/i);
 });
 
 test("global deload week lightens every upcoming session in the cycle", () => {
@@ -146,8 +146,8 @@ test("global deload week lightens every upcoming session in the cycle", () => {
 
   const adapted = adaptProgramAfterSession(threeDayProgram, completed, settings, [completed, previousHard]);
 
-  assert.match(adapted[1].notes?.join(" ") ?? "", /Deload automatique/i);
-  assert.match(adapted[2].notes?.join(" ") ?? "", /Deload automatique/i);
+  assert.match(adapted[1].notes?.join(" ") ?? "", /Semaine plus legere/i);
+  assert.match(adapted[2].notes?.join(" ") ?? "", /Semaine plus legere/i);
   assert.equal(adapted[1].exercises[0].plannedLoad, "70,5 kg");
   assert.equal(adapted[2].exercises[0].plannedLoad, "162 kg");
   assert.equal(adapted[2].exercises[0].target, "3 x 10-12");
@@ -208,8 +208,8 @@ test("repeated hard and down decisions trigger a local deload on the next exposu
 
   assert.equal(adapted[1].exercises[0].target, "3 x 8-10");
   assert.equal(adapted[1].exercises[0].plannedLoad, "70,5 kg");
-  assert.match(adapted[1].exercises[0].cue, /Deload local/i);
-  assert.match(adapted[1].notes?.join(" ") ?? "", /Deload local/i);
+  assert.match(adapted[1].exercises[0].cue, /Seance allegee/i);
+  assert.match(adapted[1].notes?.join(" ") ?? "", /Seance allegee/i);
 });
 
 test("fat loss goal drift increases easy cardio dose on next session", () => {

@@ -114,7 +114,7 @@ test("recommendPrograms ranks matching program first", () => {
   assert.equal(recommendations[0].program.id, "ppl-judo");
   assert.equal(recommendations[0].rank, 1);
   assert.ok(recommendations[0].score > recommendations[1].score);
-  assert.ok(recommendations[0].reasons.includes("Objectif principal aligne."));
+  assert.ok(recommendations[0].reasons.includes("Adapte a ton objectif recomposition."));
 });
 
 test("instantiateProgramTemplate keeps PlannedSession compatibility", () => {
@@ -165,4 +165,119 @@ test("Sofiane does not receive Shape & Burn Alicia", () => {
   const recommendations = recommendPrograms(SOFIANE_PROFILE_PRESET.settings, PROGRAM_CATALOG);
 
   assert.equal(recommendations.some((recommendation) => recommendation.program.id === "shape-burn-alicia-4j"), false);
+});
+
+test("fat loss beginner profile receives a weight-loss or cardio friendly program", () => {
+  const recommendations = recommendPrograms({
+    ...baseSettings,
+    athleteName: "Nouveau",
+    sex: "prefer-not-to-say",
+    currentWeightKg: 92,
+    targetWeightKg: 80,
+    benchOneRepMaxKg: 0,
+    judoDays: [],
+    mainGoal: "Perte de poids",
+    primaryGoal: "perte-gras",
+    experienceLevel: "debutant",
+    weeklyFrequency: 3,
+    cardioLevel: "Faible",
+    externalSports: [],
+    watchPoints: [],
+    preferences: ["marche", "machines"],
+    avoid: ["course"],
+    strengthReferences: []
+  }, PROGRAM_CATALOG);
+
+  assert.ok(["cardio-sante-renforcement-3-5j", "full-body-progression-3j"].includes(recommendations[0].program.id));
+  assert.ok(recommendations[0].reasons.some((reason) => /perte de gras|perte de poids|cardio/i.test(reason)));
+});
+
+test("advanced strength profile receives a force or hypertrophy-friendly program", () => {
+  const recommendations = recommendPrograms({
+    ...baseSettings,
+    athleteName: "Force",
+    judoDays: [],
+    mainGoal: "Force",
+    primaryGoal: "performance",
+    experienceLevel: "avance",
+    weeklyFrequency: 6,
+    externalSports: [],
+    watchPoints: [],
+    avoid: [],
+    preferences: ["barres", "machines"]
+  }, PROGRAM_CATALOG);
+
+  assert.equal(recommendations[0].program.id, "push-pull-legs-classique-6j");
+  assert.ok(recommendations[0].reasons.some((reason) => /force|niveau avance|6 seances/i.test(reason)));
+});
+
+test("weekly frequency influences instantiated session count", () => {
+  const template = PROGRAM_CATALOG.find((program) => program.id === "ppl-upper-lower-5j");
+  assert.ok(template);
+
+  const threeDays = instantiateProgramTemplate(template, { ...baseSettings, weeklyFrequency: 3 });
+  const fiveDays = instantiateProgramTemplate(template, { ...baseSettings, weeklyFrequency: 5 });
+
+  assert.equal(threeDays.length, 3);
+  assert.equal(fiveDays.length, 5);
+});
+
+test("short sessions reduce exercise count without changing catalog content", () => {
+  const template = PROGRAM_CATALOG.find((program) => program.id === "ppl-upper-lower-5j");
+  assert.ok(template);
+
+  const shortProgram = instantiateProgramTemplate(template, {
+    ...baseSettings,
+    primaryGoal: "perte-gras",
+    sessionDurationPreference: "short",
+    weeklyFrequency: 5
+  });
+
+  assert.ok(shortProgram.every((session) => session.exercises.length <= 5));
+  assert.ok(template.sessions.some((session) => session.exercises.length > 5));
+});
+
+test("refused exercises are filtered during program instantiation", () => {
+  const template: ProgramTemplate = {
+    ...judoTemplate,
+    id: "avoid-test",
+    sessions: [
+      {
+        id: "mixed",
+        weekday: "monday",
+        title: "Mixed",
+        focus: "Filtering",
+        duration: "45 min",
+        intensity: "ModÃ©rÃ©e",
+        exercises: [
+          {
+            id: "burpees",
+            name: "Burpees",
+            target: "3 x 10",
+            rest: "60 s",
+            cue: "Explosif."
+          },
+          {
+            id: "leg-press",
+            name: "Presse a cuisses",
+            target: "3 x 10",
+            rest: "90 s",
+            cue: "Controle."
+          },
+          {
+            id: "pulldown",
+            name: "Tirage vertical",
+            target: "3 x 10",
+            rest: "90 s",
+            cue: "Controle."
+          }
+        ]
+      }
+    ]
+  };
+
+  const program = instantiateProgramTemplate(template, { ...baseSettings, avoid: ["burpees"] });
+
+  assert.equal(program[0].exercises.some((exercise) => exercise.name === "Burpees"), false);
+  assert.ok(program[0].notes?.some((note) => note.includes("Exercices retires")));
 });
