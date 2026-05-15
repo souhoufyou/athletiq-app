@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
 import { useCoachStorage } from "@/lib/storage";
@@ -11,6 +11,8 @@ import { useCoachStorage } from "@/lib/storage";
 export function AppShell({ children }: { children: ReactNode }) {
   const { isReady, isOnboardingDone } = useCoachStorage();
   const router = useRouter();
+  const pathname = usePathname();
+  const showHeader = pathname === "/";
 
   useEffect(() => {
     if (isReady && !isOnboardingDone) {
@@ -54,8 +56,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="app-shell mx-auto min-h-screen w-full max-w-[96rem] px-4 pt-4 safe-bottom sm:px-6 lg:px-8">
-      <AppHeader />
+    <div
+      className={`app-shell mx-auto min-h-screen w-full max-w-[96rem] safe-bottom sm:px-6 lg:px-8 ${
+        showHeader ? "px-4 pt-4" : "px-4 pt-5"
+      }`}
+    >
+      {showHeader ? <AppHeader /> : null}
       <main className="app-content">{children}</main>
       <BottomNav />
     </div>

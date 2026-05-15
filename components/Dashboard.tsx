@@ -8,6 +8,7 @@ import { WeekTimelineCompact } from "@/components/WeekTimeline";
 import { getActiveProgramTemplate } from "@/lib/activeProgram";
 import { estimateCalories } from "@/lib/calories";
 import { getWeekday } from "@/lib/date";
+import { getSessionImage } from "@/lib/session-images";
 import { getSessionCategory, getSessionTypeLabel, parseDurationToMs } from "@/lib/sessionMeta";
 import { useCoachStorage } from "@/lib/storage";
 import { formatDurationLong } from "@/lib/time";
@@ -159,6 +160,7 @@ function TodaySessionCard({
   const exerciseCount = session.exercises.length;
   const plannedMs = parseDurationToMs(session.duration);
   const calorieEstimate = estimateCalories(session.intensity, weightKg, plannedMs);
+  const heroImage = getSessionImage(session.title, session.focus, category);
 
   const status: "to-do" | "in-progress" | "done" = isCompleted
     ? "done"
@@ -185,46 +187,57 @@ function TodaySessionCard({
   }[status];
 
   return (
-    <section className="session-step-card p-5">
+    <section className="session-step-card overflow-hidden p-0">
       <div className="session-step-accent" />
 
-      <div className="flex items-start justify-between gap-3">
-        <p className="text-[11px] font-black uppercase tracking-[0.28em] text-coral">
-          Séance du jour · {typeLabel}
-        </p>
-        <span className={`shrink-0 rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-wide ${statusTone}`}>
-          {statusLabel}
-        </span>
-      </div>
-
-      <div className="mt-4 flex items-start gap-4">
-        <SessionExerciseIcon category={category} className="size-20 shrink-0" />
-        <div className="min-w-0 flex-1">
-          <h1 className="text-2xl font-black leading-tight text-white sm:text-3xl">
-            {session.title}
-          </h1>
-          {session.focus ? (
-            <p className="mt-1 line-clamp-2 text-xs font-semibold text-white/55">{session.focus}</p>
-          ) : null}
+      {/* Hero image */}
+      <div
+        className="relative h-44 w-full bg-cover bg-center"
+        style={{ backgroundImage: `url(${heroImage})` }}
+      >
+        <div className="absolute inset-0 bg-gradient-to-t from-[#04050d] via-[#04050d]/65 to-transparent" />
+        <div className="absolute inset-0 flex flex-col justify-between p-4">
+          <div className="flex items-start justify-between gap-3">
+            <p className="rounded-full bg-black/35 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-coral backdrop-blur">
+              Séance du jour · {typeLabel}
+            </p>
+            <span className={`shrink-0 rounded-full border bg-black/35 px-3 py-1 text-[10px] font-black uppercase tracking-wide backdrop-blur ${statusTone}`}>
+              {statusLabel}
+            </span>
+          </div>
+          <div className="flex items-end gap-3">
+            <SessionExerciseIcon category={category} className="size-14 shrink-0 backdrop-blur" />
+            <div className="min-w-0 flex-1">
+              <h1 className="text-2xl font-black leading-tight text-white sm:text-3xl drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]">
+                {session.title}
+              </h1>
+              {session.focus ? (
+                <p className="mt-1 line-clamp-1 text-xs font-semibold text-white/80 drop-shadow-[0_1px_4px_rgba(0,0,0,0.7)]">
+                  {session.focus}
+                </p>
+              ) : null}
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="mt-5 grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-3 gap-2 p-5 pt-4">
         <Stat label="Durée" value={session.duration || "—"} />
         <Stat label="Exercices" value={String(exerciseCount)} />
         <Stat label="Calories" value={`${calorieEstimate.low}–${calorieEstimate.high}`} />
       </div>
 
-      <button className="session-cta-primary mt-6" onClick={onStart} type="button">
-        {ctaLabel}
-      </button>
-
-      <Link
-        className="session-cta-secondary mt-3 inline-flex items-center justify-center"
-        href="/programme"
-      >
-        Voir le programme
-      </Link>
+      <div className="px-5 pb-5">
+        <button className="session-cta-primary" onClick={onStart} type="button">
+          {ctaLabel}
+        </button>
+        <Link
+          className="session-cta-secondary mt-3 inline-flex items-center justify-center"
+          href="/programme"
+        >
+          Voir le programme
+        </Link>
+      </div>
     </section>
   );
 }
