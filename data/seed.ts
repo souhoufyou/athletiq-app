@@ -54,10 +54,10 @@ export const coachSeed: CoachSeed = {
       weekday: "monday",
       scheduleLabel: "Lundi midi",
       title: "Haut du corps force",
-      focus: "Force haut du corps + judo soir",
+      focus: "Force haut du corps",
       duration: "50-60 min",
       intensity: "Soutenue",
-      notes: ["Judo le soir: garder 1-2 reps en réserve sur les accessoires."],
+      notes: ["Garder 1-2 reps en réserve sur les accessoires si tu enchaînes un sport externe."],
       exercises: [
         {
           id: "bench-press-5x5",
@@ -303,10 +303,10 @@ export const coachSeed: CoachSeed = {
       weekday: "friday",
       scheduleLabel: "Vendredi midi",
       title: "Épaules, bras, rappel haut",
-      focus: "Modéré + judo soir",
+      focus: "Modéré, rappel haut du corps",
       duration: "45-55 min",
       intensity: "Modérée",
-      notes: ["Judo le soir: pas de grip lourd, pas d'échec musculaire."],
+      notes: ["Pas de grip lourd, pas d'échec musculaire si tu enchaînes un sport externe."],
       exercises: [
         {
           id: "machine-shoulder-press",
@@ -334,7 +334,7 @@ export const coachSeed: CoachSeed = {
           name: "Chest press légère/modérée",
           target: "3 x 10-12",
           rest: "75 s",
-          cue: "RPE modéré, garde de la fraîcheur pour le judo."
+          cue: "RPE modéré, garde de la fraîcheur si tu enchaînes un sport externe."
         },
         {
           id: "light-moderate-machine-row",

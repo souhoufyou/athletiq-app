@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AthletIQ IA",
+  title: "AthletIQ",
   description: "Ton coach adaptatif intelligent. Progression personnalisee, guardrails de securite, analyse de seances.",
   icons: {
     apple: "/brand/athletiq-icon.svg",

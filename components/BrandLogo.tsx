@@ -7,7 +7,7 @@ type BrandLogoProps = {
 export function BrandLogo({ className = "", variant = "icon" }: BrandLogoProps) {
   if (variant === "wordmark") {
     return (
-      <div className={`brand-wordmark ${className}`} aria-label="AthletIQ IA">
+      <div className={`brand-wordmark ${className}`} aria-label="AthletIQ">
         <span className="brand-wordmark-icon">
           <LogoMark className="brand-wordmark-mark" />
         </span>
@@ -17,13 +17,12 @@ export function BrandLogo({ className = "", variant = "icon" }: BrandLogoProps) 
           </span>
           <span className="brand-wordmark-tagline">Coach adaptatif</span>
         </span>
-        <span className="brand-wordmark-ai">IA</span>
       </div>
     );
   }
 
   return (
-    <span className={`brand-icon ${className}`} aria-label="AthletIQ IA">
+    <span className={`brand-icon ${className}`} aria-label="AthletIQ">
       <LogoMark className="brand-icon-svg" />
     </span>
   );

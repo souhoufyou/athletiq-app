@@ -235,7 +235,7 @@ function GoalsSection({
     `Prochain record bench visé : ${benchNextMax} kg × 1`,
     "Objectif cardio : souffle et récupération en amélioration",
     judoDaysCount > 0
-      ? `Judo ${judoDaysCount}×/semaine : améliorer souffle, grip et récupération`
+      ? `Sport externe ${judoDaysCount}×/semaine : améliorer souffle, grip et récupération`
       : "Maintenir la mobilité et la santé articulaire"
   ].filter(Boolean);
 

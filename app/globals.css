@@ -210,8 +210,7 @@ select {
     gap: 0.1rem;
   }
 
-  .brand-wordmark-text,
-  .brand-wordmark-ai {
+  .brand-wordmark-text {
     line-height: 1;
     font-size: 1.42rem;
     font-weight: 900;
@@ -234,8 +233,7 @@ select {
     text-shadow: 0 0 18px rgba(255, 255, 255, 0.16);
   }
 
-  .brand-wordmark-text span,
-  .brand-wordmark-ai {
+  .brand-wordmark-text span {
     align-self: flex-start;
     border-radius: 0.55rem;
     background: rgba(255, 90, 0, 0.12);
@@ -469,4 +467,314 @@ select {
     border-radius: 1.25rem;
     padding: 1.25rem;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  }
+
+  /* ── Session mode (premium UI) ───────────────────────────────────────── */
+
+  @keyframes session-fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes session-pulse-amber {
+    0%, 100% {
+      box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.55);
+    }
+    50% {
+      box-shadow: 0 0 0 16px rgba(245, 158, 11, 0);
+    }
+  }
+
+  .session-step-enter {
+    animation: session-fade-in 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .session-step-card {
+    position: relative;
+    overflow: hidden;
+    border-radius: 1.75rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background:
+      radial-gradient(28rem 18rem at 100% -10%, rgba(255, 90, 0, 0.18), transparent 60%),
+      linear-gradient(180deg, rgba(20, 22, 28, 1), rgba(8, 9, 13, 1));
+    box-shadow: 0 28px 60px rgba(0, 0, 0, 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
+  .session-step-accent {
+    position: absolute;
+    inset-inline: 0;
+    top: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #ff5a00, #ff9f1a, #ff7a18);
+  }
+
+  .session-cta-primary {
+    height: 4.25rem;
+    width: 100%;
+    border-radius: 1.25rem;
+    font-size: 1.125rem;
+    font-weight: 900;
+    color: #fff;
+    background: linear-gradient(180deg, #ff7a18, #ff4d00);
+    box-shadow:
+      0 18px 45px rgba(255, 90, 0, 0.4),
+      inset 0 1px 0 rgba(255, 255, 255, 0.22);
+    transition: transform 120ms ease, box-shadow 120ms ease;
+  }
+  .session-cta-primary:active {
+    transform: translateY(1px);
+    box-shadow:
+      0 12px 32px rgba(255, 90, 0, 0.32),
+      inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  }
+  .session-cta-primary[disabled] {
+    opacity: 0.45;
+    box-shadow: none;
+  }
+
+  .session-cta-secondary {
+    height: 3.5rem;
+    width: 100%;
+    border-radius: 1rem;
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: rgba(255, 255, 255, 0.78);
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: background-color 120ms ease;
+  }
+  .session-cta-secondary:active {
+    background: rgba(255, 255, 255, 0.12);
+  }
+
+  .session-adjust-btn {
+    height: 3.5rem;
+    width: 3.5rem;
+    border-radius: 1rem;
+    font-size: 1.5rem;
+    font-weight: 900;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 100ms ease, transform 100ms ease;
+  }
+  .session-adjust-btn:active {
+    background: rgba(255, 90, 0, 0.18);
+    transform: scale(0.96);
+  }
+  .session-adjust-btn[disabled] {
+    opacity: 0.35;
+  }
+
+  .session-number-input {
+    width: 100%;
+    height: 4.5rem;
+    text-align: center;
+    font-size: 2.5rem;
+    line-height: 1;
+    font-weight: 900;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 1rem;
+    outline: none;
+    transition: border-color 120ms ease, background-color 120ms ease;
+  }
+  .session-number-input:focus {
+    border-color: #ff7a18;
+    background: rgba(255, 90, 0, 0.06);
+  }
+
+  .session-rest-ring {
+    transform: rotate(-90deg);
+  }
+  .session-rest-ring-track {
+    stroke: rgba(255, 255, 255, 0.08);
+    fill: none;
+  }
+  .session-rest-ring-progress {
+    stroke: #ff9f1a;
+    fill: none;
+    transition: stroke-dashoffset 1s linear;
+    filter: drop-shadow(0 0 12px rgba(245, 158, 11, 0.55));
+  }
+  .session-rest-final-warning {
+    animation: session-pulse-amber 1.05s ease-out infinite;
+  }
+
+  /* ── LIGHT MODE (when .dark is NOT on <html>) ───────────────────────── */
+
+  html:not(.dark) {
+    color-scheme: light;
+  }
+
+  html:not(.dark) body {
+    background:
+      radial-gradient(42rem 26rem at 105% -4%, rgba(255, 91, 0, 0.16), transparent 60%),
+      linear-gradient(180deg, #f6f7fb 0%, #ffffff 60%, #f1f3f7 100%) !important;
+    color: #0b0d12 !important;
+  }
+
+  html:not(.dark) body::before,
+  html:not(.dark) body::after {
+    display: none;
+  }
+
+  html:not(.dark) .app-shell::before {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.8), transparent 50%),
+      radial-gradient(23rem 15rem at 86% 5%, rgba(255, 90, 0, 0.20), transparent 70%) !important;
+    opacity: 0.6;
+  }
+
+  /* Surfaces */
+  html:not(.dark) .card-dark,
+  html:not(.dark) .session-step-card,
+  html:not(.dark) .premium-gradient,
+  html:not(.dark) .premium-card,
+  html:not(.dark) .section-card {
+    background: #ffffff !important;
+    border-color: rgba(0, 0, 0, 0.08) !important;
+    box-shadow: 0 10px 28px rgba(15, 20, 35, 0.08), 0 2px 6px rgba(15, 20, 35, 0.04) !important;
+    color: #0b0d12;
+  }
+  html:not(.dark) .session-step-accent {
+    height: 4px;
+  }
+
+  html:not(.dark) .bg-ink { background-color: #ffffff !important; }
+  html:not(.dark) .bg-mist { background-color: #f3f4f6 !important; }
+
+  /* Hex inline backgrounds used in the dark design */
+  html:not(.dark) .bg-\[\#11131a\],
+  html:not(.dark) .bg-\[\#10131d\],
+  html:not(.dark) .bg-\[\#0f111a\],
+  html:not(.dark) .bg-\[\#0f111a\]\/95,
+  html:not(.dark) .bg-\[\#080a0f\],
+  html:not(.dark) .bg-\[\#080a0f\]\/88,
+  html:not(.dark) .bg-\[\#040506\],
+  html:not(.dark) .bg-\[\#050607\] {
+    background: #ffffff !important;
+    color: #0b0d12;
+  }
+
+  /* Text on light mode (override "text-white/*" utilities) */
+  html:not(.dark) .text-white { color: #0b0d12 !important; }
+  html:not(.dark) .text-white\/80 { color: rgba(11, 13, 18, 0.85) !important; }
+  html:not(.dark) .text-white\/70 { color: rgba(11, 13, 18, 0.75) !important; }
+  html:not(.dark) .text-white\/68 { color: rgba(11, 13, 18, 0.72) !important; }
+  html:not(.dark) .text-white\/65 { color: rgba(11, 13, 18, 0.7) !important; }
+  html:not(.dark) .text-white\/60 { color: rgba(11, 13, 18, 0.65) !important; }
+  html:not(.dark) .text-white\/55 { color: rgba(11, 13, 18, 0.6) !important; }
+  html:not(.dark) .text-white\/50 { color: rgba(11, 13, 18, 0.55) !important; }
+  html:not(.dark) .text-white\/45 { color: rgba(11, 13, 18, 0.5) !important; }
+  html:not(.dark) .text-white\/40 { color: rgba(11, 13, 18, 0.45) !important; }
+  html:not(.dark) .text-white\/35 { color: rgba(11, 13, 18, 0.4) !important; }
+  html:not(.dark) .text-white\/30 { color: rgba(11, 13, 18, 0.35) !important; }
+  html:not(.dark) .text-white\/25 { color: rgba(11, 13, 18, 0.3) !important; }
+
+  /* Layered surfaces: invert white-alpha to black-alpha */
+  html:not(.dark) .bg-white\/4 { background-color: rgba(15, 20, 35, 0.04) !important; }
+  html:not(.dark) .bg-white\/5 { background-color: rgba(15, 20, 35, 0.05) !important; }
+  html:not(.dark) .bg-white\/6 { background-color: rgba(15, 20, 35, 0.06) !important; }
+  html:not(.dark) .bg-white\/8 { background-color: rgba(15, 20, 35, 0.07) !important; }
+  html:not(.dark) .bg-white\/10 { background-color: rgba(15, 20, 35, 0.08) !important; }
+  html:not(.dark) .bg-white\/12 { background-color: rgba(15, 20, 35, 0.10) !important; }
+  html:not(.dark) .bg-white\/15 { background-color: rgba(15, 20, 35, 0.12) !important; }
+  html:not(.dark) .bg-white\/20 { background-color: rgba(15, 20, 35, 0.16) !important; }
+  html:not(.dark) .bg-white\/\[0\.04\] { background-color: rgba(15, 20, 35, 0.04) !important; }
+  html:not(.dark) .bg-black\/15 { background-color: rgba(15, 20, 35, 0.05) !important; }
+  html:not(.dark) .bg-black\/35 { background-color: rgba(15, 20, 35, 0.06) !important; }
+  html:not(.dark) .bg-black\/70 { background-color: rgba(15, 20, 35, 0.55) !important; }
+
+  /* Borders */
+  html:not(.dark) .border-white\/6 { border-color: rgba(15, 20, 35, 0.06) !important; }
+  html:not(.dark) .border-white\/8 { border-color: rgba(15, 20, 35, 0.08) !important; }
+  html:not(.dark) .border-white\/10 { border-color: rgba(15, 20, 35, 0.10) !important; }
+  html:not(.dark) .border-white\/12 { border-color: rgba(15, 20, 35, 0.12) !important; }
+  html:not(.dark) .border-white\/15 { border-color: rgba(15, 20, 35, 0.14) !important; }
+
+  /* Inputs / focus */
+  html:not(.dark) input,
+  html:not(.dark) textarea,
+  html:not(.dark) select {
+    color: #0b0d12;
+  }
+  html:not(.dark) input::placeholder,
+  html:not(.dark) textarea::placeholder {
+    color: rgba(11, 13, 18, 0.4);
+  }
+
+  /* Session number input adapts to light surface */
+  html:not(.dark) .session-number-input {
+    background: rgba(15, 20, 35, 0.04);
+    border-color: rgba(15, 20, 35, 0.12);
+    color: #0b0d12;
+  }
+  html:not(.dark) .session-number-input:focus {
+    border-color: #ff7a18;
+    background: rgba(255, 90, 0, 0.06);
+  }
+
+  /* Adjust buttons (-/+) on light bg */
+  html:not(.dark) .session-adjust-btn {
+    background: rgba(15, 20, 35, 0.06);
+    border-color: rgba(15, 20, 35, 0.12);
+    color: #0b0d12;
+  }
+  html:not(.dark) .session-adjust-btn:active {
+    background: rgba(255, 90, 0, 0.15);
+  }
+
+  /* CTA secondary on light bg */
+  html:not(.dark) .session-cta-secondary {
+    background: rgba(15, 20, 35, 0.05);
+    border-color: rgba(15, 20, 35, 0.10);
+    color: rgba(11, 13, 18, 0.78);
+  }
+
+  /* Bottom nav background swap */
+  html:not(.dark) .app-header { color: #0b0d12; }
+  html:not(.dark) .brand-wordmark-icon {
+    background:
+      radial-gradient(circle at 75% 15%, rgba(255, 122, 24, 0.32), transparent 44%),
+      linear-gradient(180deg, #ffffff, #f1f3f7) !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 8px 18px rgba(255, 90, 0, 0.18);
+  }
+  html:not(.dark) .brand-wordmark-text {
+    color: #0b0d12 !important;
+    text-shadow: none;
+  }
+
+  /* Header topline subtle in light mode */
+  html:not(.dark) .app-header-topline {
+    opacity: 0.4;
+  }
+
+  /* Coral / sea / sky accent BG transparency stay readable */
+  html:not(.dark) .bg-coral\/10 { background-color: rgba(255, 90, 0, 0.10) !important; }
+  html:not(.dark) .bg-coral\/12 { background-color: rgba(255, 90, 0, 0.12) !important; }
+  html:not(.dark) .bg-coral\/15 { background-color: rgba(255, 90, 0, 0.14) !important; }
+  html:not(.dark) .bg-coral\/20 { background-color: rgba(255, 90, 0, 0.16) !important; }
+  html:not(.dark) .bg-sea\/10 { background-color: rgba(36, 192, 122, 0.12) !important; }
+  html:not(.dark) .bg-sea\/15 { background-color: rgba(36, 192, 122, 0.16) !important; }
+  html:not(.dark) .bg-sky\/10 { background-color: rgba(255, 122, 24, 0.10) !important; }
+  html:not(.dark) .bg-sky\/15 { background-color: rgba(255, 122, 24, 0.14) !important; }
+  html:not(.dark) .bg-amber\/10 { background-color: rgba(245, 158, 11, 0.14) !important; }
+  html:not(.dark) .bg-amber\/15 { background-color: rgba(245, 158, 11, 0.18) !important; }
+
+  /* Quit confirm / dialogs */
+  html:not(.dark) [role="dialog"] > div {
+    background: #ffffff !important;
+    color: #0b0d12;
+    border-color: rgba(15, 20, 35, 0.12) !important;
   }

@@ -93,7 +93,7 @@ const defaultSettings: UserSettings = {
   judoDays: athleteProfile.judoDays,
   cautionLevel: "normal",
   aiEnabled: false,
-  darkMode: false,
+  darkMode: true,
   age: athleteProfile.age,
   heightCm: athleteProfile.heightCm,
   gym: athleteProfile.gym,

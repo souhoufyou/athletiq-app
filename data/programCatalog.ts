@@ -198,7 +198,7 @@ export const PROGRAM_CATALOG: ProgramTemplate[] = [
   {
     id: "ppl-upper-lower-5j",
     name: "Push Pull Legs Upper Lower",
-    description: "Programme avance pour Sofiane: force au developpe couche, volume intelligent, recomposition et cardio sans course.",
+    description: "Programme avance pour la recomposition: force au developpe couche, volume intelligent et cardio sans course.",
     level: "avance",
     primaryObjective: "recomposition",
     secondaryObjectives: ["force", "perte-gras", "cardio-sante"],

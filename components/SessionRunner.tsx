@@ -1,110 +1,66 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AdaptationExplanationCard } from "@/components/AdaptationExplanation";
 import { SessionSummary } from "@/components/SessionSummary";
+import { SessionStepAnnounce } from "@/components/session/SessionStepAnnounce";
+import { SessionStepFeedback } from "@/components/session/SessionStepFeedback";
+import { SessionStepRest } from "@/components/session/SessionStepRest";
+import { SessionStepSet } from "@/components/session/SessionStepSet";
+import { SessionStepWrapUp, type SessionWrapUp } from "@/components/session/SessionStepWrapUp";
 import { getActiveProgramTemplate } from "@/lib/activeProgram";
 import { getContextualAlternatives } from "@/lib/alternatives";
 import { estimateCalories, type CalorieEstimate } from "@/lib/calories";
-import { appendCalibrationEvent, createLoadFeedbackCalibrationEvent } from "@/lib/calibrationEvents";
 import { rememberExerciseSwap } from "@/lib/exerciseSwapPreferences";
-import { getLiveCoachAdvice, type LiveCoachAdvice } from "@/lib/liveCoaching";
-import { getExerciseLoadInsight } from "@/lib/loadInsights";
-import { applyLoadFeedbackToSettings, tuneExerciseLoad, type LoadFeedback } from "@/lib/loadTuning";
 import { summarizeProgressions } from "@/lib/progression";
-import { defaultSessionFeedback, getCompletedCount } from "@/lib/session";
+import { getCompletedCount } from "@/lib/session";
+import {
+  aggregateSets,
+  computeInitialStep,
+  getDefaultLoadForSet,
+  getDefaultRepsValue,
+  getPlannedSetCount,
+  type SessionStep
+} from "@/lib/sessionFlow";
 import { useCoachStorage } from "@/lib/storage";
 import { formatDuration, formatDurationLong, parseRestSeconds } from "@/lib/time";
 import type {
   ActiveSession,
-  BreathFeedback,
   CoachAiResponse,
   CompletedSession,
   EffortStatus,
-  ExerciseSelectionInsight,
-  ExerciseLog,
-  PlannedSession
+  Exercise,
+  SetLog
 } from "@/types/training";
-
-type RestTimerState = {
-  done: boolean;
-  exerciseId?: string;
-  initialSeconds: number;
-  running: boolean;
-  secondsLeft: number;
-};
-
-const statusOptions: Array<{ value: EffortStatus; label: string; idle: string; active: string }> = [
-  {
-    value: "ok",
-    label: "OK",
-    idle: "border-sea/25 bg-sea/10 text-sea",
-    active: "border-sea bg-sea text-white"
-  },
-  {
-    value: "easy",
-    label: "Facile",
-    idle: "border-sea/25 bg-sea/10 text-sea",
-    active: "border-sea bg-sea text-white"
-  },
-  {
-    value: "hard",
-    label: "Trop dur",
-    idle: "border-coral/30 bg-coral/10 text-coral",
-    active: "border-coral bg-coral text-white"
-  },
-  {
-    value: "pain",
-    label: "Douleur",
-    idle: "border-red-500/30 bg-red-500/10 text-red-600",
-    active: "border-red-600 bg-red-600 text-white"
-  },
-  {
-    value: "skipped",
-    label: "Pas fait",
-    idle: "border-white/10 bg-white/8 text-white/60",
-    active: "border-zinc-500 bg-zinc-600 text-white"
-  }
-];
-
-const quickReasonOptions = [
-  "douleur poignet",
-  "douleur épaule",
-  "douleur dos",
-  "douleur genou",
-  "souffle",
-  "trop lourd",
-  "manque d'énergie"
-];
 
 export function SessionRunner() {
   const [lastSummary, setLastSummary] = useState<CompletedSession | null>(null);
   const [aiStatus, setAiStatus] = useState<string>("");
-  const [finishWarning, setFinishWarning] = useState<string>("");
-  const [loadFeedbackMessage, setLoadFeedbackMessage] = useState<string>("");
-  const [showAlternatives, setShowAlternatives] = useState(false);
+  const [step, setStep] = useState<SessionStep | null>(null);
+  const [showQuitConfirm, setShowQuitConfirm] = useState(false);
+  const [alternativesFor, setAlternativesFor] = useState<number | null>(null);
+  const stepInitializedRef = useRef<string | null>(null);
+  const lastTrackedExerciseIdRef = useRef<string | null>(null);
+
   const {
     activeSession,
     attachAiCoachResponse,
-    clearReplacement,
+    cancelActiveSession,
     completeSession,
     currentProgram,
     dateKey,
-    history,
     isReady,
     pauseSessionTimer,
     replaceExercise,
     resumeSessionTimer,
-    setCurrentProgram,
+    settings,
     setSettings,
     setActiveExercise,
     startSession,
-    settings,
     todaySession,
     todaysCompletedSession,
     updateExerciseLog,
-    updateExerciseLogsBatch,
     updateSessionFeedback
   } = useCoachStorage();
 
@@ -113,83 +69,55 @@ export function SessionRunner() {
     [activeSession, currentProgram]
   );
   const runningSession = activePlannedSession ?? todaySession;
-  const lastLoads = useMemo(
-    () =>
-      Object.fromEntries(
-        runningSession.exercises.map((exercise) => [exercise.id, getLastLoad(history, exercise.id)])
-      ) as Record<string, string | undefined>,
-    [history, runningSession.exercises]
-  );
-  const loadFeedbackExerciseKey =
-    activeSession?.timing.activeExerciseId
-    ?? activePlannedSession?.exercises[0]?.id
-    ?? todaySession.exercises[0]?.id
-    ?? "";
   const activeProgram = useMemo(() => getActiveProgramTemplate(currentProgram), [currentProgram]);
 
+  const matchingActive = Boolean(activeSession && activePlannedSession && activeSession.dateKey === dateKey);
+  const active = matchingActive ? activeSession : null;
+  const currentSession = active ? runningSession : todaySession;
+
+  // Initialise / re-sync the step machine when a new active session appears
   useEffect(() => {
-    setLoadFeedbackMessage("");
-  }, [loadFeedbackExerciseKey]);
+    if (!active) {
+      if (stepInitializedRef.current !== null) {
+        stepInitializedRef.current = null;
+        setStep(null);
+      }
+      return;
+    }
+
+    if (stepInitializedRef.current === active.sessionId) {
+      return;
+    }
+    stepInitializedRef.current = active.sessionId;
+    setStep(computeInitialStep(currentSession.exercises, active.logs));
+  }, [active, currentSession.exercises]);
+
+  // Keep per-exercise timing tracking aligned with the visible exercise.
+  // The store writes a fresh reference on every emit, so we MUST guard with a
+  // ref to avoid an infinite render loop (active → effect → setActiveExercise
+  // → new active reference → effect again).
+  useEffect(() => {
+    if (!active || !step) {
+      lastTrackedExerciseIdRef.current = null;
+      return;
+    }
+    if (step.type === "complete" || step.type === "wrap-up") return;
+
+    const exercise = currentSession.exercises[step.exerciseIndex];
+    if (!exercise) return;
+    if (lastTrackedExerciseIdRef.current === exercise.id) return;
+
+    lastTrackedExerciseIdRef.current = exercise.id;
+    setActiveExercise(exercise.id);
+  }, [active, step, currentSession.exercises, setActiveExercise]);
 
   if (!isReady) {
     return <div className="rounded-lg bg-white p-5 font-bold shadow-soft">Chargement...</div>;
   }
 
-  const matchingActive = Boolean(activeSession && activePlannedSession && activeSession.dateKey === dateKey);
-  const active = matchingActive ? activeSession : null;
-  const currentSession = active ? runningSession : todaySession;
-  const completedCount = active ? getCompletedCount(active.logs) : 0;
-  const exerciseTotal = Math.max(1, currentSession.exercises.length);
-  const progressPercent = active ? Math.round((completedCount / exerciseTotal) * 100) : 0;
-  const currentExerciseId = active?.timing.activeExerciseId ?? currentSession.exercises[0]?.id;
-  const foundIndex = currentSession.exercises.findIndex((exercise) => exercise.id === currentExerciseId);
-  const currentIndex = foundIndex >= 0 ? foundIndex : 0;
-  const currentExercise = currentSession.exercises[currentIndex] ?? currentSession.exercises[0];
-  const previousExercise = currentSession.exercises[currentIndex - 1];
-  const nextExercise = currentSession.exercises[currentIndex + 1];
-  const currentRestSeconds = currentExercise ? parseRestSeconds(currentExercise.rest) : 0;
-  const currentLastLoad = currentExercise ? lastLoads[currentExercise.id] : undefined;
-  // Use replacement if user swapped the exercise this session
-  const effectiveExercise = (currentExercise && active?.replacements?.[currentExercise.id]) ?? currentExercise;
-  const loadInsight = effectiveExercise ? getExerciseLoadInsight(effectiveExercise, settings) : undefined;
-  const isReplaced = Boolean(currentExercise && active?.replacements?.[currentExercise.id]);
-  const feedback = active?.feedback ?? defaultSessionFeedback;
-  const currentLog = currentExercise && active
-    ? active.logs[currentExercise.id] ?? createEmptyLog(currentExercise.id)
-    : createEmptyLog(currentExercise?.id ?? "exercise");
-  const alternatives = currentExercise
-    ? getContextualAlternatives(currentExercise.id, currentExercise, {
-        avoid: settings.avoid,
-        comment: currentLog.comment,
-        equipment: settings.equipment,
-        status: currentLog.status,
-        watchPoints: settings.watchPoints
-      })
-    : [];
-  const liveAdvice = effectiveExercise
-    ? getLiveCoachAdvice({
-        exercise: effectiveExercise,
-        feedback,
-        log: currentLog,
-        session: currentSession
-      })
-    : undefined;
-
-  const goToExercise = (index: number) => {
-    const target = currentSession.exercises[index];
-
-    if (!target) {
-      return;
-    }
-
-    setActiveExercise(target.id);
-    setShowAlternatives(false);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const handleRequestAi = (session: CompletedSession) => {
-    requestAiCoach(session, settings.aiEnabled, attachAiCoachResponse, setLastSummary, setAiStatus);
-  };
+  // ─────────────────────────────────────────────────────────────────────────
+  // PRE / POST-SESSION VIEW (no active session)
+  // ─────────────────────────────────────────────────────────────────────────
 
   if (!active) {
     const summarySession = lastSummary ?? todaysCompletedSession;
@@ -205,6 +133,10 @@ export function SessionRunner() {
           )
         : undefined;
 
+    const handleRequestAi = (session: CompletedSession) => {
+      requestAiCoach(session, settings.aiEnabled, attachAiCoachResponse, setLastSummary, setAiStatus);
+    };
+
     return (
       <div className="space-y-5">
         <section className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#11131a] p-5 text-white shadow-soft">
@@ -212,7 +144,7 @@ export function SessionRunner() {
           <div className="relative">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-xs font-black uppercase tracking-[0.22em] text-coral">Mode seance</p>
+                <p className="text-xs font-black uppercase tracking-[0.22em] text-coral">Mode séance</p>
                 <h1 className="mt-2 text-3xl font-black leading-[0.95] text-white">{todaySession.title}</h1>
                 <p className="mt-2 text-sm font-semibold leading-relaxed text-white/60">
                   {activeProgram?.name ?? "Programme actif"} - {todaySession.focus}
@@ -224,12 +156,13 @@ export function SessionRunner() {
             </div>
 
             <div className="mt-5 grid grid-cols-3 gap-2">
-              <LaunchMetric label="Duree" value={todaySession.duration} />
+              <LaunchMetric label="Durée" value={todaySession.duration} />
               <LaunchMetric label="Exercices" value={String(todaySession.exercises.length)} />
-              <LaunchMetric label="Intensite" value={todaySession.intensity} />
+              <LaunchMetric label="Intensité" value={todaySession.intensity} />
             </div>
           </div>
         </section>
+
         {summarySession?.progressions ? (
           <GuidedSessionReport
             aiEnabled={settings.aiEnabled}
@@ -239,26 +172,51 @@ export function SessionRunner() {
             session={summarySession}
           />
         ) : null}
+
         {!summarySession ? <SessionSummary completed={Boolean(todaysCompletedSession)} session={todaySession} /> : null}
-        {todaysCompletedSession && !lastSummary ? (
-          <div className="card-dark border border-moss/20 p-4">
-            <p className="font-black text-moss">Séance validée aujourd&apos;hui.</p>
+
+        {todaysCompletedSession ? (
+          <div className="card-dark border border-sea/20 p-4">
+            <p className="font-black text-sea">Séance du jour validée ✓</p>
             <p className="mt-1 text-sm font-semibold text-white/55">
-              Elle est disponible dans l&apos;historique. Tu peux aussi relancer une nouvelle saisie si besoin.
+              Le bilan est ci-dessus et disponible dans l&apos;historique.
+              {summarySession ? " Tu peux la relancer si tu veux la refaire." : ""}
             </p>
           </div>
         ) : null}
-        <button
-          className="h-16 w-full rounded-2xl bg-coral px-4 text-lg font-black text-white shadow-[0_18px_45px_rgba(255,91,0,0.32)] transition hover:bg-coral/90"
-          onClick={() => {
-            setLastSummary(null);
-            setAiStatus("");
-            startSession(todaySession);
-          }}
-          type="button"
-        >
-          Commencer la séance guidée
-        </button>
+
+        {todaysCompletedSession ? (
+          <button
+            className="h-12 w-full rounded-md border border-white/10 bg-white/8 text-sm font-black text-white/70 transition hover:bg-white/12"
+            onClick={() => {
+              if (typeof window !== "undefined") {
+                const ok = window.confirm(
+                  "Une séance est déjà validée aujourd'hui. Relancer en créera une seconde dans l'historique (la précédente est conservée). Continuer ?"
+                );
+                if (!ok) return;
+              }
+              setLastSummary(null);
+              setAiStatus("");
+              startSession(todaySession);
+            }}
+            type="button"
+          >
+            Refaire la séance
+          </button>
+        ) : (
+          <button
+            className="h-16 w-full rounded-2xl bg-coral px-4 text-lg font-black text-white shadow-[0_18px_45px_rgba(255,91,0,0.32)] transition hover:bg-coral/90"
+            onClick={() => {
+              setLastSummary(null);
+              setAiStatus("");
+              startSession(todaySession);
+            }}
+            type="button"
+          >
+            Commencer la séance
+          </button>
+        )}
+
         <section className="card-dark p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -288,6 +246,7 @@ export function SessionRunner() {
             ))}
           </div>
         </section>
+
         <Link
           className="block h-12 rounded-md border border-white/10 bg-white/8 px-4 py-3 text-center font-black text-white"
           href="/"
@@ -298,117 +257,52 @@ export function SessionRunner() {
     );
   }
 
-  const updateCurrentLog = (patch: Partial<ExerciseLog>) => {
-    if (!currentExercise) {
-      return;
-    }
+  // ─────────────────────────────────────────────────────────────────────────
+  // DURING-SESSION VIEW (step machine)
+  // ─────────────────────────────────────────────────────────────────────────
 
-    updateExerciseLog(currentExercise.id, patch);
-    setFinishWarning("");
-  };
+  if (!step) {
+    return <div className="rounded-lg bg-white p-5 font-bold shadow-soft">Chargement de la séance...</div>;
+  }
 
-  const applyLiveLoadFeedback = (feedbackDecision: LoadFeedback) => {
-    if (!currentExercise || !effectiveExercise) {
-      return;
-    }
+  const completedCount = getCompletedCount(active.logs);
+  const exerciseTotal = Math.max(1, currentSession.exercises.length);
+  const progressPercent = Math.round((completedCount / exerciseTotal) * 100);
 
-    const tunedExercise = tuneExerciseLoad(effectiveExercise, feedbackDecision);
-    const nextSettings = appendCalibrationEvent(
-      applyLoadFeedbackToSettings(settings, effectiveExercise, feedbackDecision),
-      createLoadFeedbackCalibrationEvent(effectiveExercise, feedbackDecision, tunedExercise.plannedLoad)
-    );
+  const persistSet = (exerciseId: string, newSet: SetLog) => {
+    const current = active.logs[exerciseId]?.sets ?? [];
+    const filtered = current.filter((s) => s.setIndex !== newSet.setIndex);
+    const nextSets = [...filtered, newSet].sort((a, b) => a.setIndex - b.setIndex);
+    const aggregate = aggregateSets(nextSets);
 
-    if (isReplaced) {
-      replaceExercise(currentExercise.id, tunedExercise);
-    } else {
-      setCurrentProgram(currentProgram.map((session) => ({
-        ...session,
-        exercises: session.exercises.map((exercise) => (
-          session.id === currentSession.id && exercise.id === currentExercise.id ? tunedExercise : exercise
-        ))
-      })));
-    }
-
-    setSettings(nextSettings);
-
-    if (tunedExercise.plannedLoad && feedbackDecision !== "correct") {
-      updateCurrentLog({ usedLoad: tunedExercise.plannedLoad });
-    }
-
-    setLoadFeedbackMessage(
-      feedbackDecision === "correct"
-        ? `${effectiveExercise.name}: charge validee pour cette seance.`
-        : feedbackDecision === "too-light"
-          ? `${effectiveExercise.name}: charge montee tout de suite et futur calibrage plus ambitieux.`
-          : `${effectiveExercise.name}: charge reduite tout de suite et futur calibrage plus prudent.`
-    );
-  };
-
-  const handleStatus = (status: EffortStatus) => {
-    if (!currentExercise) {
-      return;
-    }
-
-    const patch: Partial<ExerciseLog> = { status };
-
-    if (status !== "skipped" && !currentLog.usedLoad && currentExercise.plannedLoad) {
-      patch.usedLoad = currentExercise.plannedLoad;
-    }
-
-    if ((status === "ok" || status === "easy") && !currentLog.completedReps) {
-      patch.completedReps = currentExercise.target;
-    }
-
-    updateCurrentLog(patch);
-  };
-
-  const applyQuickReason = (reason: string) => {
-    const currentComment = currentLog.comment.trim();
-    const hasReason = currentComment.toLowerCase().includes(reason.toLowerCase());
-
-    updateCurrentLog({
-      comment: hasReason ? currentComment : [currentComment, reason].filter(Boolean).join(", ")
+    updateExerciseLog(exerciseId, {
+      sets: nextSets,
+      usedLoad: aggregate.usedLoad,
+      completedReps: aggregate.completedReps
     });
   };
 
-  const revealAlternatives = () => {
-    setShowAlternatives(true);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+  const effectiveExerciseAt = (index: number): Exercise | undefined => {
+    const planned = currentSession.exercises[index];
+    if (!planned) return undefined;
+    return active.replacements?.[planned.id] ?? planned;
   };
 
-  const markAllOk = () => {
-    updateExerciseLogsBatch(currentSession.exercises.map((exercise) => {
-      const existing = active.logs[exercise.id];
-
-      return {
-        exerciseId: exercise.id,
-        patch: {
-          status: "ok" as EffortStatus,
-          usedLoad: existing?.usedLoad || exercise.plannedLoad || "",
-          completedReps: existing?.completedReps || exercise.target
-        }
-      };
-    }));
-    setFinishWarning("");
-  };
-
-  const needsQuickReason = currentLog.status === "hard" || currentLog.status === "pain";
-
-  const finishSession = () => {
-    const missingReason = currentSession.exercises.find((exercise) => {
-      const log = active.logs[exercise.id];
-      return (log?.status === "hard" || log?.status === "pain") && !log.comment.trim();
-    });
-
-    if (missingReason) {
-      setFinishWarning("Ajoute une raison rapide sur les exercices trop durs ou douloureux avant de terminer.");
-      setActiveExercise(missingReason.id);
+  const goToNextExerciseOrWrapUp = (currentIndex: number) => {
+    const nextIndex = currentIndex + 1;
+    if (nextIndex < currentSession.exercises.length) {
+      setStep({ type: "announce", exerciseIndex: nextIndex });
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
 
-    const completed = completeSession(currentSession);
+    setStep({ type: "wrap-up" });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
+  const finalizeSession = () => {
+    setStep({ type: "complete" });
+    const completed = completeSession(currentSession);
     if (completed) {
       setLastSummary(completed);
       setAiStatus("");
@@ -416,20 +310,115 @@ export function SessionRunner() {
     }
   };
 
+  const handleStart = (exerciseIndex: number) => {
+    setStep({ type: "set", exerciseIndex, setIndex: 1 });
+  };
+
+  const handleSkipFromAnnounce = (exerciseIndex: number) => {
+    const exercise = currentSession.exercises[exerciseIndex];
+    if (!exercise) return;
+    updateExerciseLog(exercise.id, {
+      status: "skipped",
+      sets: [],
+      usedLoad: "",
+      completedReps: "",
+      comment: ""
+    });
+    goToNextExerciseOrWrapUp(exerciseIndex);
+  };
+
+  const handleCompleteSet = (
+    exerciseIndex: number,
+    setIndex: number,
+    data: { usedLoad: string; completedReps: string }
+  ) => {
+    const planned = currentSession.exercises[exerciseIndex];
+    const effective = effectiveExerciseAt(exerciseIndex);
+    if (!planned || !effective) return;
+
+    persistSet(planned.id, { setIndex, ...data });
+
+    const setCount = getPlannedSetCount(effective);
+    if (setIndex >= setCount) {
+      setStep({ type: "feedback", exerciseIndex });
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
+    const restSeconds = parseRestSeconds(effective.rest);
+    setStep({
+      type: "rest",
+      exerciseIndex,
+      nextSetIndex: setIndex + 1,
+      durationSec: restSeconds
+    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleContinueAfterRest = (exerciseIndex: number, nextSetIndex: number) => {
+    setStep({ type: "set", exerciseIndex, setIndex: nextSetIndex });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleFeedback = (
+    exerciseIndex: number,
+    data: { status: EffortStatus; comment: string }
+  ) => {
+    const exercise = currentSession.exercises[exerciseIndex];
+    if (!exercise) return;
+    updateExerciseLog(exercise.id, {
+      status: data.status,
+      comment: data.comment
+    });
+    goToNextExerciseOrWrapUp(exerciseIndex);
+  };
+
+  const handleWrapUp = (data: SessionWrapUp) => {
+    updateSessionFeedback({
+      difficulty: data.difficulty,
+      globalPain: data.globalPain
+    });
+    finalizeSession();
+  };
+
+  const handleApplyAlternative = (exerciseIndex: number, replacement: Exercise) => {
+    const original = currentSession.exercises[exerciseIndex];
+    if (!original) return;
+    replaceExercise(original.id, replacement);
+    setSettings(rememberExerciseSwap(settings, original, replacement));
+    setAlternativesFor(null);
+  };
+
+  const handleQuitConfirmed = () => {
+    cancelActiveSession();
+    setStep(null);
+    setShowQuitConfirm(false);
+    setAlternativesFor(null);
+    stepInitializedRef.current = null;
+  };
+
   return (
     <div className="space-y-4">
       <section className="sticky top-0 z-20 -mx-4 border-b border-white/10 bg-[#0f111a]/95 px-4 py-2 backdrop-blur sm:-mx-6 sm:px-6">
         <div className="flex items-center gap-3">
+          <button
+            aria-label="Quitter la séance"
+            className="flex size-9 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/5 text-sm font-black text-white/70 transition hover:bg-white/10"
+            onClick={() => setShowQuitConfirm(true)}
+            type="button"
+          >
+            ✕
+          </button>
           <p className="shrink-0 text-xs font-black tabular-nums text-white/70">
-            {currentIndex + 1}/{currentSession.exercises.length}
+            {completedCount}/{currentSession.exercises.length}
           </p>
           <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10">
-            <div className="h-full rounded-full bg-sky transition-all" style={{ width: `${progressPercent}%` }} />
+            <div className="h-full rounded-full bg-coral transition-all" style={{ width: `${progressPercent}%` }} />
           </div>
           <SessionElapsedTime session={active} />
           <button
             aria-label={active.timer.isPaused ? "Reprendre" : "Pause"}
-            className="flex size-8 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/5 text-xs font-black text-white/70 transition hover:bg-white/10"
+            className="flex size-9 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/5 text-sm font-black text-white/70 transition hover:bg-white/10"
             onClick={() => (active.timer.isPaused ? resumeSessionTimer() : pauseSessionTimer())}
             type="button"
           >
@@ -438,428 +427,259 @@ export function SessionRunner() {
         </div>
       </section>
 
-      <SessionCockpitCard
-        active={active}
-        completedCount={completedCount}
-        currentIndex={currentIndex}
-        currentSession={currentSession}
-        onMarkAllOk={markAllOk}
-        programName={activeProgram?.name ?? "Programme personnalise"}
-        programMeta={activeProgram ? `${activeProgram.frequency} j/sem. - ${activeProgram.averageDuration}` : `${currentProgram.length} jours actifs`}
-        progressPercent={progressPercent}
-      />
+      {step.type === "announce" ? (
+        (() => {
+          const planned = currentSession.exercises[step.exerciseIndex];
+          const effective = effectiveExerciseAt(step.exerciseIndex);
+          const isReplaced = Boolean(planned && active.replacements?.[planned.id]);
+          if (!effective) return null;
+          return (
+            <SessionStepAnnounce
+              exercise={effective}
+              exerciseIndex={step.exerciseIndex}
+              exerciseTotal={currentSession.exercises.length}
+              isReplaced={isReplaced}
+              onReplace={() => setAlternativesFor(step.exerciseIndex)}
+              onSkip={() => handleSkipFromAnnounce(step.exerciseIndex)}
+              onStart={() => handleStart(step.exerciseIndex)}
+            />
+          );
+        })()
+      ) : null}
 
-      <section className="hidden">
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-xs font-black uppercase text-sky">Séance guidée</p>
-            <h2 className="mt-0.5 truncate text-base font-black text-white">{currentSession.title}</h2>
-          </div>
-          <button
-            className="h-10 shrink-0 rounded-md bg-sea px-3 text-xs font-black text-white shadow-sm transition hover:bg-sea/90"
-            onClick={markAllOk}
-            type="button"
-          >
-            Tout marquer OK
-          </button>
-        </div>
-      </section>
+      {step.type === "set" ? (
+        (() => {
+          const planned = currentSession.exercises[step.exerciseIndex];
+          const effective = effectiveExerciseAt(step.exerciseIndex);
+          if (!planned || !effective) return null;
+          const existingSets = active.logs[planned.id]?.sets;
+          const defaultLoad = getDefaultLoadForSet(effective, step.setIndex, existingSets);
+          const defaultReps = getDefaultRepsValue(effective);
+          return (
+            <SessionStepSet
+              defaultLoad={defaultLoad}
+              defaultReps={defaultReps}
+              exercise={effective}
+              onComplete={(data) => handleCompleteSet(step.exerciseIndex, step.setIndex, data)}
+              setCount={getPlannedSetCount(effective)}
+              setIndex={step.setIndex}
+            />
+          );
+        })()
+      ) : null}
 
-      {finishWarning ? (
-        <div className="rounded-xl border border-coral/20 bg-coral/10 p-4 text-sm font-black leading-relaxed text-coral shadow-soft">
-          {finishWarning}
+      {step.type === "rest" ? (
+        (() => {
+          const planned = currentSession.exercises[step.exerciseIndex];
+          const effective = effectiveExerciseAt(step.exerciseIndex);
+          if (!planned || !effective) return null;
+          const justFinishedIndex = step.nextSetIndex - 1;
+          const lastSet = active.logs[planned.id]?.sets?.find((s) => s.setIndex === justFinishedIndex);
+          return (
+            <SessionStepRest
+              exercise={effective}
+              initialSeconds={step.durationSec}
+              lastSet={lastSet}
+              nextSetIndex={step.nextSetIndex}
+              onContinue={() => handleContinueAfterRest(step.exerciseIndex, step.nextSetIndex)}
+              setCount={getPlannedSetCount(effective)}
+              setIndexJustFinished={justFinishedIndex}
+            />
+          );
+        })()
+      ) : null}
+
+      {step.type === "feedback" ? (
+        (() => {
+          const effective = effectiveExerciseAt(step.exerciseIndex);
+          if (!effective) return null;
+          const isLast = step.exerciseIndex === currentSession.exercises.length - 1;
+          return (
+            <SessionStepFeedback
+              exercise={effective}
+              exerciseIndex={step.exerciseIndex}
+              exerciseTotal={currentSession.exercises.length}
+              isLastExercise={isLast}
+              onValidate={(data) => handleFeedback(step.exerciseIndex, data)}
+            />
+          );
+        })()
+      ) : null}
+
+      {step.type === "wrap-up" ? (
+        <SessionStepWrapUp
+          completedCount={completedCount}
+          exerciseCount={currentSession.exercises.length}
+          onValidate={handleWrapUp}
+        />
+      ) : null}
+
+      {step.type === "complete" ? (
+        <div className="session-step-card session-step-enter p-5 text-center">
+          <div className="session-step-accent" style={{ background: "linear-gradient(90deg, #24c07a, #ff7a18)" }} />
+          <p className="text-xs font-black uppercase tracking-[0.28em] text-sea">Séance terminée</p>
+          <p className="mt-2 text-base font-semibold text-white/65">
+            Enregistrement en cours…
+          </p>
         </div>
       ) : null}
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.18fr)_minmax(24rem,0.82fr)] xl:items-start">
-        <div className="space-y-4">
-      {effectiveExercise ? (
-        <>
-          <section className="relative overflow-hidden rounded-[28px] border border-white/10 bg-ink p-5 text-white shadow-soft">
-            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-coral via-amber to-sky" />
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-sm font-black uppercase text-sky">
-                  Exercice {currentIndex + 1} sur {currentSession.exercises.length}
-                </p>
-                {isReplaced ? (
-                  <p className="mt-1 text-xs font-black text-amber">Remplacé ce soir</p>
-                ) : null}
-                <h1 className="mt-2 text-3xl font-black leading-tight">{effectiveExercise.name}</h1>
-                <p className="mt-3 text-base font-semibold leading-relaxed text-white/75">{effectiveExercise.cue}</p>
-              </div>
-              {currentLog.status ? (
-                <span className="shrink-0 rounded-md bg-white/10 px-3 py-2 text-xs font-black uppercase text-white">
-                  {statusLabel(currentLog.status)}
-                </span>
-              ) : null}
-            </div>
-
-            <dl className="mt-5 grid grid-cols-2 gap-2">
-              <FocusStat label="Charge prévue" value={effectiveExercise.plannedLoad ?? "À définir"} tone="info" />
-              <FocusStat label="Séries / reps" value={effectiveExercise.target} tone="light" />
-              <FocusStat label="Repos" value={effectiveExercise.rest} tone="warn" />
-              <FocusStat label="Dernière charge" value={currentLastLoad ?? "Aucune"} tone="calm" />
-            </dl>
-
-            {loadInsight ? (
-              <div className={`mt-3 rounded-md border px-3 py-3 ${loadInsightClass(loadInsight.tone)}`}>
-                <div className="flex items-center gap-2">
-                  <span className="rounded-md bg-black/15 px-2 py-1 text-[10px] font-black uppercase">
-                    {loadInsight.badge}
-                  </span>
-                  <p className="text-xs font-semibold leading-relaxed">{loadInsight.detail}</p>
-                </div>
-              </div>
-            ) : null}
-            {effectiveExercise.selectionInsight ? (
-              <SelectionInsightCard insight={effectiveExercise.selectionInsight} />
-            ) : null}
-
-            {loadFeedbackMessage ? (
-              <div className="mt-3 rounded-md border border-sea/20 bg-sea/10 px-3 py-2 text-xs font-semibold text-sea">
-                {loadFeedbackMessage}
-              </div>
-            ) : null}
-
-            {effectiveExercise.plannedLoad ? (
-              <details className="mt-3 rounded-xl border border-white/10 bg-white/5 p-3">
-                <summary className="cursor-pointer list-none text-sm font-black text-white/70">
-                  Ajuster la charge du jour
-                </summary>
-                <div className="mt-3 grid grid-cols-3 gap-2">
-                  <LoadFeedbackButton
-                    label="Trop leger"
-                    onClick={() => applyLiveLoadFeedback("too-light")}
-                    tone="info"
-                  />
-                  <LoadFeedbackButton
-                    label="Correct"
-                    onClick={() => applyLiveLoadFeedback("correct")}
-                    tone="calm"
-                  />
-                  <LoadFeedbackButton
-                    label="Trop lourd"
-                    onClick={() => applyLiveLoadFeedback("too-heavy")}
-                    tone="warn"
-                  />
-                </div>
-              </details>
-            ) : null}
-
-            <button
-              className={`mt-4 h-11 w-full rounded-md border px-4 text-sm font-black transition ${
-                showAlternatives
-                  ? "border-amber bg-amber/20 text-amber"
-                  : "border-amber/30 bg-amber/10 text-amber hover:bg-amber/20"
-              }`}
-              onClick={() => setShowAlternatives((v) => !v)}
-              type="button"
-            >
-              {showAlternatives ? "▲ Fermer les alternatives" : "🔄 Machine occupée — voir alternatives"}
-            </button>
-          </section>
-
-          {showAlternatives ? (
-            <section className="rounded-xl border border-amber/20 bg-amber/5 p-4 shadow-soft">
-              <h3 className="text-base font-black text-amber">Alternatives recommandées</h3>
-              <p className="mt-1 text-xs font-semibold text-white/55">
-                Triées selon ton retour actuel, tes points à surveiller et tes exercices à éviter.
-              </p>
-              {alternatives.length > 0 ? (
-                <div className="mt-3 space-y-2">
-                  {alternatives.map((alt) => (
-                    <div
-                      className="overflow-hidden rounded-xl border border-white/10 bg-white/5"
-                      key={`${alt.name}-${alt.target}`}
-                    >
-                      <div className="p-3">
-                        <p className="font-black text-white">{alt.name}</p>
-                        <p className="mt-1 text-xs font-semibold text-white/55">{alt.target} · Repos {alt.rest}</p>
-                        <p className="mt-2 text-xs font-semibold leading-relaxed text-white/70">{alt.cue}</p>
-                      </div>
-                      <button
-                        className="w-full border-t border-white/10 bg-amber/15 py-2 text-sm font-black text-amber transition hover:bg-amber/25"
-                        onClick={() => {
-                          if (!currentExercise) return;
-                          replaceExercise(currentExercise.id, alt);
-                          setSettings(rememberExerciseSwap(settings, currentExercise, alt));
-                          setShowAlternatives(false);
-                        }}
-                        type="button"
-                      >
-                        Choisir cet exercice
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="mt-3 rounded-md bg-white/8 p-3 text-sm font-semibold text-white/50">
-                  Aucune alternative prédéfinie. Adapte librement la charge ou l&apos;exercice.
-                </p>
-              )}
-              {isReplaced ? (
-                <button
-                  className="mt-3 h-10 w-full rounded-md border border-white/10 bg-white/8 text-sm font-black text-white/60"
-                  onClick={() => {
-                    if (!currentExercise) return;
-                    clearReplacement(currentExercise.id);
-                    setShowAlternatives(false);
-                  }}
-                  type="button"
-                >
-                  Revenir à l&apos;exercice original
-                </button>
-              ) : null}
-            </section>
-          ) : null}
-        </>
+      {alternativesFor !== null ? (
+        (() => {
+          const planned = currentSession.exercises[alternativesFor];
+          const effective = effectiveExerciseAt(alternativesFor);
+          if (!planned || !effective) return null;
+          const currentLog = active.logs[planned.id];
+          const isReplaced = Boolean(active.replacements?.[planned.id]);
+          const alternatives = getContextualAlternatives(planned.id, planned, {
+            avoid: settings.avoid,
+            comment: currentLog?.comment,
+            equipment: settings.equipment,
+            status: currentLog?.status,
+            watchPoints: settings.watchPoints
+          });
+          return (
+            <AlternativesSheet
+              alternatives={alternatives}
+              currentExerciseName={effective.name}
+              isReplaced={isReplaced}
+              onClose={() => setAlternativesFor(null)}
+              onResetReplacement={() => {
+                replaceExercise(planned.id, planned);
+                setAlternativesFor(null);
+              }}
+              onSelect={(alt) => handleApplyAlternative(alternativesFor, alt)}
+            />
+          );
+        })()
       ) : null}
-        </div>
 
-        <aside className="space-y-4 xl:sticky xl:top-32">
-      <RestTimerCard
-        exerciseId={currentExercise?.id}
-        onBeforeStart={() => {
-          if (currentExercise) setActiveExercise(currentExercise.id);
-        }}
-        restLabel={currentExercise?.rest ?? "-"}
-        restSeconds={currentRestSeconds}
-      />
-
-      <section className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#11131a] p-4 shadow-soft">
-        <div className="absolute inset-x-0 top-0 h-1 bg-coral" />
-        <h2 className="text-lg font-black text-white">Action rapide</h2>
-        <p className="mt-1 text-sm font-semibold text-white/55">
-          Donne ton retour principal, puis passe a l&apos;exercice suivant.
-        </p>
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          {statusOptions
-            .filter((status) => status.value !== "skipped")
-            .map((status) => {
-              const selected = currentLog.status === status.value;
-
-              return (
-                <button
-                  className={`min-h-16 rounded-2xl border px-3 text-base font-black transition ${
-                    selected ? status.active : status.idle
-                  }`}
-                  key={status.value}
-                  onClick={() => handleStatus(status.value)}
-                  type="button"
-                >
-                  {status.label}
-                </button>
-              );
-            })}
-        </div>
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <button
-            className={`h-12 rounded-2xl border px-4 text-sm font-black transition ${
-              showAlternatives
-                ? "border-amber bg-amber/20 text-amber"
-                : "border-amber/30 bg-amber/10 text-amber hover:bg-amber/20"
-            }`}
-            onClick={() => setShowAlternatives((value) => !value)}
-            type="button"
-          >
-            {showAlternatives ? "Fermer remplacement" : "Remplacer"}
-          </button>
-          <button
-            className={`h-12 rounded-2xl border px-4 text-sm font-black transition ${
-              currentLog.status === "skipped"
-                ? "border-zinc-500 bg-zinc-600 text-white"
-                : "border-white/10 bg-white/8 text-white/70"
-            }`}
-            onClick={() => handleStatus("skipped")}
-            type="button"
-          >
-            Passer
-          </button>
-        </div>
-      </section>
-
-      <details className="card-dark group p-4">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-black text-white">Ajustements detailles</h2>
-            <p className="mt-1 text-sm font-semibold text-white/55">
-              Charge realisee, reps et commentaire si tu veux etre plus precis.
+      {showQuitConfirm ? (
+        <div
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          role="dialog"
+        >
+          <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-ink p-5 text-white shadow-soft">
+            <h2 className="text-xl font-black">Quitter la séance ?</h2>
+            <p className="mt-2 text-sm font-semibold text-white/65">
+              Ta progression sur cette séance ne sera pas enregistrée dans l&apos;historique.
             </p>
-          </div>
-          <span className="rounded-md bg-white/8 px-3 py-2 text-xs font-black text-white/55 group-open:bg-sky/10 group-open:text-sky">
-            Ouvrir
-          </span>
-        </summary>
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          {statusOptions.map((status) => {
-            const selected = currentLog.status === status.value;
-
-            return (
+            <div className="mt-5 grid grid-cols-2 gap-2">
               <button
-                className={`min-h-14 rounded-md border px-3 text-base font-black transition ${
-                  selected ? status.active : status.idle
-                } ${status.value === "skipped" ? "col-span-2" : ""}`}
-                key={status.value}
-                onClick={() => handleStatus(status.value)}
+                className="h-12 rounded-md border border-white/10 bg-white/8 px-3 text-sm font-black text-white transition hover:bg-white/12"
+                onClick={() => setShowQuitConfirm(false)}
                 type="button"
               >
-                {status.label}
+                Continuer la séance
               </button>
-            );
-          })}
-        </div>
-
-        <p className="mt-3 rounded-md bg-sky/10 px-3 py-2 text-xs font-bold leading-relaxed text-sky">
-          Mode rapide : OK ou Facile remplit automatiquement la charge prévue et les reps prévues si les champs sont
-          vides.
-        </p>
-
-        {needsQuickReason ? (
-          <div className="mt-4 rounded-lg border border-coral/20 bg-coral/10 p-3">
-            <p className="text-sm font-black text-white">Raison rapide</p>
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              {quickReasonOptions.map((reason) => (
-                <button
-                  className="min-h-11 rounded-md border border-coral/20 bg-coral/10 px-3 text-sm font-black text-coral shadow-sm"
-                  key={reason}
-                  onClick={() => applyQuickReason(reason)}
-                  type="button"
-                >
-                  {reason}
-                </button>
-              ))}
+              <button
+                className="h-12 rounded-md bg-coral px-3 text-sm font-black text-white transition hover:bg-coral/90"
+                onClick={handleQuitConfirmed}
+                type="button"
+              >
+                Quitter
+              </button>
             </div>
           </div>
-        ) : null}
-
-        {liveAdvice ? (
-          <details className="mt-4 rounded-xl border border-sky/20 bg-sky/10 p-3">
-            <summary className="cursor-pointer list-none text-sm font-black text-sky">
-              Voir le conseil adaptatif
-            </summary>
-            <LiveCoachAdviceCard advice={liveAdvice} onShowAlternatives={revealAlternatives} />
-          </details>
-        ) : null}
-
-        <div className="mt-5 grid grid-cols-2 gap-3">
-          <label className="block">
-            <span className="text-sm font-bold text-white/60">Charge réalisée</span>
-            <input
-              className="mt-1 h-12 w-full rounded-md border border-white/10 bg-white/5 px-3 text-base font-semibold text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
-              inputMode="decimal"
-              onChange={(event) => updateCurrentLog({ usedLoad: event.target.value })}
-              placeholder="ex. 90 kg"
-              value={currentLog.usedLoad}
-            />
-          </label>
-          <label className="block">
-            <span className="text-sm font-bold text-white/60">Reps réalisées</span>
-            <input
-              className="mt-1 h-12 w-full rounded-md border border-white/10 bg-white/5 px-3 text-base font-semibold text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
-              inputMode="text"
-              onChange={(event) => updateCurrentLog({ completedReps: event.target.value })}
-              placeholder="ex. 5/5/5"
-              value={currentLog.completedReps}
-            />
-          </label>
         </div>
-
-        <label className="mt-4 block">
-          <span className="text-sm font-bold text-white/60">Commentaire optionnel</span>
-          <textarea
-            className="mt-1 min-h-24 w-full resize-none rounded-md border border-white/10 bg-white/5 px-3 py-3 text-base font-semibold text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
-            onChange={(event) => updateCurrentLog({ comment: event.target.value })}
-            placeholder="Sensation, douleur, adaptation..."
-            value={currentLog.comment}
-          />
-        </label>
-      </details>
-
-      <details className="card-dark group p-4">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-black text-white">Retour global</h2>
-            <p className="mt-1 text-sm font-semibold text-white/55">
-              Ressenti general de la seance pour ajuster la prochaine.
-            </p>
-          </div>
-          <span className="rounded-md bg-white/8 px-3 py-2 text-xs font-black text-white/55 group-open:bg-sky/10 group-open:text-sky">
-            Ouvrir
-          </span>
-        </summary>
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          <NumberFeedback
-            label="Difficulté"
-            max={10}
-            min={1}
-            onChange={(difficulty) => updateSessionFeedback({ difficulty })}
-            value={feedback.difficulty}
-          />
-          <NumberFeedback
-            label="Douleur globale"
-            max={10}
-            min={0}
-            onChange={(globalPain) => updateSessionFeedback({ globalPain })}
-            value={feedback.globalPain}
-          />
-          <NumberFeedback
-            label="Énergie"
-            max={10}
-            min={1}
-            onChange={(energy) => updateSessionFeedback({ energy })}
-            value={feedback.energy}
-          />
-          <label className="block">
-            <span className="text-sm font-bold text-white/60">Souffle</span>
-            <select
-              className="mt-1 h-12 w-full rounded-md border border-white/10 bg-white/5 px-3 text-base font-black text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
-              onChange={(event) => updateSessionFeedback({ breath: event.target.value as BreathFeedback })}
-              value={feedback.breath}
-            >
-              <option value="bon">Bon</option>
-              <option value="correct">Correct</option>
-              <option value="difficile">Difficile</option>
-              <option value="tres-mauvais">Très mauvais</option>
-              <option value="vertige">Vertige</option>
-              <option value="oppression">Oppression</option>
-            </select>
-          </label>
-        </div>
-      </details>
-        </aside>
-      </div>
-
-      <nav className="sticky bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-10 -mx-2 rounded-2xl border border-white/10 bg-[#0f111a]/95 p-2 shadow-soft backdrop-blur">
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            className="h-12 rounded-md border border-white/10 bg-white/8 px-3 text-sm font-black text-white disabled:opacity-40"
-            disabled={!previousExercise}
-            onClick={() => goToExercise(currentIndex - 1)}
-            type="button"
-          >
-            Exercice précédent
-          </button>
-          <button
-            className="h-12 rounded-md border border-sky/20 bg-sky/10 px-3 text-sm font-black text-sky disabled:opacity-40"
-            disabled={!nextExercise}
-            onClick={() => goToExercise(currentIndex + 1)}
-            type="button"
-          >
-            Exercice suivant
-          </button>
-          <button
-            className="col-span-2 h-14 rounded-md bg-coral px-4 text-base font-black text-white shadow-soft"
-            onClick={finishSession}
-            type="button"
-          >
-            Terminer séance
-          </button>
-        </div>
-      </nav>
+      ) : null}
     </div>
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// Alternatives bottom sheet
+// ─────────────────────────────────────────────────────────────────────────
+
+function AlternativesSheet({
+  alternatives,
+  currentExerciseName,
+  isReplaced,
+  onClose,
+  onResetReplacement,
+  onSelect
+}: {
+  alternatives: Exercise[];
+  currentExerciseName: string;
+  isReplaced: boolean;
+  onClose: () => void;
+  onResetReplacement: () => void;
+  onSelect: (alt: Exercise) => void;
+}) {
+  return (
+    <div
+      aria-modal="true"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-0 sm:items-center sm:p-4"
+      onClick={onClose}
+      role="dialog"
+    >
+      <div
+        className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-t-3xl border border-white/10 bg-ink p-5 text-white shadow-soft sm:rounded-3xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.28em] text-amber">Remplacer</p>
+            <h2 className="mt-1 text-xl font-black leading-tight">
+              Alternatives à <span className="text-white/70">{currentExerciseName}</span>
+            </h2>
+            <p className="mt-1 text-xs font-semibold text-white/55">
+              Filtrées selon ton matériel et tes contraintes.
+            </p>
+          </div>
+          <button
+            aria-label="Fermer"
+            className="flex size-9 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/5 text-sm font-black text-white/70"
+            onClick={onClose}
+            type="button"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="mt-4 space-y-2">
+          {alternatives.length === 0 ? (
+            <p className="rounded-xl border border-white/10 bg-white/4 p-4 text-sm font-semibold text-white/55">
+              Pas d&apos;alternative prédéfinie pour cet exercice. Adapte librement la charge ou l&apos;exercice.
+            </p>
+          ) : (
+            alternatives.map((alt) => (
+              <button
+                className="w-full overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-3 text-left transition hover:bg-white/8"
+                key={`${alt.name}-${alt.target}`}
+                onClick={() => onSelect(alt)}
+                type="button"
+              >
+                <p className="font-black text-white">{alt.name}</p>
+                <p className="mt-1 text-xs font-semibold text-white/55">
+                  {alt.target} · Repos {alt.rest}
+                </p>
+                {alt.cue ? (
+                  <p className="mt-2 text-xs font-semibold leading-relaxed text-white/65">{alt.cue}</p>
+                ) : null}
+              </button>
+            ))
+          )}
+        </div>
+
+        {isReplaced ? (
+          <button
+            className="session-cta-secondary mt-4"
+            onClick={onResetReplacement}
+            type="button"
+          >
+            Revenir à l&apos;exercice original
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Helpers — reused from previous implementation
+// ─────────────────────────────────────────────────────────────────────────
 
 function LaunchMetric({ label, value }: { label: string; value: string }) {
   return (
@@ -867,298 +687,6 @@ function LaunchMetric({ label, value }: { label: string; value: string }) {
       <p className="text-lg font-black leading-tight text-white">{value}</p>
       <p className="mt-1 text-[10px] font-black uppercase text-white/55">{label}</p>
     </div>
-  );
-}
-
-function SessionCockpitCard({
-  active,
-  completedCount,
-  currentIndex,
-  currentSession,
-  onMarkAllOk,
-  programMeta,
-  programName,
-  progressPercent
-}: {
-  active: ActiveSession;
-  completedCount: number;
-  currentIndex: number;
-  currentSession: PlannedSession;
-  onMarkAllOk: () => void;
-  programMeta: string;
-  programName: string;
-  progressPercent: number;
-}) {
-  return (
-    <section className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#11131a] p-4 text-white shadow-soft">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_88%_0%,rgba(255,91,0,0.28),transparent_32%),linear-gradient(135deg,rgba(255,255,255,0.08),transparent_45%)]" />
-      <div className="relative">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-coral">Training cockpit</p>
-            <h2 className="mt-1 truncate text-2xl font-black text-white">{currentSession.title}</h2>
-            <p className="mt-1 truncate text-sm font-semibold text-white/55">{programName} - {programMeta}</p>
-          </div>
-          <div className="shrink-0 text-right">
-            <p className="text-4xl font-black leading-none text-coral">{progressPercent}%</p>
-            <p className="text-[10px] font-black uppercase text-white/45">complete</p>
-          </div>
-        </div>
-
-        <div className="mt-4 grid grid-cols-3 gap-2">
-          <LaunchMetric label="Faits" value={`${completedCount}/${currentSession.exercises.length}`} />
-          <LaunchMetric label="Actuel" value={`${currentIndex + 1}`} />
-          <div className="rounded-2xl border border-white/10 bg-white/10 p-3 text-center">
-            <SessionElapsedTime session={active} />
-            <p className="mt-1 text-[10px] font-black uppercase text-white/55">chrono</p>
-          </div>
-        </div>
-
-        <div className="mt-4 flex gap-1.5 overflow-x-auto pb-1">
-          {currentSession.exercises.map((exercise, index) => {
-            const status = active.logs[exercise.id]?.status;
-            const isCurrent = index === currentIndex;
-            const isDone = Boolean(status);
-
-            return (
-              <span
-                className={`flex h-9 min-w-9 items-center justify-center rounded-xl border text-xs font-black ${
-                  isCurrent
-                    ? "border-coral bg-coral text-white"
-                    : isDone
-                      ? "border-sea/30 bg-sea/15 text-sea"
-                      : "border-white/10 bg-white/5 text-white/45"
-                }`}
-                key={exercise.id}
-                title={exercise.name}
-              >
-                {index + 1}
-              </span>
-            );
-          })}
-        </div>
-
-        <button
-          className="mt-4 h-11 w-full rounded-2xl border border-sea/25 bg-sea/15 px-3 text-sm font-black text-sea transition hover:bg-sea/20"
-          onClick={onMarkAllOk}
-          type="button"
-        >
-          Tout marquer OK
-        </button>
-      </div>
-    </section>
-  );
-}
-
-function FocusStat({
-  label,
-  tone,
-  value
-}: {
-  label: string;
-  tone: "calm" | "info" | "light" | "warn";
-  value: string;
-}) {
-  const toneClass = {
-    calm: "bg-sea/15 text-white",
-    info: "bg-sky/20 text-white",
-    light: "bg-white/10 text-white",
-    warn: "bg-amber/20 text-white"
-  }[tone];
-
-  return (
-    <div className={`rounded-md p-3 ${toneClass}`}>
-      <dt className="text-[11px] font-black uppercase text-white/65">{label}</dt>
-      <dd className="mt-1 text-lg font-black leading-tight">{value}</dd>
-    </div>
-  );
-}
-
-function SessionProgramCard({
-  programMeta,
-  programName
-}: {
-  programMeta: string;
-  programName: string;
-}) {
-  return (
-    <section className="rounded-xl border border-sky/20 bg-sky/10 p-3 shadow-soft">
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase text-sky">Programme actif</p>
-          <p className="mt-0.5 truncate text-sm font-black text-white">{programName}</p>
-          <p className="mt-0.5 text-xs font-semibold text-white/55">{programMeta}</p>
-        </div>
-        <Link
-          className="shrink-0 rounded-md border border-sky/25 bg-sky/10 px-3 py-2 text-xs font-black text-sky"
-          href="/programme"
-        >
-          Voir
-        </Link>
-      </div>
-    </section>
-  );
-}
-
-void SessionProgramCard;
-
-function SelectionInsightCard({ insight }: { insight: ExerciseSelectionInsight }) {
-  return (
-    <div className="mt-3 rounded-md border border-white/10 bg-white/6 px-3 py-3">
-      <p className="text-[10px] font-black uppercase text-white/40">Pourquoi cet exercice</p>
-      <p className="mt-1 text-xs font-semibold leading-relaxed text-white/70">{insight.summary}</p>
-      <div className="mt-2 space-y-2">
-        {insight.reasons.map((reason) => (
-          <div className={`rounded-md border px-3 py-2 ${selectionReasonClass(reason.tone)}`} key={`${reason.title}-${reason.detail}`}>
-            <p className="text-[10px] font-black uppercase">{reason.title}</p>
-            <p className="mt-1 text-xs font-semibold leading-relaxed">{reason.detail}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function LoadFeedbackButton({
-  label,
-  onClick,
-  tone
-}: {
-  label: string;
-  onClick: () => void;
-  tone: "calm" | "info" | "warn";
-}) {
-  const toneClass = {
-    calm: "border-sea/20 bg-sea/10 text-sea",
-    info: "border-sky/20 bg-sky/10 text-sky",
-    warn: "border-amber/20 bg-amber/10 text-amber"
-  }[tone];
-
-  return (
-    <button
-      className={`h-10 rounded-md border text-xs font-black transition hover:brightness-110 ${toneClass}`}
-      onClick={onClick}
-      type="button"
-    >
-      {label}
-    </button>
-  );
-}
-
-function loadInsightClass(tone: "calm" | "info" | "muted" | "warn") {
-  return {
-    calm: "border-sea/20 bg-sea/10 text-sea",
-    info: "border-sky/20 bg-sky/10 text-sky",
-    muted: "border-white/10 bg-white/8 text-white/65",
-    warn: "border-amber/20 bg-amber/10 text-amber"
-  }[tone];
-}
-
-function selectionReasonClass(tone: "calm" | "info" | "warn") {
-  return {
-    calm: "border-sea/20 bg-sea/10 text-sea",
-    info: "border-sky/20 bg-sky/10 text-sky",
-    warn: "border-amber/20 bg-amber/10 text-amber"
-  }[tone];
-}
-
-function LiveCoachAdviceCard({
-  advice,
-  onShowAlternatives
-}: {
-  advice: LiveCoachAdvice;
-  onShowAlternatives: () => void;
-}) {
-  const toneClass = {
-    calm: "border-sea/25 bg-sea/10 text-sea",
-    danger: "border-red-500/30 bg-red-500/10 text-red-200",
-    info: "border-sky/25 bg-sky/10 text-sky",
-    warn: "border-amber/30 bg-amber/10 text-amber"
-  }[advice.tone];
-  const showAlternativeButton = advice.decision === "remplacer" || Boolean(advice.replacementSuggestion);
-
-  return (
-    <div className={`mt-4 rounded-xl border p-4 ${toneClass}`}>
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-black uppercase text-white/55">Coach live</p>
-          <h3 className="mt-1 text-lg font-black text-white">{advice.title}</h3>
-        </div>
-        <span className="shrink-0 rounded-md bg-white/10 px-2 py-1 text-[11px] font-black uppercase text-white">
-          {advice.primaryAction}
-        </span>
-      </div>
-
-      <p className="mt-3 text-sm font-semibold leading-relaxed text-white/80">{advice.message}</p>
-
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <LiveCoachMetric label="Charge conseillee" value={advice.nextLoad} />
-        <LiveCoachMetric label="Cible conseillee" value={advice.nextTarget} />
-      </div>
-
-      <p className="mt-3 rounded-md bg-white/8 p-3 text-xs font-semibold leading-relaxed text-white/70">
-        {advice.reason}
-      </p>
-
-      {advice.warning ? (
-        <p className="mt-2 rounded-md bg-coral/10 p-3 text-xs font-black leading-relaxed text-coral">
-          {advice.warning}
-        </p>
-      ) : null}
-
-      {advice.replacementSuggestion ? (
-        <p className="mt-2 rounded-md bg-amber/10 p-3 text-xs font-semibold leading-relaxed text-amber">
-          Variante conseillee : {advice.replacementSuggestion}
-        </p>
-      ) : null}
-
-      {showAlternativeButton ? (
-        <button
-          className="mt-3 h-11 w-full rounded-md bg-amber px-4 text-sm font-black text-white shadow-sm transition hover:bg-amber/90"
-          onClick={onShowAlternatives}
-          type="button"
-        >
-          Voir les alternatives
-        </button>
-      ) : null}
-    </div>
-  );
-}
-
-function LiveCoachMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-md bg-white/8 p-3">
-      <p className="text-[11px] font-black uppercase text-white/50">{label}</p>
-      <p className="mt-1 text-sm font-black leading-tight text-white">{value}</p>
-    </div>
-  );
-}
-
-function NumberFeedback({
-  label,
-  max,
-  min,
-  onChange,
-  value
-}: {
-  label: string;
-  max: number;
-  min: number;
-  onChange: (value: number) => void;
-  value: number;
-}) {
-  return (
-    <label className="block">
-      <span className="text-sm font-bold text-white/60">{label}</span>
-      <input
-        className="mt-1 h-12 w-full rounded-md border border-white/10 bg-white/5 px-3 text-lg font-black text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
-        max={max}
-        min={min}
-        onChange={(event) => onChange(Number(event.target.value))}
-        type="number"
-        value={value}
-      />
-    </label>
   );
 }
 
@@ -1181,146 +709,21 @@ function SessionElapsedTime({ session }: { session: ActiveSession }) {
   );
 }
 
-function RestTimerCard({
-  exerciseId,
-  onBeforeStart,
-  restLabel,
-  restSeconds
-}: {
-  exerciseId?: string;
-  onBeforeStart: () => void;
-  restLabel: string;
-  restSeconds: number;
-}) {
-  const [timer, setTimer] = useState<RestTimerState>({
-    done: false,
-    exerciseId,
-    initialSeconds: 0,
-    running: false,
-    secondsLeft: 0
-  });
-
-  useEffect(() => {
-    setTimer({
-      done: false,
-      exerciseId,
-      initialSeconds: 0,
-      running: false,
-      secondsLeft: 0
-    });
-  }, [exerciseId]);
-
-  useEffect(() => {
-    if (!timer.running) {
-      return;
-    }
-
-    const interval = window.setInterval(() => {
-      setTimer((current) => {
-        if (!current.running) return current;
-
-        if (current.secondsLeft <= 1) {
-          return {
-            ...current,
-            done: true,
-            running: false,
-            secondsLeft: 0
-          };
-        }
-
-        return { ...current, secondsLeft: current.secondsLeft - 1 };
-      });
-    }, 1000);
-
-    return () => window.clearInterval(interval);
-  }, [timer.running]);
-
-  const startRestTimer = () => {
-    const seconds = Math.max(0, restSeconds);
-    onBeforeStart();
-    setTimer({
-      done: seconds === 0,
-      exerciseId,
-      initialSeconds: seconds,
-      running: seconds > 0,
-      secondsLeft: seconds
-    });
+function getElapsedMs(session: ActiveSession, nowMs: number): number {
+  const timer = session.timer ?? {
+    startedAt: session.startedAt,
+    isPaused: false,
+    pausedTotalMs: 0
   };
+  const startedAt = new Date(timer.startedAt).getTime();
+  const stoppedAt = timer.isPaused && timer.pausedAt ? new Date(timer.pausedAt).getTime() : nowMs;
 
-  const adjustRestTimer = (delta: number) => {
-    setTimer((current) => ({
-      ...current,
-      done: false,
-      secondsLeft: Math.max(0, current.secondsLeft + delta)
-    }));
-  };
-
-  const skipRestTimer = () => {
-    setTimer((current) => ({
-      ...current,
-      done: false,
-      running: false,
-      secondsLeft: 0
-    }));
-  };
-
-  const restartRestTimer = () => {
-    setTimer((current) => {
-      const seconds = current.initialSeconds || restSeconds;
-
-      return {
-        ...current,
-        done: false,
-        exerciseId,
-        initialSeconds: seconds,
-        running: seconds > 0,
-        secondsLeft: seconds
-      };
-    });
-  };
-
-  return (
-    <section
-      className={`rounded-xl border p-4 shadow-soft ${
-        timer.done ? "border-amber bg-amber/10" : "border-white/10 bg-white/5"
-      }`}
-    >
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-xs font-black uppercase text-amber">Minuteur repos</p>
-          <p className="mt-1 text-4xl font-black tabular-nums text-white">{formatDuration(timer.secondsLeft * 1000)}</p>
-          <p className="mt-1 text-sm font-bold text-white/55">Repos conseille : {restLabel}</p>
-        </div>
-        <button
-          className="h-14 rounded-md bg-amber px-4 text-sm font-black text-white shadow-sm"
-          onClick={startRestTimer}
-          type="button"
-        >
-          Lancer repos
-        </button>
-      </div>
-      {timer.done ? <p className="mt-3 text-sm font-black text-amber">Repos termine. Tu peux reprendre.</p> : null}
-      <div className="mt-4 grid grid-cols-4 gap-2">
-        <TimerButton onClick={() => adjustRestTimer(30)}>+30 s</TimerButton>
-        <TimerButton onClick={() => adjustRestTimer(-30)}>-30 s</TimerButton>
-        <TimerButton onClick={skipRestTimer}>Passer</TimerButton>
-        <TimerButton onClick={restartRestTimer}>Relancer</TimerButton>
-      </div>
-    </section>
-  );
+  return Math.max(0, stoppedAt - startedAt - timer.pausedTotalMs);
 }
 
-function TimerButton({ children, onClick }: { children: string; onClick: () => void }) {
-  return (
-    <button
-      className="min-h-11 rounded-md border border-white/10 bg-white/8 px-2 text-xs font-black text-white shadow-sm"
-      onClick={onClick}
-      type="button"
-    >
-      {children}
-    </button>
-  );
-}
+// ─────────────────────────────────────────────────────────────────────────
+// Post-session report (kept from previous implementation — unchanged behaviour)
+// ─────────────────────────────────────────────────────────────────────────
 
 function GuidedSessionReport({
   aiEnabled,
@@ -1367,14 +770,13 @@ function GuidedSessionReport({
           </div>
         ) : null}
         <div className="mt-5 grid grid-cols-2 gap-2">
-          <ReportMetric label="Validés" value={String(validCount)} tone="calm" />
-          <ReportMetric label="Faciles" value={String(easyCount)} tone="calm" />
-          <ReportMetric label="Trop durs" value={String(hardCount)} tone="warn" />
-          <ReportMetric label="Douleurs" value={String(painCount)} tone="danger" />
+          <ReportMetric label="Validés" tone="calm" value={String(validCount)} />
+          <ReportMetric label="Faciles" tone="calm" value={String(easyCount)} />
+          <ReportMetric label="Trop durs" tone="warn" value={String(hardCount)} />
+          <ReportMetric label="Douleurs" tone="danger" value={String(painCount)} />
         </div>
       </div>
 
-      {/* ── Explicit AI analysis button ── */}
       {!aiDone ? (
         <div className="card-dark p-4">
           <div className="flex items-center justify-between gap-3">
@@ -1405,7 +807,6 @@ function GuidedSessionReport({
         </div>
       ) : null}
 
-      {/* ── AI coach results ── */}
       {aiDone && session.aiCoach ? (
         <div className="card-dark border border-sky/20 p-4">
           <p className="text-xs font-black uppercase text-sky">Coach IA</p>
@@ -1550,43 +951,6 @@ function ReportMetric({
       <p className="mt-1 text-xs font-black uppercase text-white/70">{label}</p>
     </div>
   );
-}
-
-function statusLabel(status: EffortStatus) {
-  return statusOptions.find((item) => item.value === status)?.label ?? status;
-}
-
-function getElapsedMs(session: ActiveSession, nowMs: number): number {
-  const timer = session.timer ?? {
-    startedAt: session.startedAt,
-    isPaused: false,
-    pausedTotalMs: 0
-  };
-  const startedAt = new Date(timer.startedAt).getTime();
-  const stoppedAt = timer.isPaused && timer.pausedAt ? new Date(timer.pausedAt).getTime() : nowMs;
-
-  return Math.max(0, stoppedAt - startedAt - timer.pausedTotalMs);
-}
-
-function getLastLoad(history: CompletedSession[], exerciseId: string): string | undefined {
-  for (const session of history) {
-    const usedLoad = session.logs[exerciseId]?.usedLoad;
-
-    if (usedLoad) {
-      return usedLoad;
-    }
-  }
-
-  return undefined;
-}
-
-function createEmptyLog(exerciseId: string): ExerciseLog {
-  return {
-    exerciseId,
-    usedLoad: "",
-    completedReps: "",
-    comment: ""
-  };
 }
 
 async function requestAiCoach(

@@ -3,485 +3,404 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { SessionExerciseIcon } from "@/components/session/SessionExerciseIcon";
+import { WeekTimelineCompact } from "@/components/WeekTimeline";
 import { getActiveProgramTemplate } from "@/lib/activeProgram";
-import { getSessionImage } from "@/lib/session-images";
+import { estimateCalories } from "@/lib/calories";
+import { getWeekday } from "@/lib/date";
+import { getSessionCategory, getSessionTypeLabel, parseDurationToMs } from "@/lib/sessionMeta";
 import { useCoachStorage } from "@/lib/storage";
 import { formatDurationLong } from "@/lib/time";
-import type { CompletedSession, PlannedSession, ProgramTemplate, UserSettings, Weekday } from "@/types/training";
+import { buildWeekTimeline, getCompletedThisWeek } from "@/lib/weekTimeline";
+import type { CompletedSession, PlannedSession, Weekday } from "@/types/training";
 
 const goalLabels: Record<string, string> = {
   "perte-gras": "Perte de gras",
   "prise-masse": "Prise de masse",
   cardio: "Cardio",
-  "cardio-sante": "Cardio / sante",
+  "cardio-sante": "Cardio / santé",
   performance: "Performance",
   recomposition: "Recomposition",
-  sante: "Sante"
+  sante: "Santé"
 };
 
 export function Dashboard() {
   const {
+    activeProfileId,
     activeSession,
     currentProgram,
     dateKey,
     history,
     isReady,
+    profiles,
     settings,
     startSession,
     todaySession,
     todaysCompletedSession
   } = useCoachStorage();
   const router = useRouter();
-  const latest = history[0];
-  const activeToday = activeSession?.dateKey === dateKey && activeSession.sessionId === todaySession.id;
-  const weeklySessions = useMemo(() => getSessionsThisWeek(history), [history]);
-  const cardioDone = useMemo(() => countCardioThisWeek(weeklySessions), [weeklySessions]);
-  const lastCompound = useMemo(() => getLastCompoundPerformance(history, currentProgram), [history, currentProgram]);
-  const todayExternalSports = useMemo(() => getTodayExternalSports(settings), [settings]);
-  const hasEveningSport = settings.externalSports.length > 0 || settings.judoDays.length > 0;
-  const eveningSportTonight = todayExternalSports.length > 0;
-  const streak = useMemo(() => computeStreak(history), [history]);
+
+  const todayWeekday = useMemo(() => getWeekday(), []);
+  const todaysPlannedSession = useMemo(
+    () => currentProgram.find((s) => s.weekday === todayWeekday),
+    [currentProgram, todayWeekday]
+  );
+  const isRestDay = !todaysPlannedSession;
   const activeProgram = useMemo(() => getActiveProgramTemplate(currentProgram), [currentProgram]);
-  const latestPlanned = latest ? currentProgram.find((session) => session.id === latest.sessionId) : undefined;
-  const latestDuration = latest?.totalDurationMs ? formatDurationLong(latest.totalDurationMs) : undefined;
+  const activeProfile = useMemo(
+    () => profiles.find((profile) => profile.id === activeProfileId),
+    [profiles, activeProfileId]
+  );
+  const weeklySessions = useMemo(() => getCompletedThisWeek(history), [history]);
+  const nextSession = useMemo(() => findNextSession(currentProgram, todayWeekday), [currentProgram, todayWeekday]);
+  const recentSessions = useMemo(() => history.slice(0, 3), [history]);
+  const activeToday =
+    activeSession?.dateKey === dateKey && activeSession.sessionId === todaySession.id;
+  const timelineDays = useMemo(
+    () =>
+      buildWeekTimeline({
+        currentProgram,
+        completedThisWeek: weeklySessions,
+        todayWeekday,
+        activeSessionId: activeToday ? activeSession?.sessionId : undefined
+      }),
+    [currentProgram, weeklySessions, todayWeekday, activeToday, activeSession?.sessionId]
+  );
 
   if (!isReady) {
     return <div className="rounded-lg bg-white p-5 font-bold shadow-soft">Chargement...</div>;
   }
 
-  const todayStatus = todaysCompletedSession ? "Validee" : activeToday ? "En cours" : "Prete";
-  const ctaLabel = todaysCompletedSession ? "Voir le resume" : activeToday ? "Reprendre la seance" : "Commencer la seance";
   const mainGoal = formatGoal(settings.primaryGoal, settings.mainGoal);
 
   return (
     <div className="space-y-4">
-      <section className="relative -mx-4 overflow-hidden border-b border-white/10 bg-[#050607] text-white shadow-[0_30px_90px_rgba(0,0,0,0.55)] sm:-mx-6">
-        <div
-          className="absolute inset-0 bg-cover bg-center opacity-72"
-          style={{ backgroundImage: `url(${getSessionImage(todaySession.title, todaySession.focus)})` }}
+      <ProfileHeader
+        avatar={activeProfile?.avatar ?? "💪"}
+        goal={mainGoal}
+        name={settings.athleteName || activeProfile?.name || "Athlète"}
+        programName={activeProgram?.name ?? "Programme personnalisé"}
+      />
+
+      {isRestDay ? (
+        <RestDayCard nextSession={nextSession} />
+      ) : (
+        <TodaySessionCard
+          activeToday={activeToday}
+          isCompleted={Boolean(todaysCompletedSession)}
+          onStart={() => {
+            if (!activeToday && !todaysCompletedSession) {
+              startSession(todaySession);
+            }
+            router.push("/seance");
+          }}
+          session={todaySession}
+          weightKg={settings.currentWeightKg}
         />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_88%_5%,rgba(255,90,0,0.58),transparent_34%),linear-gradient(180deg,rgba(3,4,6,0.70),rgba(3,4,6,0.98)_76%)]" />
-        <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.12)_0_1px,transparent_1px_18px)] opacity-35" />
+      )}
 
-        <div className="relative px-4 pb-5 pt-6 sm:px-6">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-xs font-black uppercase tracking-[0.28em] text-coral">AthletIQ Coach OS 2.0</p>
-              <h1 className="mt-3 text-5xl font-black leading-[0.86] tracking-normal text-white">
-                {settings.athleteName || "Athlete"}
-              </h1>
-              <p className="mt-3 max-w-[18rem] text-sm font-semibold leading-relaxed text-white/68">
-                {mainGoal}. Aujourd&apos;hui, l&apos;app te donne une mission claire, pas un tableau complique.
-              </p>
-            </div>
-            <div className="shrink-0 rounded-[1.4rem] border border-coral/35 bg-coral/15 px-4 py-3 text-right backdrop-blur">
-              <p className="text-3xl font-black leading-none text-coral">{todayStatus}</p>
-              <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-white/45">statut</p>
-            </div>
-          </div>
+      <WeekTimelineCompact days={timelineDays} validatedCount={weeklySessions.length} />
 
-          <div className="mt-8 rounded-[2rem] border border-white/12 bg-[#080a0f]/86 p-4 shadow-[0_22px_70px_rgba(0,0,0,0.55)] backdrop-blur-xl">
-            <div className="flex items-start justify-between gap-4">
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-black uppercase tracking-[0.22em] text-coral">Mission du jour</p>
-                <h2 className="mt-2 text-4xl font-black leading-[0.92] text-white">{todaySession.title}</h2>
-                <p className="mt-3 text-sm font-semibold leading-relaxed text-white/65">{todaySession.focus}</p>
-              </div>
-              <div className="grid w-[6.25rem] shrink-0 gap-2">
-                <DashboardPill label="Duree" value={todaySession.duration} />
-                <DashboardPill label="Exos" value={String(todaySession.exercises.length)} />
-              </div>
-            </div>
-
-            <div className="mt-5 grid grid-cols-[1fr_auto] gap-3">
-              <button
-                className="h-16 rounded-[1.35rem] bg-coral px-4 text-base font-black text-white shadow-[0_18px_46px_rgba(255,90,0,0.34)] transition active:scale-[0.99]"
-                onClick={() => {
-                  if (!activeToday && !todaysCompletedSession) {
-                    startSession(todaySession);
-                  }
-
-                  router.push("/seance");
-                }}
-                type="button"
-              >
-                {ctaLabel}
-              </button>
-              <Link
-                className="flex h-16 w-16 items-center justify-center rounded-[1.35rem] border border-white/12 bg-white/10 text-xl font-black text-white backdrop-blur"
-                href="/programme"
-                title="Voir le programme"
-              >
-                →
-              </Link>
-            </div>
-          </div>
-
-          <div className="mt-4 grid grid-cols-3 gap-2">
-            <HeroMetric label="Programme" value={activeProgram?.name ?? "Programme perso"} />
-            <HeroMetric label="Semaine" value={`${weeklySessions.length}/${activeProgram?.frequency ?? currentProgram.length}`} />
-            <HeroMetric label="Ce soir" value={hasEveningSport ? (eveningSportTonight ? todayExternalSports.join(" + ") : "Repos") : "Libre"} />
-          </div>
-        </div>
-      </section>
-
-      <section className="rounded-[28px] border border-white/10 bg-[#10131d] p-4 shadow-soft">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-coral">Coach briefing</p>
-            <h2 className="mt-2 text-2xl font-black text-white">Ce qui compte maintenant</h2>
-          </div>
-          <span className="rounded-full bg-white/8 px-3 py-2 text-xs font-black text-white/55">2.0</span>
-        </div>
-        <div className="mt-4 grid gap-2">
-          <CoachBriefLine label="Priorite" value={todaySession.exercises[0]?.name ?? todaySession.title} />
-          <CoachBriefLine label="Charge a suivre" value={lastCompound.value} />
-          <CoachBriefLine label="Cardio semaine" value={cardioDone} />
-          <CoachBriefLine label="Rythme" value={streak > 0 ? `${streak} semaine${streak > 1 ? "s" : ""} active${streak > 1 ? "s" : ""}` : "Relancer la regularite"} />
-        </div>
-      </section>
-
-      <section className="grid gap-4 md:grid-cols-[1.15fr_0.85fr]">
-        <ActiveProgramCard
-          athleteName={settings.athleteName}
-          goal={mainGoal}
-          program={activeProgram}
-          sessionsCount={currentProgram.length}
-        />
-        <section className="rounded-[24px] border border-white/10 bg-[#10131d] p-4 shadow-soft">
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-sky">Progression rapide</p>
-          <div className="mt-4 grid grid-cols-1 gap-2">
-            <MetricCard label="Cardio valide" value={cardioDone} />
-            <MetricCard label={lastCompound.label} value={lastCompound.value} />
-            <MetricCard label="Serie active" value={streak > 0 ? `${streak} semaine${streak > 1 ? "s" : ""}` : "A relancer"} />
-          </div>
-        </section>
-      </section>
-
-      <section className="rounded-[24px] border border-white/10 bg-[#10131d] p-4 shadow-soft">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-sky">Plan d&apos;attaque</p>
-            <h2 className="mt-2 text-2xl font-black text-white">Les 3 prochains exos</h2>
-            <p className="mt-1 text-sm font-semibold text-white/55">Ce que tu vas faire en ouvrant la seance.</p>
-          </div>
-          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs font-black text-white/65">
-            {todaySession.exercises.length} blocs
-          </span>
-        </div>
-
-        <div className="mt-4 space-y-3">
-          {todaySession.exercises.slice(0, 3).map((exercise, index) => (
-            <div className="flex items-start gap-3 rounded-2xl border border-white/8 bg-white/[0.04] p-4" key={exercise.id}>
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-coral font-black text-white">
-                {index + 1}
-              </div>
-              <div className="min-w-0">
-                <p className="text-lg font-black text-white">{exercise.name}</p>
-                <p className="mt-1 text-sm font-semibold text-white/65">
-                  {exercise.plannedLoad ? `${exercise.plannedLoad} · ` : ""}
-                  {exercise.target}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <WeeklyTracker currentProgram={currentProgram} sessions={weeklySessions} streak={streak} />
-
-      <section className="rounded-[24px] border border-white/10 bg-[#10131d] p-4 shadow-soft">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-sky">Progression recente</p>
-            <h2 className="mt-2 text-2xl font-black text-white">
-              {latest ? latest.title : "Tu n'as pas encore valide de seance"}
-            </h2>
-            <p className="mt-1 text-sm font-semibold text-white/55">
-              {latest
-                ? latestDuration
-                  ? `Derniere seance terminee en ${latestDuration}.`
-                  : "Derniere seance enregistree dans ton historique."
-                : "Valide une premiere seance pour commencer a suivre tes progres."}
-            </p>
-          </div>
-          <Link
-            className="shrink-0 rounded-xl border border-sky/25 bg-sky/10 px-3 py-2 text-xs font-black text-sky"
-            href={latest ? "/historique" : "/seance"}
-          >
-            {latest ? "Voir l'historique" : "Lancer la seance"}
-          </Link>
-        </div>
-
-        {latestPlanned ? (
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            <MiniMetric label="Bloc valide" value={latestPlanned.title} />
-            <MiniMetric label="Duree" value={latestDuration ?? "Enregistre"} />
-          </div>
-        ) : null}
-      </section>
+      <RecentSessionsCard sessions={recentSessions} />
     </div>
   );
 }
 
-function DashboardPill({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-white/10 p-3 text-center backdrop-blur">
-      <p className="text-lg font-black leading-tight">{value}</p>
-      <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-white/65">{label}</p>
-    </div>
-  );
-}
+// ─────────────────────────────────────────────────────────────────────────
+// PROFILE HEADER
+// ─────────────────────────────────────────────────────────────────────────
 
-function HeroMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-[1.25rem] border border-white/10 bg-black/35 p-3 backdrop-blur">
-      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/45">{label}</p>
-      <p className="mt-2 text-sm font-black leading-tight text-white">{value}</p>
-    </div>
-  );
-}
-
-function CoachBriefLine({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/8 bg-white/[0.04] px-4 py-3">
-      <p className="text-xs font-black uppercase tracking-[0.18em] text-white/40">{label}</p>
-      <p className="max-w-[62%] text-right text-sm font-black leading-tight text-white">{value}</p>
-    </div>
-  );
-}
-
-function ActiveProgramCard({
-  athleteName,
+function ProfileHeader({
+  avatar,
   goal,
-  program,
-  sessionsCount
+  name,
+  programName
 }: {
-  athleteName: string;
+  avatar: string;
   goal: string;
-  program?: ProgramTemplate;
-  sessionsCount: number;
+  name: string;
+  programName: string;
 }) {
   return (
-    <section className="rounded-[24px] border border-sky/20 bg-[linear-gradient(180deg,rgba(17,20,30,1),rgba(11,13,20,1))] p-5 shadow-soft">
+    <section className="flex items-center gap-3 rounded-2xl border border-white/8 bg-white/4 p-3">
+      <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl border border-coral/30 bg-coral/15 text-2xl">
+        {avatar}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-lg font-black leading-tight text-white">{name}</p>
+        <p className="mt-0.5 truncate text-xs font-semibold text-white/55">{programName}</p>
+      </div>
+      <span className="shrink-0 max-w-[8rem] truncate rounded-full border border-sky/25 bg-sky/10 px-3 py-1 text-[11px] font-black uppercase tracking-wide text-sky">
+        {goal}
+      </span>
+    </section>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// TODAY SESSION CARD
+// ─────────────────────────────────────────────────────────────────────────
+
+function TodaySessionCard({
+  activeToday,
+  isCompleted,
+  onStart,
+  session,
+  weightKg
+}: {
+  activeToday: boolean;
+  isCompleted: boolean;
+  onStart: () => void;
+  session: PlannedSession;
+  weightKg: number;
+}) {
+  const category = getSessionCategory(session);
+  const typeLabel = getSessionTypeLabel(category);
+  const exerciseCount = session.exercises.length;
+  const plannedMs = parseDurationToMs(session.duration);
+  const calorieEstimate = estimateCalories(session.intensity, weightKg, plannedMs);
+
+  const status: "to-do" | "in-progress" | "done" = isCompleted
+    ? "done"
+    : activeToday
+      ? "in-progress"
+      : "to-do";
+
+  const statusLabel = {
+    "to-do": "À faire",
+    "in-progress": "En cours",
+    done: "Faite"
+  }[status];
+
+  const statusTone = {
+    "to-do": "border-coral/30 bg-coral/15 text-coral",
+    "in-progress": "border-amber/30 bg-amber/15 text-amber",
+    done: "border-sea/30 bg-sea/15 text-sea"
+  }[status];
+
+  const ctaLabel = {
+    "to-do": "Commencer la séance",
+    "in-progress": "Reprendre la séance",
+    done: "Voir le résumé"
+  }[status];
+
+  return (
+    <section className="session-step-card p-5">
+      <div className="session-step-accent" />
+
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-sky">Ton plan</p>
-          <h2 className="mt-2 text-2xl font-black leading-tight text-white">
-            {program?.name ?? "Programme personnalise"}
-          </h2>
-          <p className="mt-3 text-sm font-semibold leading-relaxed text-white/55">
-            {program?.description ?? "Programme actif adapte depuis tes reglages et tes retours."}
+        <p className="text-[11px] font-black uppercase tracking-[0.28em] text-coral">
+          Séance du jour · {typeLabel}
+        </p>
+        <span className={`shrink-0 rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-wide ${statusTone}`}>
+          {statusLabel}
+        </span>
+      </div>
+
+      <div className="mt-4 flex items-start gap-4">
+        <SessionExerciseIcon category={category} className="size-20 shrink-0" />
+        <div className="min-w-0 flex-1">
+          <h1 className="text-2xl font-black leading-tight text-white sm:text-3xl">
+            {session.title}
+          </h1>
+          {session.focus ? (
+            <p className="mt-1 line-clamp-2 text-xs font-semibold text-white/55">{session.focus}</p>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="mt-5 grid grid-cols-3 gap-2">
+        <Stat label="Durée" value={session.duration || "—"} />
+        <Stat label="Exercices" value={String(exerciseCount)} />
+        <Stat label="Calories" value={`${calorieEstimate.low}–${calorieEstimate.high}`} />
+      </div>
+
+      <button className="session-cta-primary mt-6" onClick={onStart} type="button">
+        {ctaLabel}
+      </button>
+
+      <Link
+        className="session-cta-secondary mt-3 inline-flex items-center justify-center"
+        href="/programme"
+      >
+        Voir le programme
+      </Link>
+    </section>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// REST DAY CARD
+// ─────────────────────────────────────────────────────────────────────────
+
+function RestDayCard({
+  nextSession
+}: {
+  nextSession?: { session: PlannedSession; weekdayLabel: string };
+}) {
+  return (
+    <section className="session-step-card p-5">
+      <div className="session-step-accent" style={{ background: "linear-gradient(90deg, #24c07a, #ff9f1a)" }} />
+
+      <p className="text-[11px] font-black uppercase tracking-[0.28em] text-sea">Aujourd&apos;hui</p>
+      <h1 className="mt-2 text-3xl font-black leading-tight text-white">Jour de repos</h1>
+      <p className="mt-2 text-sm font-semibold leading-relaxed text-white/65">
+        Pas de séance prévue aujourd&apos;hui. Hydrate-toi, mange bien, dors.
+      </p>
+
+      {nextSession ? (
+        <div className="mt-5 rounded-2xl border border-white/8 bg-white/4 p-4">
+          <p className="text-[10px] font-black uppercase tracking-wide text-white/55">Prochaine séance</p>
+          <p className="mt-1 text-lg font-black text-white">{nextSession.session.title}</p>
+          <p className="mt-1 text-xs font-semibold text-white/55">
+            {nextSession.weekdayLabel} · {nextSession.session.duration}
           </p>
         </div>
+      ) : null}
+
+      <Link
+        className="session-cta-secondary mt-5 inline-flex items-center justify-center"
+        href="/programme"
+      >
+        Voir le programme
+      </Link>
+    </section>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// RECENT SESSIONS
+// ─────────────────────────────────────────────────────────────────────────
+
+function RecentSessionsCard({ sessions }: { sessions: CompletedSession[] }) {
+  if (sessions.length === 0) {
+    return (
+      <section className="rounded-2xl border border-white/8 bg-white/4 p-4">
+        <p className="text-[11px] font-black uppercase tracking-[0.22em] text-white/55">Dernières séances</p>
+        <p className="mt-2 text-sm font-semibold text-white/55">
+          Pas encore de séance enregistrée. Lance la première pour suivre tes progrès.
+        </p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="rounded-2xl border border-white/8 bg-white/4 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[11px] font-black uppercase tracking-[0.22em] text-white/55">Dernières séances</p>
         <Link
-          className="shrink-0 rounded-xl border border-sky/25 bg-sky/10 px-3 py-2 text-xs font-black text-sky"
-          href="/programme"
+          className="text-[11px] font-black uppercase tracking-wide text-sky"
+          href="/historique"
         >
-          Ouvrir
+          Voir tout l&apos;historique
         </Link>
       </div>
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <MiniMetric label="Profil actif" value={athleteName || "Profil"} />
-        <MiniMetric label="Objectif" value={goal} />
-        <MiniMetric label="Frequence" value={program ? `${program.frequency} j/sem.` : `${sessionsCount} jours`} />
-        <MiniMetric label="Niveau" value={program?.level ?? "Perso"} />
-      </div>
+      <ul className="mt-3 space-y-2">
+        {sessions.map((session) => (
+          <li key={session.id}>
+            <RecentSessionRow session={session} />
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
 
-function MetricCard({ label, value }: { label: string; value: string }) {
+function RecentSessionRow({ session }: { session: CompletedSession }) {
+  const dateLabel = formatRelativeDate(session.completedAt);
+  const duration = session.totalDurationMs ? formatDurationLong(session.totalDurationMs) : "—";
+  const validatedCount = countValid(session);
+  const totalCount = Object.keys(session.logs ?? {}).length;
+
   return (
-    <div className="rounded-2xl border border-white/8 bg-white/[0.04] p-4">
-      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/45">{label}</p>
-      <p className="mt-2 text-lg font-black leading-tight text-white">{value}</p>
+    <div className="flex items-center gap-3 rounded-xl border border-white/8 bg-white/4 p-3">
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-sea/15 text-sm font-black text-sea">
+        ✓
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-black text-white">{session.title}</p>
+        <p className="mt-0.5 text-[11px] font-semibold text-white/55">
+          {dateLabel} · {duration} · {validatedCount}/{totalCount} ex.
+        </p>
+      </div>
     </div>
   );
 }
 
-function getSessionsThisWeek(history: CompletedSession[]) {
-  const start = new Date();
-  const day = start.getDay() === 0 ? 6 : start.getDay() - 1;
-  start.setHours(0, 0, 0, 0);
-  start.setDate(start.getDate() - day);
+// ─────────────────────────────────────────────────────────────────────────
+// SHARED HELPERS
+// ─────────────────────────────────────────────────────────────────────────
 
-  return history.filter((session) => new Date(session.completedAt) >= start);
-}
-
-function countCardioThisWeek(history: CompletedSession[]) {
-  const count = history.reduce((total, session) => {
-    const cardioLogs = Object.values(session.progressions ?? {}).filter((progression) =>
-      /cardio|tapis|marche|rameur|stairmaster|intervalles|zone 2/i.test(progression.exerciseName)
-    );
-    const completed = cardioLogs.filter((progression) => {
-      const status = session.logs[progression.exerciseId]?.status;
-      return Boolean(status) && status !== "skipped";
-    });
-
-    return total + completed.length;
-  }, 0);
-
-  return count ? `${count} bloc${count > 1 ? "s" : ""}` : "0 bloc";
-}
-
-function getLastCompoundPerformance(
-  history: CompletedSession[],
-  program: PlannedSession[]
-): { label: string; value: string } {
-  const compoundExerciseNames = new Set<string>();
-  for (const session of program) {
-    for (const exercise of session.exercises) {
-      const isCompoundShape =
-        (exercise.muscleGroups?.length ?? 0) >= 2 &&
-        (exercise.classification === "force" || exercise.classification === "hypertrophie");
-      if (isCompoundShape) {
-        compoundExerciseNames.add(exercise.name);
-      }
-    }
-  }
-
-  for (const session of history) {
-    for (const progression of Object.values(session.progressions ?? {})) {
-      if (!compoundExerciseNames.has(progression.exerciseName)) continue;
-      const log = session.logs[progression.exerciseId];
-      if (!log?.usedLoad && !log?.completedReps) continue;
-      const value = `${log.usedLoad || "-"} · ${log.completedReps || "-"}`;
-      const shortName = progression.exerciseName.split(" ").slice(0, 2).join(" ");
-      return { label: shortName, value };
-    }
-  }
-
-  return { label: "Charge cle", value: "Non renseignee" };
-}
-
-function getTodayWeekday(): Weekday {
-  const weekdays: Weekday[] = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
-  return weekdays[new Date().getDay()];
-}
-
-function getTodayExternalSports(settings: UserSettings): string[] {
-  const today = getTodayWeekday();
-  const names = settings.externalSports
-    .filter((sport) => sport.days.includes(today))
-    .map((sport) => sport.name);
-
-  if (names.length === 0 && settings.judoDays.includes(today)) {
-    return ["Sport"];
-  }
-
-  return names;
-}
-
-function getWeekStart(offsetWeeks: number): Date {
-  const date = new Date();
-  const day = date.getDay() === 0 ? 6 : date.getDay() - 1;
-  date.setHours(0, 0, 0, 0);
-  date.setDate(date.getDate() - day + offsetWeeks * 7);
-  return date;
-}
-
-function computeStreak(history: CompletedSession[]): number {
-  if (!history.length) return 0;
-
-  const thisWeekStart = getWeekStart(0);
-  const hasThisWeek = history.some((session) => new Date(session.completedAt) >= thisWeekStart);
-  const startOffset = hasThisWeek ? 0 : -1;
-  let streak = 0;
-
-  for (let i = startOffset; i >= -52; i--) {
-    const start = getWeekStart(i);
-    const end = getWeekStart(i + 1);
-    const hasSession = history.some((session) => {
-      const completedAt = new Date(session.completedAt);
-      return completedAt >= start && completedAt < end;
-    });
-    if (!hasSession) break;
-    streak++;
-  }
-
-  return streak;
-}
-
-function MiniMetric({ label, value }: { label: string; value: string }) {
+function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md bg-white/8 p-3 text-center">
-      <p className="text-sm font-black leading-tight text-white">{value}</p>
-      <p className="mt-1 text-[10px] font-black uppercase text-white/45">{label}</p>
+    <div className="rounded-xl border border-white/8 bg-white/4 p-3 text-center">
+      <p className="text-base font-black leading-tight text-white">{value}</p>
+      <p className="mt-1 text-[10px] font-black uppercase tracking-wide text-white/55">{label}</p>
     </div>
   );
 }
 
-const WEEKDAYS: Array<{ key: Weekday; short: string }> = [
-  { key: "monday", short: "L" },
-  { key: "tuesday", short: "M" },
-  { key: "wednesday", short: "M" },
-  { key: "thursday", short: "J" },
-  { key: "friday", short: "V" },
-  { key: "saturday", short: "S" },
-  { key: "sunday", short: "D" }
-];
-
-function WeeklyTracker({
-  currentProgram,
-  sessions,
-  streak
-}: {
-  currentProgram: PlannedSession[];
-  sessions: CompletedSession[];
-  streak: number;
-}) {
-  const todayKey = getTodayWeekday();
-  const completedSessionIds = new Set(sessions.map((session) => session.sessionId));
-
-  return (
-    <section className="rounded-[24px] border border-white/10 bg-[#10131d] p-5 shadow-soft">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-white/40">Ta semaine</p>
-          <h2 className="mt-2 text-2xl font-black text-white">Ou tu en es</h2>
-        </div>
-        {streak > 0 ? (
-          <span className="rounded-full bg-amber/10 px-3 py-2 text-xs font-black text-amber">
-            {streak} sem. d&apos;affilee
-          </span>
-        ) : null}
-      </div>
-
-      <div className="mt-3 grid grid-cols-7 gap-1.5">
-        {WEEKDAYS.map(({ key, short }) => {
-          const planned = currentProgram.find((session) => session.weekday === key);
-          const isToday = key === todayKey;
-          const isDone = planned ? completedSessionIds.has(planned.id) : false;
-          const isRestDay = !planned || planned.id.includes("sunday");
-
-          let dotClass = "bg-white/10 text-white/25";
-          if (isDone) dotClass = "bg-sea text-white";
-          else if (isToday && !isDone) dotClass = "bg-sky/20 text-sky ring-1 ring-sky/60";
-          else if (planned && !isDone) dotClass = "bg-white/8 text-white/40";
-
-          return (
-            <div className="flex flex-col items-center gap-1" key={key}>
-              <div className={`flex size-9 items-center justify-center rounded-full text-xs font-black ${dotClass}`}>
-                {isDone ? "✓" : isRestDay ? "-" : short}
-              </div>
-              <p className={`text-[9px] font-black uppercase ${isToday ? "text-sky" : "text-white/30"}`}>{short}</p>
-            </div>
-          );
-        })}
-      </div>
-
-      <p className="mt-3 text-xs font-semibold text-white/40">
-        {sessions.length} seance{sessions.length > 1 ? "s" : ""} validee{sessions.length > 1 ? "s" : ""} cette semaine
-      </p>
-    </section>
-  );
-}
-
-function formatGoal(primaryGoal?: string, fallback?: string) {
+function formatGoal(primaryGoal?: string, fallback?: string): string {
   if (primaryGoal && goalLabels[primaryGoal]) {
     return goalLabels[primaryGoal];
   }
+  if (!fallback) return "Objectif";
+  // Legacy mainGoal can be a long sentence — trim to the first segment
+  const short = fallback.split(/[:.]/)[0].trim();
+  return short.length > 24 ? `${short.slice(0, 24).trim()}…` : short || "Objectif";
+}
 
-  return fallback || "Objectif en cours";
+function findNextSession(
+  program: PlannedSession[],
+  todayWeekday: Weekday
+): { session: PlannedSession; weekdayLabel: string } | undefined {
+  const order: Weekday[] = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+  const todayIndex = order.indexOf(todayWeekday);
+  for (let offset = 1; offset <= 7; offset += 1) {
+    const candidate = order[(todayIndex + offset) % 7];
+    const planned = program.find((s) => s.weekday === candidate);
+    if (planned) {
+      return {
+        session: planned,
+        weekdayLabel: weekdayLabel(candidate, offset === 1)
+      };
+    }
+  }
+  return undefined;
+}
+
+function weekdayLabel(day: Weekday, isTomorrow: boolean): string {
+  if (isTomorrow) return "Demain";
+  const labels: Record<Weekday, string> = {
+    monday: "Lundi",
+    tuesday: "Mardi",
+    wednesday: "Mercredi",
+    thursday: "Jeudi",
+    friday: "Vendredi",
+    saturday: "Samedi",
+    sunday: "Dimanche"
+  };
+  return labels[day];
+}
+
+function countValid(session: CompletedSession): number {
+  return Object.values(session.logs ?? {}).filter(
+    (log) => log.status === "ok" || log.status === "easy"
+  ).length;
+}
+
+function formatRelativeDate(iso: string): string {
+  const date = new Date(iso);
+  const now = new Date();
+  const dayMs = 24 * 60 * 60 * 1000;
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const startOfDate = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  const diffDays = Math.round((startOfToday - startOfDate) / dayMs);
+
+  if (diffDays === 0) return "Aujourd'hui";
+  if (diffDays === 1) return "Hier";
+  if (diffDays > 1 && diffDays < 7) return `Il y a ${diffDays} j`;
+  if (diffDays >= 7 && diffDays < 14) return "La semaine dernière";
+
+  return new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "short" }).format(date);
 }

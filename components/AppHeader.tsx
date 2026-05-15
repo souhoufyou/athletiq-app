@@ -35,7 +35,7 @@ export function AppHeader() {
     <header className="app-header">
       <div className="app-header-topline" />
       <div className="flex items-center justify-between gap-3">
-        <Link aria-label="Accueil AthletIQ IA" className="min-w-0" href="/">
+        <Link aria-label="Accueil AthletIQ" className="min-w-0" href="/">
           <BrandLogo className="h-11" priority variant="wordmark" />
         </Link>
 

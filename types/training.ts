@@ -273,6 +273,17 @@ export type CoachSeed = {
   weeklyProgram: PlannedSession[];
 };
 
+/**
+ * Per-set entry captured by the guided session flow.
+ * Optional field on ExerciseLog — older completed sessions don't have it
+ * and the progression engine continues to read usedLoad / completedReps.
+ */
+export type SetLog = {
+  setIndex: number;       // 1-based
+  usedLoad: string;       // load entered by the user for this set
+  completedReps: string;  // reps actually performed for this set
+};
+
 export type ExerciseLog = {
   exerciseId: string;
   status?: EffortStatus;
@@ -281,6 +292,7 @@ export type ExerciseLog = {
   comment: string;
   rir?: number;
   rpe?: number;
+  sets?: SetLog[];
 };
 
 export type SessionFeedback = {
@@ -523,7 +535,9 @@ export type UserSettings = {
   sessionDurationPreference: SessionDurationPreference;
   weightLog?: WeightEntry[];
   primaryGoal?: PrimaryGoal;
+  secondaryGoal?: PrimaryGoal;
   experienceLevel?: ExperienceLevel;
   equipment?: Equipment;
   weeklyFrequency?: number; // 2-6
+  complementaryPrograms?: string[]; // IDs of activated complements (see lib/complementaryPrograms)
 };
