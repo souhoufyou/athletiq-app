@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Exercise } from "@/types/training";
-import { getSessionImages } from "@/lib/session-images";
+import { getSessionImages, getSessionImagesByCategory } from "@/lib/session-images";
 import { getSessionExerciseCategory } from "@/components/session/SessionExerciseIcon";
 import { getYouTubeSearchUrl } from "@/lib/exerciseMedia";
 
@@ -14,8 +14,18 @@ type Props = {
 export function ExerciseMediaSheet({ exercise, onClose }: Props) {
   const category = getSessionExerciseCategory(exercise);
   const photos = getSessionImages(exercise.name, category);
+  const fallbacks = getSessionImagesByCategory(category);
   const [activeIndex, setActiveIndex] = useState(0);
   const trackRef = useRef<HTMLDivElement | null>(null);
+
+  // If a Free Exercise DB URL 404s, swap it for a category-level Unsplash photo.
+  const handleImageError = (event: React.SyntheticEvent<HTMLImageElement>, index: number) => {
+    const img = event.currentTarget;
+    const fallback = fallbacks[index % fallbacks.length];
+    if (img.dataset.fallback === "1" || img.src === fallback) return;
+    img.dataset.fallback = "1";
+    img.src = fallback;
+  };
 
   // Update active index when user swipes (native scroll-snap)
   useEffect(() => {
@@ -83,12 +93,14 @@ export function ExerciseMediaSheet({ exercise, onClose }: Props) {
               style={{ scrollbarWidth: "none" }}
             >
               {photos.map((url, index) => (
-                <div className="w-full shrink-0 snap-center" key={url}>
+                <div className="w-full shrink-0 snap-center" key={`${url}-${index}`}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     alt={`${exercise.name} – vue ${index + 1}`}
-                    className="block aspect-video size-full select-none object-cover"
+                    className="block aspect-video size-full select-none bg-black object-contain"
                     draggable={false}
+                    loading="lazy"
+                    onError={(e) => handleImageError(e, index)}
                     src={url}
                   />
                 </div>
