@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useState } from "react";
+import { logout } from "@/lib/useAuth";
 import {
   appendCalibrationEvent,
   createReferenceDeletedCalibrationEvent,
@@ -837,6 +839,11 @@ export function SettingsPanel() {
             </div>
           </div>
         ) : null}
+      </SectionCard>
+
+      {/* ── COMPTE ──────────────────────────────────────────────── */}
+      <SectionCard subtitle="Gérer ta session" title="Compte">
+        <LogoutButton />
       </SectionCard>
 
       {/* ── AVANCÉ ──────────────────────────────────────────────── */}
@@ -1899,5 +1906,27 @@ function ProfilesSection({
         </div>
       ) : null}
     </section>
+  );
+}
+
+function LogoutButton() {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+
+  async function handleLogout() {
+    setLoading(true);
+    await logout();
+    router.push("/auth/login");
+  }
+
+  return (
+    <button
+      className="h-11 w-full rounded-md border border-white/10 bg-white/8 px-4 text-sm font-black text-white transition hover:bg-white/12"
+      disabled={loading}
+      onClick={handleLogout}
+      type="button"
+    >
+      {loading ? "Déconnexion..." : "Se déconnecter"}
+    </button>
   );
 }
