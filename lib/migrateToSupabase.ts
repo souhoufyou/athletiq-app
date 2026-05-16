@@ -41,7 +41,7 @@ export async function migrateLocalStorageToSupabase(userId: string): Promise<boo
 
   // 2. Migrate settings
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const settings = readLocalJson<Record<string, any>>(profileKey(activeProfileId, "settings"), null);
+  const settings = readLocalJson<Record<string, any> | null>(profileKey(activeProfileId, "settings"), null);
   if (settings) {
     await supabase.from("user_settings").upsert({
       user_id: userId,
