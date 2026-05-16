@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\belmahi\\\\Documents\\\\GitHub\\\\athletiq-app\\\\.claude\\\\worktrees\\\\vigorous-bose-f1dc84\" -Recurse -Directory)",
-      "Bash(Select-Object -ExpandProperty FullName)"
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(npm install *)"
     ]
   }
 }
