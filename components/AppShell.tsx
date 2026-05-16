@@ -12,7 +12,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { isReady, isOnboardingDone } = useCoachStorage();
   const router = useRouter();
   const pathname = usePathname();
-  const showHeader = pathname === "/";
+  // AppHeader is hidden everywhere: Dashboard has its own integrated header,
+  // other pages have their own internal headers.
+  const showHeader = false;
+  void pathname;
 
   useEffect(() => {
     if (isReady && !isOnboardingDone) {
@@ -56,11 +59,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div
-      className={`app-shell mx-auto min-h-screen w-full max-w-[96rem] safe-bottom sm:px-6 lg:px-8 ${
-        showHeader ? "px-4 pt-4" : "px-4 pt-5"
-      }`}
-    >
+    <div className="app-shell mx-auto min-h-screen w-full max-w-[96rem] px-4 safe-bottom safe-top sm:px-6 lg:px-8">
       {showHeader ? <AppHeader /> : null}
       <main className="app-content">{children}</main>
       <BottomNav />

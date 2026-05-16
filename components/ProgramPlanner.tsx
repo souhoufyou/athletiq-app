@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { SessionExerciseIcon } from "@/components/session/SessionExerciseIcon";
 import { DayStatusBadge } from "@/components/WeekTimeline";
 import { PROGRAM_CATALOG } from "@/data/programCatalog";
@@ -36,9 +36,18 @@ export function ProgramPlanner() {
     todaySession
   } = useCoachStorage();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
   const [showChangeProgram, setShowChangeProgram] = useState(false);
   const [pendingTemplate, setPendingTemplate] = useState<ProgramTemplate | null>(null);
+
+  // Auto-expand today (?day=today) or a specific weekday (?day=monday) from URL.
+  useEffect(() => {
+    const requested = searchParams?.get("day");
+    if (!requested) return;
+    const target = requested === "today" ? getWeekday() : requested;
+    setExpandedDay(target);
+  }, [searchParams]);
 
   const activeProgram = useMemo(() => getActiveProgramTemplate(currentProgram), [currentProgram]);
   const activeTemplateId = useMemo(() => getActiveProgramTemplateId(currentProgram), [currentProgram]);

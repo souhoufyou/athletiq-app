@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react";
 import { athleteProfile, weeklyProgram } from "@/data/program";
+import { applyComplementsToProgram } from "@/lib/applyComplements";
 import { getDateKey } from "@/lib/date";
 import { adaptProgramAfterSession } from "@/lib/programAdaptation";
 import { adaptSettingsAfterSession } from "@/lib/profileAdaptation";
@@ -808,9 +809,22 @@ export function useCoachStorage() {
     activeProfileId,
     activeSession,
     history,
-    currentProgram,
+    currentProgram: rawProgram,
     settings
   } = snapshot;
+
+  // Inject activated complements (abdos / mobilite / cardio…) into each session.
+  // The raw program persisted in storage is never mutated — augmentation is purely
+  // derived, so disabling a complement removes its exercises automatically.
+  const currentProgram = useMemo(
+    () =>
+      applyComplementsToProgram(
+        rawProgram,
+        settings.complementaryPrograms,
+        settings.primaryGoal
+      ),
+    [rawProgram, settings.complementaryPrograms, settings.primaryGoal]
+  );
 
   const todaySession = useMemo(() => getTodaySession(currentProgram), [currentProgram]);
   const nextSession = useMemo(() => getNextSession(currentProgram), [currentProgram]);

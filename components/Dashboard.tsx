@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { BrandLogo } from "@/components/BrandLogo";
 import { SessionExerciseIcon } from "@/components/session/SessionExerciseIcon";
 import { WeekTimelineCompact } from "@/components/WeekTimeline";
 import { getActiveProgramTemplate } from "@/lib/activeProgram";
@@ -76,6 +77,27 @@ export function Dashboard() {
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <Link aria-label="AthletIQ" className="min-w-0" href="/">
+          <BrandLogo className="h-10" variant="wordmark" />
+        </Link>
+        <Link
+          aria-label="Paramètres"
+          className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/70 transition hover:bg-white/10"
+          href="/parametres"
+        >
+          <svg className="size-4" fill="none" viewBox="0 0 24 24">
+            <path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z" stroke="currentColor" strokeWidth="2" />
+            <path
+              d="M12 3v2M12 19v2M4.2 6.2l1.4 1.4M18.4 16.4l1.4 1.4M3 12h2M19 12h2M4.2 17.8l1.4-1.4M18.4 7.6l1.4-1.4"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeWidth="2"
+            />
+          </svg>
+        </Link>
+      </div>
+
       <ProfileHeader
         avatar={activeProfile?.avatar ?? "💪"}
         goal={mainGoal}
@@ -233,7 +255,7 @@ function TodaySessionCard({
         </button>
         <Link
           className="session-cta-secondary mt-3 inline-flex items-center justify-center"
-          href="/programme"
+          href="/programme?day=today"
         >
           Voir le programme
         </Link>
