@@ -5,6 +5,7 @@
 //   2) Otherwise, we fall back to keyword matching on title/focus.
 
 import type { SessionExerciseCategory } from "@/components/session/SessionExerciseIcon";
+import { getExerciseImages } from "@/data/exerciseImageMap";
 
 const CATEGORY_PHOTOS: Record<SessionExerciseCategory, string[]> = {
   // Push : pectoraux / épaules / triceps
@@ -97,10 +98,18 @@ export function getSessionImage(...labels: Array<string | undefined>): string {
 }
 
 /**
- * Returns the array of 2-3 photos for the matched category. Used for the
- * exercise demo sheet (carousel).
+ * Returns the array of 2-3 photos for the matched exercise/category.
+ * Tries the per-exercise curated map first, then falls back to category.
+ * Used for the exercise demo sheet (carousel).
  */
 export function getSessionImages(...labels: Array<string | undefined>): string[] {
+  // Try exercise-specific match first (uses the longer labels)
+  for (const label of labels) {
+    if (!label) continue;
+    const specific = getExerciseImages(label);
+    if (specific) return specific;
+  }
+  // Fallback: category-level
   const category = findCategory(labels);
   return CATEGORY_PHOTOS[category];
 }

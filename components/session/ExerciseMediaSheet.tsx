@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Exercise } from "@/types/training";
 import { getSessionImages } from "@/lib/session-images";
 import { getSessionExerciseCategory } from "@/components/session/SessionExerciseIcon";
@@ -13,8 +13,38 @@ type Props = {
 
 export function ExerciseMediaSheet({ exercise, onClose }: Props) {
   const category = getSessionExerciseCategory(exercise);
-  const photos = getSessionImages(category, exercise.name);
+  const photos = getSessionImages(exercise.name, category);
   const [activeIndex, setActiveIndex] = useState(0);
+  const trackRef = useRef<HTMLDivElement | null>(null);
+
+  // Update active index when user swipes (native scroll-snap)
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!track) return;
+
+    let raf = 0;
+    const onScroll = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const width = track.clientWidth;
+        if (!width) return;
+        const index = Math.round(track.scrollLeft / width);
+        setActiveIndex(Math.max(0, Math.min(photos.length - 1, index)));
+      });
+    };
+
+    track.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      cancelAnimationFrame(raf);
+      track.removeEventListener("scroll", onScroll);
+    };
+  }, [photos.length]);
+
+  const goTo = (index: number) => {
+    const track = trackRef.current;
+    if (!track) return;
+    track.scrollTo({ left: track.clientWidth * index, behavior: "smooth" });
+  };
 
   return (
     <div
@@ -27,7 +57,7 @@ export function ExerciseMediaSheet({ exercise, onClose }: Props) {
         className="flex h-[92vh] w-full max-w-md flex-col rounded-t-3xl border border-white/10 bg-ink text-white shadow-soft sm:h-auto sm:max-h-[88vh] sm:rounded-3xl"
         onClick={(event) => event.stopPropagation()}
       >
-        {/* Sticky header (always visible, never scrolled away) */}
+        {/* Sticky header */}
         <div className="flex shrink-0 items-start justify-between gap-3 border-b border-white/8 p-5">
           <div className="min-w-0">
             <p className="text-[10px] font-black uppercase tracking-[0.28em] text-coral">Démo</p>
@@ -45,43 +75,72 @@ export function ExerciseMediaSheet({ exercise, onClose }: Props) {
 
         {/* Scrollable body */}
         <div className="flex-1 overflow-y-auto p-5">
-          {/* Photo carousel */}
-          <div className="overflow-hidden rounded-2xl border border-white/8 bg-black/30">
-            <div className="relative aspect-video w-full">
+          {/* Photo carousel (native horizontal scroll with snap) */}
+          <div className="relative overflow-hidden rounded-2xl border border-white/8 bg-black/30">
+            <div
+              className="flex aspect-video snap-x snap-mandatory overflow-x-auto"
+              ref={trackRef}
+              style={{ scrollbarWidth: "none" }}
+            >
               {photos.map((url, index) => (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  alt={`${exercise.name} – vue ${index + 1}`}
-                  className={`absolute inset-0 size-full object-cover transition-opacity duration-300 ${
-                    index === activeIndex ? "opacity-100" : "opacity-0"
-                  }`}
-                  key={url}
-                  src={url}
-                />
+                <div className="w-full shrink-0 snap-center" key={url}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    alt={`${exercise.name} – vue ${index + 1}`}
+                    className="block aspect-video size-full select-none object-cover"
+                    draggable={false}
+                    src={url}
+                  />
+                </div>
               ))}
-              {/* Counter overlay */}
-              <span className="absolute bottom-2 right-2 rounded-full bg-black/55 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-white/85 backdrop-blur">
-                {activeIndex + 1} / {photos.length}
-              </span>
             </div>
 
-            {/* Pagination dots */}
+            {/* Prev / Next arrows (desktop) */}
             {photos.length > 1 ? (
-              <div className="flex items-center justify-center gap-2 py-3">
-                {photos.map((url, index) => (
-                  <button
-                    aria-label={`Voir la photo ${index + 1}`}
-                    className={`h-2 rounded-full transition-all ${
-                      index === activeIndex ? "w-6 bg-coral" : "w-2 bg-white/25"
-                    }`}
-                    key={url}
-                    onClick={() => setActiveIndex(index)}
-                    type="button"
-                  />
-                ))}
-              </div>
+              <>
+                <button
+                  aria-label="Photo précédente"
+                  className="absolute left-2 top-1/2 hidden size-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur transition hover:bg-black/75 sm:flex disabled:opacity-30"
+                  disabled={activeIndex === 0}
+                  onClick={() => goTo(activeIndex - 1)}
+                  type="button"
+                >
+                  ‹
+                </button>
+                <button
+                  aria-label="Photo suivante"
+                  className="absolute right-2 top-1/2 hidden size-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur transition hover:bg-black/75 sm:flex disabled:opacity-30"
+                  disabled={activeIndex === photos.length - 1}
+                  onClick={() => goTo(activeIndex + 1)}
+                  type="button"
+                >
+                  ›
+                </button>
+              </>
             ) : null}
+
+            {/* Counter overlay */}
+            <span className="absolute bottom-2 right-2 rounded-full bg-black/55 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-white/90 backdrop-blur">
+              {activeIndex + 1} / {photos.length}
+            </span>
           </div>
+
+          {/* Dots */}
+          {photos.length > 1 ? (
+            <div className="mt-3 flex items-center justify-center gap-2">
+              {photos.map((url, index) => (
+                <button
+                  aria-label={`Voir la photo ${index + 1}`}
+                  className={`h-2 rounded-full transition-all ${
+                    index === activeIndex ? "w-6 bg-coral" : "w-2 bg-white/25"
+                  }`}
+                  key={url}
+                  onClick={() => goTo(index)}
+                  type="button"
+                />
+              ))}
+            </div>
+          ) : null}
 
           {/* Cue */}
           {exercise.cue ? (
@@ -105,7 +164,7 @@ export function ExerciseMediaSheet({ exercise, onClose }: Props) {
           </div>
 
           <p className="mt-5 text-center text-[11px] font-semibold text-white/45">
-            Les photos sont génériques. Pour la technique exacte, regarde une démo vidéo&nbsp;:
+            Pour la technique exacte, regarde une démo vidéo&nbsp;:
           </p>
 
           <a
