@@ -80,13 +80,12 @@ export function SessionStepAnnounce({
             </button>
             <button
               aria-label="Voir la démo de l'exercice"
-              className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-white/25 bg-black/40 text-white backdrop-blur transition hover:bg-black/60"
+              className="flex size-12 shrink-0 items-center justify-center rounded-xl border-2 border-white/60 bg-coral text-white shadow-[0_6px_20px_rgba(255,90,0,0.5)] transition hover:scale-105"
               onClick={() => setShowMedia(true)}
               type="button"
             >
-              <svg className="size-5" fill="none" viewBox="0 0 24 24">
-                <rect height="14" rx="2" stroke="currentColor" strokeWidth="2" width="20" x="2" y="5" />
-                <path d="m10 9 5 3-5 3z" fill="currentColor" />
+              <svg className="size-6" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M8 5v14l11-7z" />
               </svg>
             </button>
           </div>

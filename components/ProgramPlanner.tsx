@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { ExerciseMediaSheet } from "@/components/session/ExerciseMediaSheet";
 import { SessionExerciseIcon } from "@/components/session/SessionExerciseIcon";
 import { DayStatusBadge } from "@/components/WeekTimeline";
 import { PROGRAM_CATALOG } from "@/data/programCatalog";
@@ -20,7 +21,7 @@ import {
   type DayInfo,
   type DayState
 } from "@/lib/weekTimeline";
-import type { PlannedSession, ProgramTemplate } from "@/types/training";
+import type { Exercise, PlannedSession, ProgramTemplate } from "@/types/training";
 
 export function ProgramPlanner() {
   const {
@@ -385,6 +386,7 @@ function DayDetail({
   const category = getSessionCategory(session);
   const plannedMs = parseDurationToMs(session.duration);
   const calorieEstimate = estimateCalories(session.intensity, currentWeightKg, plannedMs);
+  const [mediaExercise, setMediaExercise] = useState<Exercise | null>(null);
 
   const ctaLabel =
     state === "done" ? "Voir le résumé"
@@ -411,19 +413,33 @@ function DayDetail({
       <ol className="mt-4 space-y-1.5">
         {session.exercises.map((exercise, index) => (
           <li
-            className="flex items-center gap-3 rounded-lg border border-white/6 bg-white/4 px-3 py-2"
+            className="flex items-center gap-2 rounded-lg border border-white/6 bg-white/4 px-3 py-2"
             key={exercise.id}
           >
             <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-coral/15 text-[11px] font-black text-coral">
               {index + 1}
             </span>
-            <div className="min-w-0 flex-1">
+            <button
+              className="min-w-0 flex-1 text-left"
+              onClick={() => setMediaExercise(exercise)}
+              type="button"
+            >
               <p className="truncate text-sm font-black text-white">{exercise.name}</p>
               <p className="text-[11px] font-semibold text-white/55">
                 {exercise.target}
                 {exercise.plannedLoad ? ` · ${exercise.plannedLoad}` : ""}
               </p>
-            </div>
+            </button>
+            <button
+              aria-label={`Voir la démo de ${exercise.name}`}
+              className="flex size-8 shrink-0 items-center justify-center rounded-md border border-coral/30 bg-coral/15 text-coral transition hover:bg-coral/25"
+              onClick={() => setMediaExercise(exercise)}
+              type="button"
+            >
+              <svg className="size-4" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+            </button>
           </li>
         ))}
       </ol>
@@ -431,6 +447,10 @@ function DayDetail({
       <button className="session-cta-primary mt-5" onClick={onStart} type="button">
         {ctaLabel}
       </button>
+
+      {mediaExercise ? (
+        <ExerciseMediaSheet exercise={mediaExercise} onClose={() => setMediaExercise(null)} />
+      ) : null}
     </div>
   );
 }
