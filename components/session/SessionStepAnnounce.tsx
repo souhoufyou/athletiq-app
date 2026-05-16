@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { Exercise, MuscleGroup } from "@/types/training";
 import { getPlannedRepsLabel, getPlannedSetCount } from "@/lib/sessionFlow";
 import { getSessionImage } from "@/lib/session-images";
@@ -7,6 +8,7 @@ import {
   SessionExerciseIcon,
   getSessionExerciseCategory
 } from "@/components/session/SessionExerciseIcon";
+import { ExerciseMediaSheet } from "@/components/session/ExerciseMediaSheet";
 
 type Props = {
   exercise: Exercise;
@@ -44,6 +46,7 @@ export function SessionStepAnnounce({
   const muscles = exercise.muscleGroups ?? [];
   const category = getSessionExerciseCategory(exercise);
   const heroImage = getSessionImage(category, exercise.name);
+  const [showMedia, setShowMedia] = useState(false);
 
   return (
     <section className="session-step-card session-step-enter overflow-hidden p-0">
@@ -68,9 +71,24 @@ export function SessionStepAnnounce({
           </div>
           <div className="flex items-end gap-3">
             <SessionExerciseIcon category={category} className="size-12 shrink-0 backdrop-blur" />
-            <h1 className="flex-1 text-2xl font-black leading-tight text-white sm:text-3xl drop-shadow-[0_2px_8px_rgba(0,0,0,0.7)]">
+            <button
+              className="flex-1 text-left text-2xl font-black leading-tight text-white sm:text-3xl drop-shadow-[0_2px_8px_rgba(0,0,0,0.7)]"
+              onClick={() => setShowMedia(true)}
+              type="button"
+            >
               {exercise.name}
-            </h1>
+            </button>
+            <button
+              aria-label="Voir la démo de l'exercice"
+              className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-white/25 bg-black/40 text-white backdrop-blur transition hover:bg-black/60"
+              onClick={() => setShowMedia(true)}
+              type="button"
+            >
+              <svg className="size-5" fill="none" viewBox="0 0 24 24">
+                <rect height="14" rx="2" stroke="currentColor" strokeWidth="2" width="20" x="2" y="5" />
+                <path d="m10 9 5 3-5 3z" fill="currentColor" />
+              </svg>
+            </button>
           </div>
         </div>
       </div>
@@ -125,6 +143,10 @@ export function SessionStepAnnounce({
           </button>
         </div>
       </div>
+
+      {showMedia ? (
+        <ExerciseMediaSheet exercise={exercise} onClose={() => setShowMedia(false)} />
+      ) : null}
     </section>
   );
 }

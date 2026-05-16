@@ -44,3 +44,50 @@ function loadImage(src: string): Promise<HTMLImageElement> {
     img.src = src;
   });
 }
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error("Lecture du fichier impossible."));
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * Read any image/GIF/video file the user picked and produce a base64 data URL
+ * suitable for localStorage.
+ *   - JPG/PNG → compressed via canvas (max 600 px, JPEG q=0.8)
+ *   - GIF     → raw data URL (compression would kill the animation)
+ *   - VIDEO   → raw data URL, max 3 MB
+ *
+ * Returns the data URL + a discriminator so the UI can render the right tag.
+ */
+export async function fileToExerciseMedia(
+  file: File
+): Promise<{ dataUrl: string; type: "image" | "gif" | "video" }> {
+  if (typeof window === "undefined") throw new Error("Browser only");
+
+  const isImage = file.type.startsWith("image/");
+  const isGif = file.type === "image/gif";
+  const isVideo = file.type.startsWith("video/");
+
+  if (!isImage && !isVideo) {
+    throw new Error("Format non supporté. Choisis une image, un GIF ou une vidéo.");
+  }
+
+  // Hard caps to protect localStorage (≈5 MB total per origin)
+  const MAX_RAW = 3 * 1024 * 1024;
+  if ((isGif || isVideo) && file.size > MAX_RAW) {
+    throw new Error("Fichier trop lourd (max 3 Mo pour les GIF / vidéos).");
+  }
+
+  if (isGif) {
+    return { dataUrl: await fileToDataUrl(file), type: "gif" };
+  }
+  if (isVideo) {
+    return { dataUrl: await fileToDataUrl(file), type: "video" };
+  }
+  // Static image: compress to 600 px square thumbnail.
+  return { dataUrl: await fileToCompressedAvatar(file, 600, 0.8), type: "image" };
+}
