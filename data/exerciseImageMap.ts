@@ -14,8 +14,9 @@ export type ExerciseImageEntry = {
 };
 
 // Free Exercise DB image URL (via jsDelivr CDN).
+// Note: the real path is `{slug}/{0|1}.jpg` (no `/images/` segment).
 const fdb = (slug: string, index: 0 | 1 = 0) =>
-  `https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/${slug}/images/${index}.jpg`;
+  `https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/${slug}/${index}.jpg`;
 
 // Unsplash backup (only used inside this file when we want a stock gym shot)
 const u = (id: string) =>
@@ -35,8 +36,9 @@ export const EXERCISE_IMAGE_MAP: ExerciseImageEntry[] = [
   {
     pattern: /chest press|d[ée]velopp[ée] machine|press machine/i,
     photos: [
-      fdb("Iso-Lateral_Chest_Press", 0),
-      fdb("Iso-Lateral_Chest_Press", 1),
+      fdb("Leverage_Chest_Press", 0),
+      fdb("Leverage_Chest_Press", 1),
+      fdb("Cable_Chest_Press", 0),
       fdb("Dumbbell_Bench_Press", 0)
     ]
   },
@@ -113,8 +115,9 @@ export const EXERCISE_IMAGE_MAP: ExerciseImageEntry[] = [
   {
     pattern: /barre au front|skull crusher|extension triceps barre/i,
     photos: [
-      fdb("Skullcrusher", 0),
-      fdb("Skullcrusher", 1)
+      fdb("Cable_Lying_Triceps_Extension", 0),
+      fdb("Cable_Lying_Triceps_Extension", 1),
+      fdb("Decline_Close-Grip_Bench_To_Skull_Crusher", 0)
     ]
   },
 
@@ -141,7 +144,7 @@ export const EXERCISE_IMAGE_MAP: ExerciseImageEntry[] = [
     photos: [
       fdb("Seated_Cable_Rows", 0),
       fdb("Seated_Cable_Rows", 1),
-      fdb("Wide-Grip_Seated_Cable_Row", 0)
+      fdb("Elevated_Cable_Rows", 0)
     ]
   },
   {
@@ -149,7 +152,7 @@ export const EXERCISE_IMAGE_MAP: ExerciseImageEntry[] = [
     photos: [
       fdb("Bent_Over_Barbell_Row", 0),
       fdb("Bent_Over_Barbell_Row", 1),
-      fdb("Yates_Row", 0)
+      fdb("T-Bar_Row_with_Handle", 0)
     ]
   },
   {
@@ -190,8 +193,8 @@ export const EXERCISE_IMAGE_MAP: ExerciseImageEntry[] = [
   {
     pattern: /curl (c[aâ]ble|poulie)|cable curl/i,
     photos: [
-      fdb("Cable_Curl", 0),
-      fdb("Cable_Curl", 1),
+      fdb("Cable_Preacher_Curl", 0),
+      fdb("Cable_Preacher_Curl", 1),
       fdb("Cable_Hammer_Curls_-_Rope_Attachment", 0)
     ]
   },
@@ -266,9 +269,10 @@ export const EXERCISE_IMAGE_MAP: ExerciseImageEntry[] = [
   {
     pattern: /hip thrust|fessiers|glute bridge/i,
     photos: [
-      fdb("Hip_Lift_with_Band", 0),
-      fdb("Glute_Bridge_Two_Legs_On_Bench_-_Male", 0),
-      u("1517344884509-a0c97ec11bcc")
+      fdb("Barbell_Hip_Thrust", 0),
+      fdb("Barbell_Hip_Thrust", 1),
+      fdb("Barbell_Glute_Bridge", 0),
+      fdb("Hip_Lift_with_Band", 0)
     ]
   },
 
@@ -293,8 +297,8 @@ export const EXERCISE_IMAGE_MAP: ExerciseImageEntry[] = [
     photos: [
       fdb("Dumbbell_Lunges", 0),
       fdb("Dumbbell_Lunges", 1),
-      fdb("Walking_Lunges", 0),
-      fdb("Walking_Lunges", 1)
+      fdb("Bodyweight_Walking_Lunge", 0),
+      fdb("Barbell_Lunge", 0)
     ]
   },
   {
@@ -312,7 +316,7 @@ export const EXERCISE_IMAGE_MAP: ExerciseImageEntry[] = [
     photos: [
       fdb("Pushups", 0),
       fdb("Pushups", 1),
-      fdb("Wide-Grip_Decline_Push-Up", 0)
+      fdb("Decline_Push-Up", 0)
     ]
   },
 
@@ -330,7 +334,8 @@ export const EXERCISE_IMAGE_MAP: ExerciseImageEntry[] = [
     photos: [
       fdb("Crunches", 0),
       fdb("Crunches", 1),
-      fdb("Bicycle_Crunch", 0)
+      fdb("Air_Bike", 0),
+      fdb("Ab_Crunch_Machine", 0)
     ]
   },
   {
