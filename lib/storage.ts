@@ -753,6 +753,13 @@ function renameProfileAction(profileId: string, name: string, avatar?: string) {
   }
 }
 
+function setProfilePhotoAction(profileId: string, photoUrl: string | undefined) {
+  const nextProfiles = store.profiles.map((p) =>
+    p.id === profileId ? { ...p, photoUrl: photoUrl || undefined } : p
+  );
+  persistProfilesAndUpdate(nextProfiles, store.activeProfileId);
+}
+
 function deleteProfileAction(profileId: string) {
   if (store.profiles.length <= 1) return;
   const remaining = store.profiles.filter((p) => p.id !== profileId);
@@ -863,6 +870,7 @@ export function useCoachStorage() {
     profiles,
     regenerateProgram: regenerateProgramAction,
     renameProfile: renameProfileAction,
+    setProfilePhoto: setProfilePhotoAction,
     replaceExercise: replaceExerciseAction,
     resetAll: resetAllAction,
     resumeSessionTimer: resumeSessionTimerAction,

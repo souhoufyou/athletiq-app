@@ -713,6 +713,9 @@ function EngagementScreen({
   const startHold = () => {
     if (committed) return;
     startedAtRef.current = performance.now();
+    if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+      try { navigator.vibrate(30); } catch {}
+    }
     const tick = () => {
       if (startedAtRef.current === null) return;
       const elapsed = performance.now() - startedAtRef.current;
@@ -721,8 +724,10 @@ function EngagementScreen({
       if (ratio >= 1) {
         setCommitted(true);
         rafRef.current = null;
-        // Small delay so the user sees the bar full before nav
-        window.setTimeout(onCommit, 200);
+        if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+          try { navigator.vibrate([60, 40, 120]); } catch {}
+        }
+        window.setTimeout(onCommit, 600);
         return;
       }
       rafRef.current = requestAnimationFrame(tick);
@@ -730,65 +735,136 @@ function EngagementScreen({
     rafRef.current = requestAnimationFrame(tick);
   };
 
+  // Ring math
+  const ringSize = 220;
+  const ringStroke = 10;
+  const radius = (ringSize - ringStroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const dashOffset = circumference * (1 - progress);
+
   return (
     <div className="app-shell mx-auto flex min-h-screen w-full max-w-xl flex-col items-center justify-center px-4 pb-10 pt-8 sm:px-6">
       <div className="mb-8 flex items-center gap-3">
         <BrandLogo className="h-10" priority variant="wordmark" />
       </div>
 
-      <div className="w-full rounded-[28px] border border-coral/25 bg-[#11131a]/90 p-6 text-center shadow-soft">
-        <p className="text-[10px] font-black uppercase tracking-[0.28em] text-coral">
+      <div className="w-full rounded-[28px] border border-coral/20 bg-[#0a0c12] p-6 text-center shadow-soft">
+        <p className="text-[10px] font-black uppercase tracking-[0.32em] text-coral">
           Engagement
         </p>
-        <h1 className="mt-3 text-3xl font-black leading-tight text-white">
+        <h1 className="mt-3 text-3xl font-black leading-tight text-white sm:text-4xl">
           {athleteName}, tu es prêt(e) ?
         </h1>
-        <p className="mt-3 text-sm font-semibold leading-relaxed text-white/65">
-          Le programme est calé. Le reste, c&apos;est toi qui le construis, séance après séance.
-          Maintiens le bouton pour confirmer ton engagement.
+        <p className="mx-auto mt-4 max-w-sm text-sm font-semibold leading-relaxed text-white/65">
+          Le programme est calé. Le reste — la régularité, l&apos;effort — c&apos;est toi.
         </p>
 
-        <div className="mt-8">
-          <button
+        <div className="mt-8 flex flex-col items-center">
+          <div
             aria-label="Maintenir pour s'engager"
-            className={`relative h-20 w-full overflow-hidden rounded-2xl border-2 px-4 text-lg font-black text-white transition select-none ${
-              committed
-                ? "border-sea bg-sea"
-                : progress > 0
-                  ? "border-coral bg-coral/90"
-                  : "border-coral bg-coral"
-            }`}
-            onPointerDown={startHold}
-            onPointerUp={stopHold}
+            className={`relative select-none ${committed ? "celebration-check" : ""}`}
             onPointerCancel={stopHold}
+            onPointerDown={startHold}
             onPointerLeave={stopHold}
+            onPointerUp={stopHold}
+            onTouchEnd={stopHold}
             onTouchStart={(event) => {
               event.preventDefault();
               startHold();
             }}
-            onTouchEnd={stopHold}
-            type="button"
+            role="button"
+            style={{ width: ringSize, height: ringSize, touchAction: "none" }}
+            tabIndex={0}
           >
-            <span
+            {/* Subtle pulse halo */}
+            <div
               aria-hidden="true"
-              className="absolute inset-y-0 left-0 bg-white/20 transition-[width] duration-100"
-              style={{ width: `${Math.round(progress * 100)}%` }}
+              className={`absolute inset-0 rounded-full ${
+                committed ? "bg-sea/25" : progress > 0 ? "bg-coral/25" : "engagement-halo bg-coral/15"
+              }`}
             />
-            <span className="relative z-10">
-              {committed ? "✓ Engagé" : "Maintenir pour m'engager"}
-            </span>
-          </button>
-          <p className="mt-2 text-[11px] font-semibold text-white/45">
+            {/* Progress ring */}
+            <svg
+              aria-hidden="true"
+              className="absolute inset-0 -rotate-90"
+              height={ringSize}
+              viewBox={`0 0 ${ringSize} ${ringSize}`}
+              width={ringSize}
+            >
+              <circle
+                cx={ringSize / 2}
+                cy={ringSize / 2}
+                fill="none"
+                r={radius}
+                stroke="rgba(255,255,255,0.08)"
+                strokeWidth={ringStroke}
+              />
+              <circle
+                cx={ringSize / 2}
+                cy={ringSize / 2}
+                fill="none"
+                r={radius}
+                stroke={committed ? "#24c07a" : "#ff5a00"}
+                strokeDasharray={circumference}
+                strokeDashoffset={dashOffset}
+                strokeLinecap="round"
+                strokeWidth={ringStroke}
+                style={{
+                  transition: progress === 0 && !committed ? "stroke-dashoffset 0.25s ease-out" : "none",
+                  filter: progress > 0 ? "drop-shadow(0 0 16px rgba(255, 90, 0, 0.5))" : undefined
+                }}
+              />
+            </svg>
+            {/* Central button */}
+            <div
+              className={`absolute inset-4 flex flex-col items-center justify-center rounded-full text-white transition-colors ${
+                committed
+                  ? "bg-sea"
+                  : progress > 0
+                    ? "bg-gradient-to-b from-coral to-[#ff4d00]"
+                    : "bg-gradient-to-b from-coral to-[#ff4d00]"
+              }`}
+              style={{
+                boxShadow: committed
+                  ? "0 18px 45px rgba(36, 192, 122, 0.45), inset 0 1px 0 rgba(255,255,255,0.18)"
+                  : "0 18px 45px rgba(255, 90, 0, 0.40), inset 0 1px 0 rgba(255,255,255,0.22)"
+              }}
+            >
+              {committed ? (
+                <>
+                  <svg className="size-14" fill="none" viewBox="0 0 24 24">
+                    <path
+                      d="M5 12l5 5 9-11"
+                      stroke="currentColor"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="3"
+                    />
+                  </svg>
+                  <p className="mt-2 text-base font-black uppercase tracking-wide">Engagé</p>
+                </>
+              ) : (
+                <>
+                  <p className="text-2xl font-black leading-tight">Je m&apos;engage</p>
+                  <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.2em] text-white/80">
+                    Maintenir
+                  </p>
+                </>
+              )}
+            </div>
+          </div>
+
+          <p className="mt-5 min-h-[1.25rem] text-sm font-semibold text-white/55">
             {committed
-              ? "Top. On y va."
+              ? "On y va. Première séance prête."
               : progress > 0
                 ? "Continue d'appuyer…"
-                : "Pose ton doigt et garde 2-3 secondes."}
+                : "Pose ton doigt sur le bouton. Garde 2 secondes."}
           </p>
         </div>
 
         <button
-          className="mt-6 text-xs font-bold text-white/45 underline-offset-2 hover:underline"
+          className="mt-7 text-xs font-bold text-white/40 underline-offset-2 hover:underline"
           onClick={onCancel}
           type="button"
         >

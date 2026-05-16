@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AdaptationExplanationCard } from "@/components/AdaptationExplanation";
 import { SessionSummary } from "@/components/SessionSummary";
+import { SessionCelebration } from "@/components/session/SessionCelebration";
 import { SessionStepAnnounce } from "@/components/session/SessionStepAnnounce";
 import { SessionStepFeedback } from "@/components/session/SessionStepFeedback";
 import { SessionStepRest } from "@/components/session/SessionStepRest";
@@ -101,7 +102,7 @@ export function SessionRunner() {
       lastTrackedExerciseIdRef.current = null;
       return;
     }
-    if (step.type === "complete" || step.type === "wrap-up") return;
+    if (step.type === "complete" || step.type === "wrap-up" || step.type === "celebration") return;
 
     const exercise = currentSession.exercises[step.exerciseIndex];
     if (!exercise) return;
@@ -378,7 +379,9 @@ export function SessionRunner() {
       difficulty: data.difficulty,
       globalPain: data.globalPain
     });
-    finalizeSession();
+    // Show the celebration screen first, then run finalizeSession on Continue.
+    setStep({ type: "celebration" });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleApplyAlternative = (exerciseIndex: number, replacement: Exercise) => {
@@ -511,6 +514,16 @@ export function SessionRunner() {
           completedCount={completedCount}
           exerciseCount={currentSession.exercises.length}
           onValidate={handleWrapUp}
+        />
+      ) : null}
+
+      {step.type === "celebration" ? (
+        <SessionCelebration
+          durationLabel={formatDurationLong(
+            Math.max(0, Date.now() - new Date(active.timer.startedAt).getTime() - active.timer.pausedTotalMs)
+          )}
+          exerciseCount={currentSession.exercises.length}
+          onContinue={finalizeSession}
         />
       ) : null}
 

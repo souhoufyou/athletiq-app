@@ -496,7 +496,8 @@ export type ActiveProgramMeta = {
 export type Profile = {
   id: string;
   name: string;
-  avatar: string; // emoji
+  avatar: string;     // emoji (fallback when no photo)
+  photoUrl?: string;  // base64 data URL of a user-uploaded photo
 };
 
 export type UserSettings = {

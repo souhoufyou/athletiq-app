@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BrandLogo } from "@/components/BrandLogo";
+import { fileToCompressedAvatar } from "@/lib/imageUpload";
 import { SessionExerciseIcon } from "@/components/session/SessionExerciseIcon";
 import { WeekTimelineCompact } from "@/components/WeekTimeline";
 import { getActiveProgramTemplate } from "@/lib/activeProgram";
@@ -35,6 +36,8 @@ export function Dashboard() {
     history,
     isReady,
     profiles,
+    setProfilePhoto,
+    setSettings,
     settings,
     startSession,
     todaySession,
@@ -81,27 +84,47 @@ export function Dashboard() {
         <Link aria-label="AthletIQ" className="min-w-0" href="/">
           <BrandLogo className="h-10" variant="wordmark" />
         </Link>
-        <Link
-          aria-label="Paramètres"
-          className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/70 transition hover:bg-white/10"
-          href="/parametres"
+        <button
+          aria-label={settings.darkMode ? "Passer en mode clair" : "Passer en mode sombre"}
+          className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/80 transition hover:bg-white/10"
+          onClick={() => setSettings({ ...settings, darkMode: !settings.darkMode })}
+          title={settings.darkMode ? "Mode clair" : "Mode sombre"}
+          type="button"
         >
-          <svg className="size-4" fill="none" viewBox="0 0 24 24">
-            <path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z" stroke="currentColor" strokeWidth="2" />
-            <path
-              d="M12 3v2M12 19v2M4.2 6.2l1.4 1.4M18.4 16.4l1.4 1.4M3 12h2M19 12h2M4.2 17.8l1.4-1.4M18.4 7.6l1.4-1.4"
-              stroke="currentColor"
-              strokeLinecap="round"
-              strokeWidth="2"
-            />
-          </svg>
-        </Link>
+          {settings.darkMode ? (
+            // Sun icon (currently dark → click to go light)
+            <svg className="size-5" fill="none" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="2" />
+              <path
+                d="M12 3v2M12 19v2M4.5 4.5l1.4 1.4M18.1 18.1l1.4 1.4M3 12h2M19 12h2M4.5 19.5l1.4-1.4M18.1 5.9l1.4-1.4"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeWidth="2"
+              />
+            </svg>
+          ) : (
+            // Moon icon (currently light → click to go dark)
+            <svg className="size-5" fill="none" viewBox="0 0 24 24">
+              <path
+                d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+              />
+            </svg>
+          )}
+        </button>
       </div>
 
       <ProfileHeader
         avatar={activeProfile?.avatar ?? "💪"}
         goal={mainGoal}
         name={settings.athleteName || activeProfile?.name || "Athlète"}
+        onPhotoChange={(dataUrl) => {
+          if (activeProfile) setProfilePhoto(activeProfile.id, dataUrl);
+        }}
+        photoUrl={activeProfile?.photoUrl}
         programName={activeProgram?.name ?? "Programme personnalisé"}
       />
 
@@ -137,18 +160,59 @@ function ProfileHeader({
   avatar,
   goal,
   name,
+  onPhotoChange,
+  photoUrl,
   programName
 }: {
   avatar: string;
   goal: string;
   name: string;
+  onPhotoChange: (dataUrl: string | undefined) => void;
+  photoUrl?: string;
   programName: string;
 }) {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  const handleFile = async (file: File | undefined) => {
+    if (!file) return;
+    setUploadError(null);
+    try {
+      const dataUrl = await fileToCompressedAvatar(file);
+      onPhotoChange(dataUrl);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "Erreur d'import");
+    }
+  };
+
   return (
     <section className="flex items-center gap-3 rounded-2xl border border-white/8 bg-white/4 p-3">
-      <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl border border-coral/30 bg-coral/15 text-2xl">
-        {avatar}
-      </span>
+      <button
+        aria-label="Changer la photo de profil"
+        className="group relative flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-coral/30 bg-coral/15 text-2xl transition hover:border-coral/60"
+        onClick={() => fileInputRef.current?.click()}
+        type="button"
+      >
+        {photoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img alt={name} className="size-full object-cover" src={photoUrl} />
+        ) : (
+          <span aria-hidden="true">{avatar}</span>
+        )}
+        <span className="absolute inset-0 hidden items-center justify-center bg-black/50 text-[10px] font-black uppercase text-white group-hover:flex">
+          {photoUrl ? "Changer" : "Photo"}
+        </span>
+      </button>
+      <input
+        accept="image/*"
+        className="hidden"
+        onChange={(event) => handleFile(event.target.files?.[0])}
+        ref={fileInputRef}
+        type="file"
+      />
+      {uploadError ? (
+        <span className="sr-only" role="alert">{uploadError}</span>
+      ) : null}
       <div className="min-w-0 flex-1">
         <p className="truncate text-lg font-black leading-tight text-white">{name}</p>
         <p className="mt-0.5 truncate text-xs font-semibold text-white/55">{programName}</p>
@@ -218,7 +282,7 @@ function TodaySessionCard({
         style={{ backgroundImage: `url(${heroImage})` }}
       >
         <div className="absolute inset-0 bg-gradient-to-t from-[#04050d] via-[#04050d]/65 to-transparent" />
-        <div className="absolute inset-0 flex flex-col justify-between p-4">
+        <div className="hero-overlay absolute inset-0 flex flex-col justify-between p-4">
           <div className="flex items-start justify-between gap-3">
             <p className="rounded-full bg-black/35 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-coral backdrop-blur">
               Séance du jour · {typeLabel}

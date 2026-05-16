@@ -55,7 +55,7 @@ export function SessionStepAnnounce({
         style={{ backgroundImage: `url(${heroImage})` }}
       >
         <div className="absolute inset-0 bg-gradient-to-t from-[#04050d] via-[#04050d]/55 to-transparent" />
-        <div className="absolute inset-0 flex flex-col justify-between p-4">
+        <div className="hero-overlay absolute inset-0 flex flex-col justify-between p-4">
           <div className="flex items-center justify-between gap-3">
             <p className="rounded-full bg-black/35 px-3 py-1 text-[10px] font-black uppercase tracking-[0.28em] text-white/85 backdrop-blur">
               Exercice {exerciseIndex + 1} / {exerciseTotal}
@@ -111,7 +111,7 @@ export function SessionStepAnnounce({
         <div className="mt-3 grid grid-cols-2 gap-2">
           {onReplace ? (
             <button className="session-cta-secondary" onClick={onReplace} type="button">
-              🔄 Remplacer
+              Remplacer
             </button>
           ) : (
             <span />

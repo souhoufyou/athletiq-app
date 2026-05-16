@@ -13,6 +13,7 @@ export type SessionStep =
   | { type: "rest"; exerciseIndex: number; nextSetIndex: number; durationSec: number }
   | { type: "feedback"; exerciseIndex: number }
   | { type: "wrap-up" }
+  | { type: "celebration" }
   | { type: "complete" };
 
 /**
