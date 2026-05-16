@@ -40,7 +40,8 @@ export async function migrateLocalStorageToSupabase(userId: string): Promise<boo
   }, { onConflict: "user_id" });
 
   // 2. Migrate settings
-  const settings = readLocalJson<any>(profileKey(activeProfileId, "settings"), null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const settings = readLocalJson<Record<string, any>>(profileKey(activeProfileId, "settings"), null);
   if (settings) {
     await supabase.from("user_settings").upsert({
       user_id: userId,
@@ -86,7 +87,8 @@ export async function migrateLocalStorageToSupabase(userId: string): Promise<boo
   }
 
   // 3. Migrate program
-  const program = readLocalJson<any[]>(profileKey(activeProfileId, "program"), []);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const program = readLocalJson<Record<string, any>[]>(profileKey(activeProfileId, "program"), []);
   if (program.length > 0) {
     // Delete existing planned sessions for this user
     await supabase.from("planned_sessions").delete().eq("user_id", userId);
@@ -105,7 +107,8 @@ export async function migrateLocalStorageToSupabase(userId: string): Promise<boo
   }
 
   // 4. Migrate history
-  const history = readLocalJson<any[]>(profileKey(activeProfileId, "history"), []);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const history = readLocalJson<Record<string, any>[]>(profileKey(activeProfileId, "history"), []);
   if (history.length > 0) {
     for (const session of history) {
       await supabase.from("completed_sessions").upsert({
