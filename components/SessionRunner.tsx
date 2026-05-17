@@ -22,6 +22,7 @@ import {
   getDefaultLoadForSet,
   getDefaultRepsValue,
   getPlannedSetCount,
+  parseLoadValue,
   type SessionStep
 } from "@/lib/sessionFlow";
 import { useCoachStorage } from "@/lib/storage";
@@ -51,6 +52,7 @@ export function SessionRunner() {
     completeSession,
     currentProgram,
     dateKey,
+    history,
     isReady,
     pauseSessionTimer,
     replaceExercise,
@@ -75,6 +77,35 @@ export function SessionRunner() {
   const matchingActive = Boolean(activeSession && activePlannedSession && activeSession.dateKey === dateKey);
   const active = matchingActive ? activeSession : null;
   const currentSession = active ? runningSession : todaySession;
+
+  const hasPersonalRecord = useMemo(() => {
+    if (!activeSession?.logs || history.length === 0) return false;
+    const bestByName = new Map<string, number>();
+    for (const past of history) {
+      for (const [exId, prog] of Object.entries(past.progressions ?? {})) {
+        const log = past.logs?.[exId];
+        if (!log?.usedLoad || !prog?.exerciseName) continue;
+        const parts = parseLoadValue(log.usedLoad);
+        if (!parts || parts.value <= 0) continue;
+        const key = prog.exerciseName.toLowerCase().trim();
+        if (parts.value > (bestByName.get(key) ?? 0)) {
+          bestByName.set(key, parts.value);
+        }
+      }
+    }
+    for (const exercise of currentSession.exercises) {
+      const log = activeSession.logs[exercise.id];
+      if (!log?.sets) continue;
+      const key = exercise.name.toLowerCase().trim();
+      const prevBest = bestByName.get(key) ?? 0;
+      if (prevBest <= 0) continue;
+      for (const set of log.sets) {
+        const parts = parseLoadValue(set.usedLoad);
+        if (parts && parts.value > prevBest) return true;
+      }
+    }
+    return false;
+  }, [activeSession?.logs, history, currentSession.exercises]);
 
   // Initialise / re-sync the step machine when a new active session appears
   useEffect(() => {
@@ -528,6 +559,7 @@ export function SessionRunner() {
             Math.max(0, Date.now() - new Date(active.timer.startedAt).getTime() - active.timer.pausedTotalMs)
           )}
           exerciseCount={currentSession.exercises.length}
+          hasPersonalRecord={hasPersonalRecord}
           onContinue={finalizeSession}
         />
       ) : null}
@@ -778,7 +810,7 @@ function GuidedSessionReport({
         </p>
         {calories ? (
           <div className="mt-3 inline-flex items-center gap-2 rounded-md bg-white/10 px-3 py-2">
-            <span className="text-lg">🔥</span>
+            <svg className="size-5 text-coral" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2c.5 2.5-.5 4.5-1.5 6C9.5 10 9 12 10 14c.5-1.5 1.5-2.5 3-3 1-.5 2-2 2-4 1 1 2.5 3.5 2.5 6.5a6.5 6.5 0 1 1-13 0C4.5 9 8 5 12 2z" /></svg>
             <div>
               <p className="text-xs font-black uppercase text-white/60">Calories estimées</p>
               <p className="text-xl font-black text-white">

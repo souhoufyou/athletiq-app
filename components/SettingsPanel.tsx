@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { fileToCompressedAvatar } from "@/lib/imageUpload";
 import { logout } from "@/lib/useAuth";
 import {
   appendCalibrationEvent,
@@ -30,7 +31,7 @@ import type {
   WeightEntry
 } from "@/types/training";
 
-const AVATAR_CHOICES = ["💪", "🏋️", "🥋", "🏃", "🤸", "🧘", "👤", "🦁", "🔥", "⚡"];
+const AVATAR_CHOICES: string[] = [];
 
 const goalLabels: Record<PrimaryGoal, string> = {
   "perte-gras": "Perte de gras",
@@ -493,6 +494,7 @@ export function SettingsPanel() {
     regenerateProgram,
     renameProfile,
     resetAll,
+    setProfilePhoto,
     setSettings,
     settings,
     switchProfile
@@ -505,20 +507,21 @@ export function SettingsPanel() {
   const activeProgram = getActiveProgramTemplate(currentProgram);
   const weeklyFrequency = settings.weeklyFrequency ?? Math.max(currentProgram.length, 3);
 
+  const activeProfile = profiles.find((p) => p.id === activeProfileId);
+
   return (
     <div className="space-y-4">
-      <ProfilesSection
-        activeProfileId={activeProfileId}
-        onCreate={createProfile}
-        onDelete={deleteProfile}
-        onRename={renameProfile}
-        onSwitch={switchProfile}
-        profiles={profiles}
-      />
-
       {/* ── PROFIL ───────────────────────────────────────────────── */}
       <SectionCard subtitle="Tes infos personnelles essentielles." title="Profil">
-        <label className="block">
+        <ProfilePhotoUpload
+          name={settings.athleteName || "Athlète"}
+          photoUrl={activeProfile?.photoUrl}
+          onPhotoChange={(dataUrl) => {
+            if (activeProfile) setProfilePhoto(activeProfile.id, dataUrl);
+          }}
+        />
+
+        <label className="mt-4 block">
           <span className="text-sm font-bold text-white/60">Prénom</span>
           <input
             className="mt-1 h-12 w-full rounded-md border border-white/10 bg-white/5 px-3 font-semibold text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
@@ -841,11 +844,6 @@ export function SettingsPanel() {
         ) : null}
       </SectionCard>
 
-      {/* ── COMPTE ──────────────────────────────────────────────── */}
-      <SectionCard subtitle="Gérer ta session" title="Compte">
-        <LogoutButton />
-      </SectionCard>
-
       {/* ── SUIVI POIDS ─────────────────────────────────────────── */}
       <WeightLogSection
         currentWeightKg={settings.currentWeightKg}
@@ -860,6 +858,9 @@ export function SettingsPanel() {
           setSettings({ ...settings, weightLog: nextLog, currentWeightKg: entry.kg });
         }}
       />
+
+      {/* ── DÉCONNEXION (tout en bas) ──────────────────────────── */}
+      <LogoutButton />
     </div>
   );
 }
@@ -1639,54 +1640,25 @@ function ProfilesSection({
 
   return (
     <section className="card-dark p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-black text-white">Profils</h2>
-          <p className="mt-1 text-sm font-semibold text-white/55">
-            Chaque profil a son propre programme et historique.
-          </p>
-        </div>
-        {!creating ? (
-          <button
-            className="h-10 shrink-0 rounded-md bg-sky px-3 text-sm font-black text-white transition hover:bg-sky/80"
-            onClick={() => setCreating(true)}
-            type="button"
-          >
-            + Ajouter
-          </button>
-        ) : null}
-      </div>
+      <h2 className="text-xl font-black text-white">Profils</h2>
 
-      <div className="mt-4 space-y-2">
+      <div className="mt-3 space-y-2">
         {profiles.map((profile) => {
           const isActive = profile.id === activeProfileId;
           const isEditing = editingId === profile.id;
+          const initial = profile.name.trim().charAt(0).toUpperCase() || "P";
 
           if (isEditing) {
             return (
               <div className="rounded-xl border border-sky/30 bg-sky/5 p-3" key={profile.id}>
                 <div className="flex items-center gap-2">
-                  <span className="text-2xl">{editAvatar}</span>
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-sky/20 text-sm font-black text-sky">{initial}</span>
                   <input
                     className="h-11 flex-1 rounded-md border border-white/10 bg-white/5 px-3 font-semibold text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
                     onChange={(e) => setEditName(e.target.value)}
                     placeholder="Nom du profil"
                     value={editName}
                   />
-                </div>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {AVATAR_CHOICES.map((avatar) => (
-                    <button
-                      className={`flex size-9 items-center justify-center rounded-md border text-lg transition ${
-                        avatar === editAvatar ? "border-sky bg-sky/20" : "border-white/10 bg-white/5 hover:bg-white/10"
-                      }`}
-                      key={avatar}
-                      onClick={() => setEditAvatar(avatar)}
-                      type="button"
-                    >
-                      {avatar}
-                    </button>
-                  ))}
                 </div>
                 <div className="mt-3 flex gap-2">
                   <button
@@ -1720,16 +1692,14 @@ function ProfilesSection({
               }`}
               key={profile.id}
             >
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-white/10 text-2xl">
-                {profile.avatar}
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white/10 text-sm font-black text-white">
+                {initial}
               </span>
               <div className="min-w-0 flex-1">
                 <p className="truncate font-black text-white">{profile.name}</p>
                 {isActive ? (
                   <p className="text-xs font-black uppercase text-sky">Profil actif</p>
-                ) : (
-                  <p className="text-xs font-semibold text-white/45">Touche pour basculer</p>
-                )}
+                ) : null}
               </div>
               {!isActive ? (
                 <button
@@ -1750,76 +1720,12 @@ function ProfilesSection({
                 }}
                 type="button"
               >
-                ✎
+                <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
               </button>
-              {profiles.length > 1 ? (
-                <button
-                  aria-label="Supprimer"
-                  className="flex size-9 shrink-0 items-center justify-center rounded-md border border-coral/20 bg-coral/10 text-coral transition hover:bg-coral/20"
-                  onClick={() => {
-                    if (window.confirm(`Supprimer le profil ${profile.name} ? Cette action est définitive.`)) {
-                      onDelete(profile.id);
-                    }
-                  }}
-                  type="button"
-                >
-                  ✕
-                </button>
-              ) : null}
             </div>
           );
         })}
       </div>
-
-      {creating ? (
-        <div className="mt-4 rounded-xl border border-sky/30 bg-sky/5 p-3">
-          <p className="text-sm font-black text-sky">Nouveau profil</p>
-          <div className="mt-3 flex items-center gap-2">
-            <span className="text-2xl">{draftAvatar}</span>
-            <input
-              autoFocus
-              className="h-11 flex-1 rounded-md border border-white/10 bg-white/5 px-3 font-semibold text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
-              onChange={(e) => setDraftName(e.target.value)}
-              placeholder="Prénom"
-              value={draftName}
-            />
-          </div>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {AVATAR_CHOICES.map((avatar) => (
-              <button
-                className={`flex size-9 items-center justify-center rounded-md border text-lg transition ${
-                  avatar === draftAvatar ? "border-sky bg-sky/20" : "border-white/10 bg-white/5 hover:bg-white/10"
-                }`}
-                key={avatar}
-                onClick={() => setDraftAvatar(avatar)}
-                type="button"
-              >
-                {avatar}
-              </button>
-            ))}
-          </div>
-          <div className="mt-3 flex gap-2">
-            <button
-              className="h-10 flex-1 rounded-md border border-white/10 bg-white/8 text-sm font-black text-white"
-              onClick={() => {
-                setCreating(false);
-                setDraftName("");
-              }}
-              type="button"
-            >
-              Annuler
-            </button>
-            <button
-              className="h-10 flex-1 rounded-md bg-sky text-sm font-black text-white disabled:opacity-50"
-              disabled={!draftName.trim()}
-              onClick={submitCreate}
-              type="button"
-            >
-              Créer le profil
-            </button>
-          </div>
-        </div>
-      ) : null}
     </section>
   );
 }
@@ -1836,12 +1742,90 @@ function LogoutButton() {
 
   return (
     <button
-      className="h-11 w-full rounded-md border border-white/10 bg-white/8 px-4 text-sm font-black text-white transition hover:bg-white/12"
+      className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-red-500/25 bg-red-500/10 px-4 text-sm font-black text-red-400 transition hover:bg-red-500/20"
       disabled={loading}
       onClick={handleLogout}
       type="button"
     >
+      <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
+      </svg>
       {loading ? "Déconnexion..." : "Se déconnecter"}
     </button>
+  );
+}
+
+function ProfilePhotoUpload({
+  name,
+  photoUrl,
+  onPhotoChange
+}: {
+  name: string;
+  photoUrl?: string;
+  onPhotoChange: (dataUrl: string | undefined) => void;
+}) {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const initials = name.trim().charAt(0).toUpperCase() || "A";
+
+  const handleFile = async (file: File | undefined) => {
+    if (!file) return;
+    setUploadError(null);
+    try {
+      const dataUrl = await fileToCompressedAvatar(file);
+      onPhotoChange(dataUrl);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "Erreur d'import");
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-4">
+      <button
+        aria-label="Changer la photo de profil"
+        className="group relative flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-coral/30 bg-coral/15 transition hover:border-coral/60"
+        onClick={() => fileInputRef.current?.click()}
+        type="button"
+      >
+        {photoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img alt={name} className="size-full object-cover" src={photoUrl} />
+        ) : (
+          <span className="text-xl font-black text-coral">{initials}</span>
+        )}
+        <span className="absolute inset-0 hidden items-center justify-center bg-black/50 text-[10px] font-black uppercase text-white group-hover:flex">
+          {photoUrl ? "Changer" : "Photo"}
+        </span>
+      </button>
+      <input
+        accept="image/*"
+        className="hidden"
+        onChange={(event) => handleFile(event.target.files?.[0])}
+        ref={fileInputRef}
+        type="file"
+      />
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-bold text-white/60">Photo de profil</p>
+        <button
+          className="mt-1 text-xs font-bold text-sky underline-offset-2 hover:underline"
+          onClick={() => fileInputRef.current?.click()}
+          type="button"
+        >
+          {photoUrl ? "Changer la photo" : "Ajouter une photo"}
+        </button>
+        {photoUrl ? (
+          <button
+            className="ml-3 text-xs font-bold text-white/40 underline-offset-2 hover:underline"
+            onClick={() => onPhotoChange(undefined)}
+            type="button"
+          >
+            Supprimer
+          </button>
+        ) : null}
+        {uploadError ? (
+          <p className="mt-1 text-xs text-coral">{uploadError}</p>
+        ) : null}
+      </div>
+    </div>
   );
 }

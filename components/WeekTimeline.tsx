@@ -71,7 +71,7 @@ function getCompactSymbol(day: DayInfo): string {
 export function DayStatusBadge({ state }: { state: DayState }) {
   const tone = getDayStateTone(state);
   return (
-    <span className={`shrink-0 rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-wide ${tone.badge}`}>
+    <span className={`shrink-0 whitespace-nowrap rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-wide ${tone.badge}`}>
       {getDayStateLabel(state)}
     </span>
   );

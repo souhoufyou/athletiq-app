@@ -122,12 +122,12 @@ export function HistoryList() {
                     ) : null}
                     {calorieEstimate ? (
                       <span className="rounded-md bg-amber/10 px-3 py-2 text-sm font-black text-amber">
-                        🔥 ~{Math.round((calorieEstimate.low + calorieEstimate.high) / 2)} kcal
+                        ~{Math.round((calorieEstimate.low + calorieEstimate.high) / 2)} kcal
                       </span>
                     ) : null}
                     {prExerciseIds.size > 0 ? (
                       <span className="rounded-md bg-sea/10 px-3 py-2 text-sm font-black text-sea">
-                        🏆 {prExerciseIds.size} PR
+                        {prExerciseIds.size} PR
                       </span>
                     ) : null}
                   </div>
@@ -186,7 +186,7 @@ export function HistoryList() {
                       <div className="flex items-start justify-between gap-2">
                         <p className="font-black leading-tight text-white">
                           {progression?.exerciseName ?? exerciseNames.get(log.exerciseId) ?? log.exerciseId}
-                          {isPR ? <span className="ml-2 text-xs font-black text-sea">🏆 PR</span> : null}
+                          {isPR ? <span className="ml-2 text-xs font-black text-sea">PR</span> : null}
                         </p>
                         <p
                           className={`shrink-0 rounded-md px-2 py-1 text-xs font-black ${

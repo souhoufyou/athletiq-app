@@ -498,8 +498,158 @@ select {
     }
   }
 
+  @keyframes session-slide-in {
+    from {
+      opacity: 0;
+      transform: translateX(40px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes counter-pop {
+    0% {
+      opacity: 0;
+      transform: scale(0.5);
+    }
+    60% {
+      opacity: 1;
+      transform: scale(1.15);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes confetti-fall {
+    0% {
+      opacity: 1;
+      transform: translateY(0) rotate(0deg) scale(1);
+    }
+    100% {
+      opacity: 0;
+      transform: translateY(110vh) rotate(720deg) scale(0.3);
+    }
+  }
+
+  @keyframes confetti-spread {
+    0% {
+      transform: translateX(0);
+    }
+    100% {
+      transform: translateX(var(--confetti-x, 0px));
+    }
+  }
+
+  @keyframes motivation-glow {
+    0%, 100% {
+      opacity: 0.4;
+      transform: scale(0.95);
+    }
+    50% {
+      opacity: 0.7;
+      transform: scale(1.05);
+    }
+  }
+
+  @keyframes motivation-text-rise {
+    from {
+      opacity: 0;
+      transform: translateY(20px) scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  @keyframes motivation-emoji-pop {
+    0% {
+      opacity: 0;
+      transform: scale(0) rotate(-15deg);
+    }
+    50% {
+      transform: scale(1.2) rotate(5deg);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1) rotate(0deg);
+    }
+  }
+
+  @keyframes sparkline-draw {
+    from {
+      stroke-dashoffset: var(--sparkline-length, 300);
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  @keyframes sparkline-dot-in {
+    from {
+      opacity: 0;
+      transform: scale(0);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
   .session-step-enter {
-    animation: session-fade-in 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+    animation: session-slide-in 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .counter-pop {
+    animation: counter-pop 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .confetti-piece {
+    position: fixed;
+    top: -10px;
+    z-index: 100;
+    pointer-events: none;
+    animation:
+      confetti-fall var(--confetti-duration, 2.8s) cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards,
+      confetti-spread var(--confetti-duration, 2.8s) ease-out forwards;
+  }
+
+  .motivation-glow {
+    animation: motivation-glow 3s ease-in-out infinite;
+    filter: blur(28px);
+  }
+
+  .motivation-emoji {
+    animation: motivation-emoji-pop 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.3s both;
+  }
+
+  .motivation-title {
+    animation: motivation-text-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.5s both;
+  }
+
+  .motivation-subtitle {
+    animation: motivation-text-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.75s both;
+  }
+
+  .motivation-progress-bar {
+    animation: motivation-text-rise 0.5s ease-out 1s both;
+  }
+
+  .sparkline-path {
+    animation: sparkline-draw 1.2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+
+  .sparkline-dot {
+    animation: sparkline-dot-in 0.3s ease-out 1.1s both;
+  }
+
+  @keyframes motivation-bar-fill {
+    from { width: 0%; }
+    to { width: 100%; }
   }
 
   .session-step-card {

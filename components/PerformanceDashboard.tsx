@@ -42,6 +42,7 @@ type ExercisePerformance = {
   nextTarget: string;
   progression: string;
   recentDelta: number;
+  sparkline: number[];
   trend: "douleur" | "pas assez de données" | "progresse" | "régresse" | "stable";
   volume?: number;
 };
@@ -101,9 +102,9 @@ export function PerformanceDashboard() {
             </div>
           </div>
           <div className="mt-5 grid grid-cols-3 gap-2">
-            <HeroMetric label="DC" value={bench?.best ?? "-"} />
-            <HeroMetric label="Squat" value={squat?.best ?? "-"} />
-            <HeroMetric label="Soulevé" value={deadlift?.best ?? "-"} />
+            <HeroMetric label="DC" sparkline={bench?.sparkline} value={bench?.best ?? "-"} />
+            <HeroMetric label="Squat" sparkline={squat?.sparkline} value={squat?.best ?? "-"} />
+            <HeroMetric label="Soulevé" sparkline={deadlift?.sparkline} value={deadlift?.best ?? "-"} />
           </div>
         </div>
       </section>
@@ -149,6 +150,57 @@ export function PerformanceDashboard() {
   );
 }
 
+function Sparkline({ data, color = "#ff5a00", height = 40, width = 120 }: { data: number[]; color?: string; height?: number; width?: number }) {
+  if (data.length < 2) return null;
+
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = max - min || 1;
+  const padding = 4;
+  const innerW = width - padding * 2;
+  const innerH = height - padding * 2;
+
+  const points = data.map((v, i) => ({
+    x: padding + (i / (data.length - 1)) * innerW,
+    y: padding + innerH - ((v - min) / range) * innerH
+  }));
+
+  const pathD = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(" ");
+  const areaD = `${pathD} L ${points[points.length - 1].x.toFixed(1)} ${height} L ${points[0].x.toFixed(1)} ${height} Z`;
+  const last = points[points.length - 1];
+  const pathLength = points.reduce((acc, p, i) => {
+    if (i === 0) return 0;
+    const prev = points[i - 1];
+    return acc + Math.sqrt((p.x - prev.x) ** 2 + (p.y - prev.y) ** 2);
+  }, 0);
+
+  return (
+    <svg className="overflow-visible" height={height} viewBox={`0 0 ${width} ${height}`} width={width}>
+      <defs>
+        <linearGradient id={`spark-fill-${color.replace("#", "")}`} x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.25" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={areaD} fill={`url(#spark-fill-${color.replace("#", "")})`} />
+      <path
+        className="sparkline-path"
+        d={pathD}
+        fill="none"
+        stroke={color}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2"
+        style={{
+          strokeDasharray: pathLength,
+          "--sparkline-length": `${pathLength}`
+        } as React.CSSProperties}
+      />
+      <circle className="sparkline-dot" cx={last.x} cy={last.y} fill={color} r="3" />
+    </svg>
+  );
+}
+
 function PerformanceCard({ performance }: { performance: ExercisePerformance }) {
   const isCardio = performance.definition.kind === "cardio";
 
@@ -161,6 +213,16 @@ function PerformanceCard({ performance }: { performance: ExercisePerformance }) 
         </div>
         <TrendBadge trend={performance.trend} />
       </div>
+
+      {performance.sparkline.length >= 2 ? (
+        <div className="mt-3 rounded-xl border border-white/6 bg-white/4 px-3 py-2">
+          <p className="mb-1 text-[10px] font-black uppercase tracking-wide text-white/40">Tendance charges</p>
+          <Sparkline
+            color={performance.trend === "progresse" ? "#24c07a" : performance.trend === "régresse" ? "#ff5a00" : "#f59e0b"}
+            data={performance.sparkline}
+          />
+        </div>
+      ) : null}
 
       <div className="mt-4 grid grid-cols-2 gap-2">
         <PerfTile label="Dernière perf" value={performance.latest} />
@@ -277,11 +339,16 @@ function CalibrationJournalSection({ events }: { events: CalibrationEvent[] }) {
   );
 }
 
-function HeroMetric({ label, value }: { label: string; value: string }) {
+function HeroMetric({ label, sparkline, value }: { label: string; sparkline?: number[]; value: string }) {
   return (
     <div className="rounded-md bg-white/10 p-3 text-center">
       <p className="text-lg font-black leading-tight">{value}</p>
       <p className="mt-1 text-[11px] font-black uppercase text-white/60">{label}</p>
+      {sparkline && sparkline.length >= 2 ? (
+        <div className="mt-1.5 flex justify-center">
+          <Sparkline color="#ff9f1a" data={sparkline} height={24} width={80} />
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -384,6 +451,11 @@ function buildExercisePerformance(
   const bestStrength = definition.kind === "strength" ? getBestStrength(entries, definition.referenceBest) : undefined;
   const bestLabel = bestCardio?.label ?? bestStrength?.label ?? "Aucune donnée";
 
+  const sparkline = entries
+    .filter((e) => e.loadKg !== undefined && e.loadKg > 0)
+    .slice(-8)
+    .map((e) => e.loadKg as number);
+
   return {
     best: bestLabel,
     bestBadge: bestStrength?.isReference || entries.length ? "record" : undefined,
@@ -393,6 +465,7 @@ function buildExercisePerformance(
     nextTarget: planned ? formatPlannedTarget(planned) : "À définir",
     progression,
     recentDelta,
+    sparkline,
     trend,
     volume: latest?.volume
   };
