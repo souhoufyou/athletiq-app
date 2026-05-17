@@ -112,20 +112,28 @@ export function ProgramPlanner() {
         sessionsThisWeek={currentProgram.length}
       />
 
-      <section className="space-y-2" aria-label="Semaine type">
-        {timelineDays.map((day) => {
+      <section aria-label="Semaine type">
+        {timelineDays.map((day, index) => {
           const isExpanded = expandedDay === day.weekday;
+          const isLast = index === timelineDays.length - 1;
           return (
-            <DayRow
-              currentWeightKg={settings.currentWeightKg}
-              day={day}
-              isExpanded={isExpanded}
-              key={day.weekday}
-              onStart={() => {
-                if (day.planned) handleStartFromDay(day.planned, day.state);
-              }}
-              onToggle={() => setExpandedDay(isExpanded ? null : day.weekday)}
-            />
+            <div className="flex gap-3" key={day.weekday}>
+              <div className="flex w-5 shrink-0 flex-col items-center">
+                <TimelineDot state={day.state} isToday={day.isToday} />
+                {!isLast ? <TimelineConnector /> : null}
+              </div>
+              <div className="min-w-0 flex-1 pb-2">
+                <DayRow
+                  currentWeightKg={settings.currentWeightKg}
+                  day={day}
+                  isExpanded={isExpanded}
+                  onStart={() => {
+                    if (day.planned) handleStartFromDay(day.planned, day.state);
+                  }}
+                  onToggle={() => setExpandedDay(isExpanded ? null : day.weekday)}
+                />
+              </div>
+            </div>
           );
         })}
       </section>
@@ -324,6 +332,29 @@ function capitalize(text: string): string {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
+// TIMELINE VERTICAL CONNECTOR
+// ─────────────────────────────────────────────────────────────────────────
+
+function TimelineDot({ state, isToday }: { state: DayState; isToday: boolean }) {
+  const color =
+    state === "done" ? "bg-sea border-sea"
+    : state === "in-progress" ? "bg-amber border-amber"
+    : state === "to-do" ? "bg-coral/30 border-coral"
+    : state === "missed" ? "bg-white/20 border-white/30"
+    : "bg-white/10 border-white/15";
+
+  return (
+    <div
+      className={`mt-4 size-3 shrink-0 rounded-full border-2 ${color} ${isToday ? "ring-2 ring-coral/50 ring-offset-1 ring-offset-[#0f111a]" : ""}`}
+    />
+  );
+}
+
+function TimelineConnector() {
+  return <div className="w-0.5 flex-1 bg-white/10" />;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
 // DAY ROW (collapsed + expanded)
 // ─────────────────────────────────────────────────────────────────────────
 
@@ -340,14 +371,17 @@ function DayRow({
   onStart: () => void;
   onToggle: () => void;
 }) {
-  const accent = day.isToday ? "border-l-coral" : "border-l-white/12";
+  const accent = day.isToday ? "border-l-coral" : day.state === "missed" ? "border-l-white/25" : "border-l-white/12";
   const planned = day.planned;
   const isRest = !planned;
+  const isMissed = day.state === "missed";
 
   return (
     <article
-      className={`overflow-hidden rounded-2xl border border-white/8 bg-white/4 transition ${
-        day.isToday ? "ring-1 ring-coral/40" : ""
+      className={`overflow-hidden rounded-2xl border transition ${
+        day.isToday ? "border-white/8 bg-white/4 ring-1 ring-coral/40"
+        : isMissed ? "border-white/6 bg-white/[0.02] opacity-70"
+        : "border-white/8 bg-white/4"
       }`}
     >
       <button
