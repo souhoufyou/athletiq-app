@@ -846,105 +846,20 @@ export function SettingsPanel() {
         <LogoutButton />
       </SectionCard>
 
-      {/* ── AVANCÉ ──────────────────────────────────────────────── */}
-      <details className="card-dark group p-4">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
-          <div>
-            <h2 className="text-xl font-black text-white">Avancé</h2>
-            <p className="mt-1 text-sm font-semibold text-white/55">
-              Analyse IA, sport externe, calibration force, préférences détaillées.
-            </p>
-          </div>
-          <span className="rounded-md bg-white/8 px-3 py-2 text-xs font-black text-white/55 group-open:bg-sky/10 group-open:text-sky">
-            Ouvrir
-          </span>
-        </summary>
-
-        <div className="mt-4 space-y-4">
-          <ToggleRow
-            checked={settings.aiEnabled}
-            label="Analyse IA des séances"
-            onChange={(checked) => setSettings({ ...settings, aiEnabled: checked })}
-          />
-
-          <label className="block">
-            <span className="text-sm font-bold text-white/60">Niveau de prudence du moteur</span>
-            <select
-              className="mt-1 h-12 w-full rounded-md border border-white/10 bg-white/5 px-3 font-semibold text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
-              onChange={(event) => setSettings({ ...settings, cautionLevel: event.target.value as CautionLevel })}
-              value={settings.cautionLevel}
-            >
-              <option value="prudent">Prudent</option>
-              <option value="normal">Normal</option>
-              <option value="agressif">Agressif</option>
-            </select>
-          </label>
-
-          <label className="block">
-            <span className="text-sm font-bold text-white/60">Unité de charge</span>
-            <select
-              className="mt-1 h-12 w-full rounded-md border border-white/10 bg-white/5 px-3 font-semibold text-white outline-none focus:border-sky focus:ring-2 focus:ring-sky/20"
-              onChange={(event) => setSettings({ ...settings, loadUnit: event.target.value === "lb" ? "lb" : "kg" })}
-              value={settings.loadUnit}
-            >
-              <option value="kg">kg</option>
-              <option value="lb">lb</option>
-            </select>
-          </label>
-
-          <ExternalSportsSection
-            externalSports={settings.externalSports}
-            onChange={(externalSports) => setSettings({ ...settings, externalSports })}
-          />
-
-          <StrengthReferencesSection
-            loadUnit={settings.loadUnit}
-            onChange={(strengthReferences) => setSettings({ ...settings, strengthReferences })}
-            onSettingsChange={setSettings}
-            settings={settings}
-            strengthReferences={settings.strengthReferences}
-          />
-
-          <WeightLogSection
-            currentWeightKg={settings.currentWeightKg}
-            targetWeightKg={settings.targetWeightKg}
-            weightLog={settings.weightLog ?? []}
-            onLog={(entry) => {
-              const existing = settings.weightLog ?? [];
-              const sameDay = existing.find((e) => e.date === entry.date);
-              const nextLog = sameDay
-                ? existing.map((e) => (e.date === entry.date ? entry : e))
-                : [entry, ...existing].slice(0, 30);
-              setSettings({ ...settings, weightLog: nextLog, currentWeightKg: entry.kg });
-            }}
-          />
-
-          <section className="rounded-2xl border border-white/8 bg-white/4 p-4">
-            <h3 className="text-base font-black text-white">Préférences détaillées</h3>
-            <p className="mt-1 text-xs font-semibold text-white/55">
-              Listes utilisées par le moteur pour adapter ton plan.
-            </p>
-            <TextListField
-              label="Points de vigilance"
-              onChange={(values) => setSettings({ ...settings, watchPoints: values })}
-              placeholder="ex. poignet droit, lombaires, genou gauche"
-              values={settings.watchPoints}
-            />
-            <TextListField
-              label="Préférences"
-              onChange={(values) => setSettings({ ...settings, preferences: values })}
-              placeholder="ex. machines, haltères, full body"
-              values={settings.preferences}
-            />
-            <TextListField
-              label="Exercices à éviter"
-              onChange={(values) => setSettings({ ...settings, avoid: values })}
-              placeholder="ex. dips, squat barre, course"
-              values={settings.avoid}
-            />
-          </section>
-        </div>
-      </details>
+      {/* ── SUIVI POIDS ─────────────────────────────────────────── */}
+      <WeightLogSection
+        currentWeightKg={settings.currentWeightKg}
+        targetWeightKg={settings.targetWeightKg}
+        weightLog={settings.weightLog ?? []}
+        onLog={(entry) => {
+          const existing = settings.weightLog ?? [];
+          const sameDay = existing.find((e) => e.date === entry.date);
+          const nextLog = sameDay
+            ? existing.map((e) => (e.date === entry.date ? entry : e))
+            : [entry, ...existing].slice(0, 30);
+          setSettings({ ...settings, weightLog: nextLog, currentWeightKg: entry.kg });
+        }}
+      />
     </div>
   );
 }

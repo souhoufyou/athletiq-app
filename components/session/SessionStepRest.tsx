@@ -71,6 +71,13 @@ export function SessionStepRest({
     }
   }, [secondsLeft, initialSeconds]);
 
+  // Auto-advance to next set 2s after rest timer ends
+  useEffect(() => {
+    if (secondsLeft !== 0 || initialSeconds === 0) return;
+    const timeout = window.setTimeout(onContinue, 2000);
+    return () => window.clearTimeout(timeout);
+  }, [secondsLeft, initialSeconds, onContinue]);
+
   const done = secondsLeft <= 0;
   const ringSize = 240;
   const ringStroke = 12;
@@ -167,7 +174,7 @@ export function SessionStepRest({
       </div>
 
       <button className="session-cta-primary mt-5" onClick={onContinue} type="button">
-        Lancer la série {nextSetIndex}
+        {done ? `Série ${nextSetIndex} dans 2s…` : `Lancer la série ${nextSetIndex}`}
       </button>
     </section>
   );

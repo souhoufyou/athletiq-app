@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ExerciseMediaSheet } from "@/components/session/ExerciseMediaSheet";
@@ -9,7 +8,7 @@ import { DayStatusBadge } from "@/components/WeekTimeline";
 import { PROGRAM_CATALOG } from "@/data/programCatalog";
 import { getActiveProgramTemplate, getActiveProgramTemplateId } from "@/lib/activeProgram";
 import { estimateCalories } from "@/lib/calories";
-import { getActiveComplements } from "@/lib/complementaryPrograms";
+import { COMPLEMENTARY_PROGRAMS, getActiveComplements } from "@/lib/complementaryPrograms";
 import { getWeekday } from "@/lib/date";
 import { instantiateProgramTemplate } from "@/lib/programInstantiation";
 import { recommendPrograms } from "@/lib/programRecommendation";
@@ -32,6 +31,7 @@ export function ProgramPlanner() {
     history,
     isReady,
     setCurrentProgram,
+    setSettings,
     settings,
     startSession,
     todaySession
@@ -112,25 +112,42 @@ export function ProgramPlanner() {
         sessionsThisWeek={currentProgram.length}
       />
 
-      <section className="space-y-2" aria-label="Semaine type">
-        {timelineDays.map((day) => {
+      <section aria-label="Semaine type">
+        {timelineDays.map((day, index) => {
           const isExpanded = expandedDay === day.weekday;
+          const isLast = index === timelineDays.length - 1;
           return (
-            <DayRow
-              currentWeightKg={settings.currentWeightKg}
-              day={day}
-              isExpanded={isExpanded}
-              key={day.weekday}
-              onStart={() => {
-                if (day.planned) handleStartFromDay(day.planned, day.state);
-              }}
-              onToggle={() => setExpandedDay(isExpanded ? null : day.weekday)}
-            />
+            <div className="flex gap-3" key={day.weekday}>
+              <div className="flex w-5 shrink-0 flex-col items-center">
+                <TimelineDot state={day.state} isToday={day.isToday} />
+                {!isLast ? <TimelineConnector /> : null}
+              </div>
+              <div className="min-w-0 flex-1 pb-2">
+                <DayRow
+                  currentWeightKg={settings.currentWeightKg}
+                  day={day}
+                  isExpanded={isExpanded}
+                  onStart={() => {
+                    if (day.planned) handleStartFromDay(day.planned, day.state);
+                  }}
+                  onToggle={() => setExpandedDay(isExpanded ? null : day.weekday)}
+                />
+              </div>
+            </div>
           );
         })}
       </section>
 
-      <ComplementsSection complementIds={settings.complementaryPrograms ?? []} />
+      <ComplementsSection
+        complementIds={settings.complementaryPrograms ?? []}
+        onToggle={(id) => {
+          const current = settings.complementaryPrograms ?? [];
+          const next = current.includes(id)
+            ? current.filter((cid) => cid !== id)
+            : [...current, id];
+          setSettings({ ...settings, complementaryPrograms: next });
+        }}
+      />
 
       {showChangeProgram ? (
         <ChangeProgramSheet
@@ -153,49 +170,62 @@ export function ProgramPlanner() {
   );
 }
 
-function ComplementsSection({ complementIds }: { complementIds: string[] }) {
-  const complements = getActiveComplements(complementIds);
+function ComplementsSection({
+  complementIds,
+  onToggle
+}: {
+  complementIds: string[];
+  onToggle: (id: string) => void;
+}) {
+  const activeCount = complementIds.length;
 
   return (
-    <section className="rounded-2xl border border-white/8 bg-white/4 p-4" aria-label="Compléments">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-[11px] font-black uppercase tracking-[0.22em] text-white/55">Compléments</p>
-        <Link
-          className="text-[11px] font-black uppercase tracking-wide text-sky"
-          href="/parametres"
-        >
-          Gérer
-        </Link>
-      </div>
-
-      {complements.length === 0 ? (
-        <p className="mt-3 text-sm font-semibold text-white/55">
-          Aucun complément actif. Ajoute-en depuis les paramètres pour intégrer mobilité, abdos ou cardio léger.
-        </p>
-      ) : (
-        <ul className="mt-3 space-y-2">
-          {complements.map((complement) => (
-            <li
-              className="flex items-start justify-between gap-3 rounded-xl border border-white/8 bg-white/4 p-3"
+    <details className="group rounded-2xl border border-white/8 bg-white/4">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4">
+        <div>
+          <p className="text-[11px] font-black uppercase tracking-[0.22em] text-white/55">
+            Programmes complémentaires
+          </p>
+          <p className="mt-1 text-xs font-semibold text-white/45">
+            Abdos, cardio, mobilité — à combiner avec ton programme principal.
+          </p>
+        </div>
+        <span className="shrink-0 rounded-md bg-white/8 px-2.5 py-1 text-[10px] font-black text-white/45 group-open:bg-sky/10 group-open:text-sky">
+          {activeCount} actif{activeCount !== 1 ? "s" : ""}
+        </span>
+      </summary>
+      <div className="space-y-2 px-4 pb-4">
+        {COMPLEMENTARY_PROGRAMS.map((complement) => {
+          const active = complementIds.includes(complement.id);
+          return (
+            <button
+              className={`flex w-full items-start justify-between gap-3 rounded-xl border p-3 text-left transition ${
+                active
+                  ? "border-sea/40 bg-sea/10"
+                  : "border-white/10 bg-white/5 hover:bg-white/8"
+              }`}
               key={complement.id}
+              onClick={() => onToggle(complement.id)}
+              type="button"
             >
               <div className="min-w-0">
                 <p className="truncate text-sm font-black text-white">{complement.name}</p>
                 <p className="mt-0.5 text-[11px] font-semibold text-white/55">
                   {complement.weeklyTarget} · ~{complement.defaultDurationMin} min
                 </p>
-                <p className="mt-1 text-[11px] font-semibold leading-relaxed text-white/55">
-                  {complement.shortDescription}
-                </p>
               </div>
-              <span className="shrink-0 rounded-full border border-sea/30 bg-sea/15 px-2.5 py-1 text-[10px] font-black uppercase text-sea">
-                Actif
+              <span
+                className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-black uppercase ${
+                  active ? "border-sea/30 bg-sea/15 text-sea" : "border-white/10 bg-white/8 text-white/55"
+                }`}
+              >
+                {active ? "Actif" : "Ajouter"}
               </span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
+            </button>
+          );
+        })}
+      </div>
+    </details>
   );
 }
 
@@ -279,11 +309,10 @@ function ProgramHeader({
         </button>
       </div>
 
-      <dl className="mt-4 grid grid-cols-3 gap-2">
-        <Meta label="Niveau" value={level ? capitalize(level) : "Perso"} />
-        <Meta label="Fréquence" value={frequency ? `${frequency} j/sem.` : `${sessionsThisWeek} j/sem.`} />
-        <Meta label="Durée moy." value={durationLabel ?? "—"} />
-      </dl>
+      <p className="mt-3 text-sm font-semibold text-white/55">
+        {frequency ? `${frequency} j/sem.` : `${sessionsThisWeek} j/sem.`}
+        {durationLabel ? ` · ${durationLabel}` : ""}
+      </p>
     </section>
   );
 }
@@ -303,6 +332,29 @@ function capitalize(text: string): string {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
+// TIMELINE VERTICAL CONNECTOR
+// ─────────────────────────────────────────────────────────────────────────
+
+function TimelineDot({ state, isToday }: { state: DayState; isToday: boolean }) {
+  const color =
+    state === "done" ? "bg-sea border-sea"
+    : state === "in-progress" ? "bg-amber border-amber"
+    : state === "to-do" ? "bg-coral/30 border-coral"
+    : state === "missed" ? "bg-white/20 border-white/30"
+    : "bg-white/10 border-white/15";
+
+  return (
+    <div
+      className={`mt-4 size-3 shrink-0 rounded-full border-2 ${color} ${isToday ? "ring-2 ring-coral/50 ring-offset-1 ring-offset-[#0f111a]" : ""}`}
+    />
+  );
+}
+
+function TimelineConnector() {
+  return <div className="w-0.5 flex-1 bg-white/10" />;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
 // DAY ROW (collapsed + expanded)
 // ─────────────────────────────────────────────────────────────────────────
 
@@ -319,14 +371,17 @@ function DayRow({
   onStart: () => void;
   onToggle: () => void;
 }) {
-  const accent = day.isToday ? "border-l-coral" : "border-l-white/12";
+  const accent = day.isToday ? "border-l-coral" : day.state === "missed" ? "border-l-white/25" : "border-l-white/12";
   const planned = day.planned;
   const isRest = !planned;
+  const isMissed = day.state === "missed";
 
   return (
     <article
-      className={`overflow-hidden rounded-2xl border border-white/8 bg-white/4 transition ${
-        day.isToday ? "ring-1 ring-coral/40" : ""
+      className={`overflow-hidden rounded-2xl border transition ${
+        day.isToday ? "border-white/8 bg-white/4 ring-1 ring-coral/40"
+        : isMissed ? "border-white/6 bg-white/[0.02] opacity-70"
+        : "border-white/8 bg-white/4"
       }`}
     >
       <button
