@@ -15,14 +15,65 @@ const MESSAGES = [
   "Encore une, encore plus solide."
 ];
 
+const PR_MESSAGES = [
+  "Record personnel battu !",
+  "Nouveau record. Tu montes.",
+  "PR ! Tu repousses tes limites.",
+  "Record explosé. Bravo.",
+  "Nouveau PR. La progression est réelle."
+];
+
+const CONFETTI_COLORS = ["#ff5a00", "#ff9f1a", "#24c07a", "#f59e0b", "#ff4d00", "#fff"];
+const CONFETTI_COUNT = 32;
+
+function ConfettiEffect() {
+  const pieces = useMemo(() => {
+    return Array.from({ length: CONFETTI_COUNT }, (_, i) => {
+      const color = CONFETTI_COLORS[i % CONFETTI_COLORS.length];
+      const left = Math.random() * 100;
+      const xSpread = (Math.random() - 0.5) * 200;
+      const duration = 2.2 + Math.random() * 1.4;
+      const delay = Math.random() * 0.5;
+      const size = 6 + Math.random() * 6;
+      const isCircle = Math.random() > 0.5;
+      return { color, left, xSpread, duration, delay, size, isCircle };
+    });
+  }, []);
+
+  return (
+    <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-50 overflow-hidden">
+      {pieces.map((p, i) => (
+        <div
+          className="confetti-piece"
+          key={i}
+          style={{
+            left: `${p.left}%`,
+            width: p.size,
+            height: p.isCircle ? p.size : p.size * 2.5,
+            borderRadius: p.isCircle ? "50%" : "2px",
+            backgroundColor: p.color,
+            "--confetti-x": `${p.xSpread}px`,
+            "--confetti-duration": `${p.duration}s`,
+            animationDelay: `${p.delay}s`
+          } as React.CSSProperties}
+        />
+      ))}
+    </div>
+  );
+}
+
 type Props = {
   durationLabel?: string;
   exerciseCount: number;
+  hasPersonalRecord?: boolean;
   onContinue: () => void;
 };
 
-export function SessionCelebration({ durationLabel, exerciseCount, onContinue }: Props) {
-  const message = useMemo(() => MESSAGES[Math.floor(Math.random() * MESSAGES.length)], []);
+export function SessionCelebration({ durationLabel, exerciseCount, hasPersonalRecord = false, onContinue }: Props) {
+  const message = useMemo(() => {
+    if (hasPersonalRecord) return PR_MESSAGES[Math.floor(Math.random() * PR_MESSAGES.length)];
+    return MESSAGES[Math.floor(Math.random() * MESSAGES.length)];
+  }, [hasPersonalRecord]);
   const [phase, setPhase] = useState<"intro" | "ready">("intro");
 
   useEffect(() => {
@@ -32,7 +83,8 @@ export function SessionCelebration({ durationLabel, exerciseCount, onContinue }:
 
   return (
     <section className="session-step-card session-step-enter relative flex min-h-[28rem] flex-col items-center justify-center overflow-hidden p-6 text-center">
-      <div className="session-step-accent" style={{ background: "linear-gradient(90deg, #24c07a, #ff7a18)" }} />
+      {hasPersonalRecord && <ConfettiEffect />}
+      <div className="session-step-accent" style={{ background: hasPersonalRecord ? "linear-gradient(90deg, #f59e0b, #ff5a00, #f59e0b)" : "linear-gradient(90deg, #24c07a, #ff7a18)" }} />
 
       {/* Background pulse */}
       <div aria-hidden="true" className="absolute inset-0 -z-10 flex items-center justify-center">

@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
+import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { BrandLogo } from "@/components/BrandLogo";
-import { fileToCompressedAvatar } from "@/lib/imageUpload";
+
 import { SessionExerciseIcon } from "@/components/session/SessionExerciseIcon";
 import { WeekTimelineCompact } from "@/components/WeekTimeline";
 import { getActiveProgramTemplate } from "@/lib/activeProgram";
@@ -36,7 +36,6 @@ export function Dashboard() {
     history,
     isReady,
     profiles,
-    setProfilePhoto,
     setSettings,
     settings,
     startSession,
@@ -118,14 +117,20 @@ export function Dashboard() {
       </div>
 
       <ProfileHeader
-        avatar={activeProfile?.avatar ?? "💪"}
         goal={mainGoal}
         name={settings.athleteName || activeProfile?.name || "Athlète"}
-        onPhotoChange={(dataUrl) => {
-          if (activeProfile) setProfilePhoto(activeProfile.id, dataUrl);
-        }}
         photoUrl={activeProfile?.photoUrl}
         programName={activeProgram?.name ?? "Programme personnalisé"}
+      />
+
+      <DynamicHeroCard
+        athleteName={settings.athleteName || "Athlète"}
+        completedThisWeek={weeklySessions.length}
+        frequency={settings.weeklyFrequency ?? 4}
+        isCompleted={Boolean(todaysCompletedSession)}
+        isRestDay={isRestDay}
+        recentSessions={recentSessions}
+        sessionTitle={todaysPlannedSession?.title}
       />
 
       {isRestDay ? (
@@ -153,71 +158,161 @@ export function Dashboard() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
+// SVG ICONS (no emojis)
+// ─────────────────────────────────────────────────────────────────────────
+
+function HeroIcon({ name, color = "currentColor" }: { name: "bolt" | "check" | "flame" | "rest" | "trophy"; color?: string }) {
+  const props = { className: "size-5", fill: "none", viewBox: "0 0 24 24", stroke: color, strokeWidth: 2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  switch (name) {
+    case "check":
+      return <svg {...props}><path d="M5 12l5 5 9-11" /></svg>;
+    case "trophy":
+      return <svg {...props}><path d="M6 9H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h2M18 9h2a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-2M6 3h12v6a6 6 0 0 1-12 0V3zM9 21h6M12 15v6" /></svg>;
+    case "rest":
+      return <svg {...props}><path d="M17 18a5 5 0 0 0-10 0M12 13V2M4.93 10.93l1.41 1.41M2 18h2M20 18h2M17.66 12.34l1.41-1.41" /></svg>;
+    case "flame":
+      return <svg {...props} fill={color} stroke="none"><path d="M12 2c.5 2.5-.5 4.5-1.5 6C9.5 10 9 12 10 14c.5-1.5 1.5-2.5 3-3 1-.5 2-2 2-4 1 1 2.5 3.5 2.5 6.5a6.5 6.5 0 1 1-13 0C4.5 9 8 5 12 2z" /></svg>;
+    case "bolt":
+      return <svg {...props}><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></svg>;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// DYNAMIC HERO CARD
+// ─────────────────────────────────────────────────────────────────────────
+
+function DynamicHeroCard({
+  athleteName,
+  completedThisWeek,
+  frequency,
+  isCompleted,
+  isRestDay,
+  recentSessions,
+  sessionTitle
+}: {
+  athleteName: string;
+  completedThisWeek: number;
+  frequency: number;
+  isCompleted: boolean;
+  isRestDay: boolean;
+  recentSessions: CompletedSession[];
+  sessionTitle?: string;
+}) {
+  const insight = useMemo(() => {
+    if (isCompleted) {
+      return {
+        icon: "check" as const,
+        title: "Séance validée",
+        subtitle: `Bravo ${athleteName}. ${completedThisWeek}/${frequency} cette semaine.`,
+        tone: "sea" as const
+      };
+    }
+
+    if (completedThisWeek >= frequency) {
+      return {
+        icon: "trophy" as const,
+        title: "Objectif hebdo atteint",
+        subtitle: `${completedThisWeek} séances cette semaine. Continue sur ta lancée.`,
+        tone: "sea" as const
+      };
+    }
+
+    if (isRestDay) {
+      return {
+        icon: "rest" as const,
+        title: "Récupération active",
+        subtitle: "Profite de ce jour off. Hydratation, mobilité, sommeil.",
+        tone: "amber" as const
+      };
+    }
+
+    const streak = getStreak(recentSessions);
+    if (streak >= 3) {
+      return {
+        icon: "flame" as const,
+        title: `${streak} séances d'affilée`,
+        subtitle: `${sessionTitle ?? "Ta séance"} t'attend. La série continue.`,
+        tone: "coral" as const
+      };
+    }
+
+    const remaining = frequency - completedThisWeek;
+    return {
+      icon: "bolt" as const,
+      title: sessionTitle ? `Jour de ${sessionTitle.toLowerCase().split(" ")[0]}` : "C'est l'heure",
+      subtitle: `${remaining} séance${remaining > 1 ? "s" : ""} restante${remaining > 1 ? "s" : ""} cette semaine. On y va.`,
+      tone: "coral" as const
+    };
+  }, [athleteName, completedThisWeek, frequency, isCompleted, isRestDay, recentSessions, sessionTitle]);
+
+  const toneStyles = {
+    coral: "border-coral/20 bg-coral/10",
+    sea: "border-sea/20 bg-sea/10",
+    amber: "border-amber/20 bg-amber/10"
+  }[insight.tone];
+
+  const iconColor = { coral: "#ff5a00", sea: "#24c07a", amber: "#f59e0b" }[insight.tone];
+
+  return (
+    <div className={`session-step-enter flex items-center gap-3 rounded-2xl border p-4 ${toneStyles}`}>
+      <div className="flex size-10 shrink-0 items-center justify-center rounded-xl" style={{ background: `${iconColor}20` }}>
+        <HeroIcon name={insight.icon} color={iconColor} />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-black leading-tight text-white">{insight.title}</p>
+        <p className="mt-0.5 text-xs font-semibold leading-relaxed text-white/60">{insight.subtitle}</p>
+      </div>
+    </div>
+  );
+}
+
+function getStreak(sessions: CompletedSession[]): number {
+  if (sessions.length === 0) return 0;
+  let streak = 0;
+  const now = new Date();
+  for (const session of sessions) {
+    const diff = (now.getTime() - new Date(session.completedAt).getTime()) / (1000 * 60 * 60 * 24);
+    if (diff <= streak + 2) {
+      streak++;
+    } else {
+      break;
+    }
+  }
+  return streak;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
 // PROFILE HEADER
 // ─────────────────────────────────────────────────────────────────────────
 
 function ProfileHeader({
-  avatar,
   goal,
   name,
-  onPhotoChange,
   photoUrl,
   programName
 }: {
-  avatar: string;
   goal: string;
   name: string;
-  onPhotoChange: (dataUrl: string | undefined) => void;
   photoUrl?: string;
   programName: string;
 }) {
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-
-  const handleFile = async (file: File | undefined) => {
-    if (!file) return;
-    setUploadError(null);
-    try {
-      const dataUrl = await fileToCompressedAvatar(file);
-      onPhotoChange(dataUrl);
-    } catch (err) {
-      setUploadError(err instanceof Error ? err.message : "Erreur d'import");
-    }
-  };
+  const initials = name.trim().charAt(0).toUpperCase() || "A";
 
   return (
     <section className="flex items-center gap-3 rounded-2xl border border-white/8 bg-white/4 p-3">
-      <button
-        aria-label="Changer la photo de profil"
-        className="group relative flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-coral/30 bg-coral/15 text-2xl transition hover:border-coral/60"
-        onClick={() => fileInputRef.current?.click()}
-        type="button"
-      >
+      <div className="relative flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-coral/30 bg-coral/15">
         {photoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img alt={name} className="size-full object-cover" src={photoUrl} />
         ) : (
-          <span aria-hidden="true">{avatar}</span>
+          <span className="text-lg font-black text-coral">{initials}</span>
         )}
-        <span className="absolute inset-0 hidden items-center justify-center bg-black/50 text-[10px] font-black uppercase text-white group-hover:flex">
-          {photoUrl ? "Changer" : "Photo"}
-        </span>
-      </button>
-      <input
-        accept="image/*"
-        className="hidden"
-        onChange={(event) => handleFile(event.target.files?.[0])}
-        ref={fileInputRef}
-        type="file"
-      />
-      {uploadError ? (
-        <span className="sr-only" role="alert">{uploadError}</span>
-      ) : null}
+      </div>
       <div className="min-w-0 flex-1">
         <p className="truncate text-lg font-black leading-tight text-white">{name}</p>
         <p className="mt-0.5 truncate text-xs font-semibold text-white/55">{programName}</p>
       </div>
-      <span className="shrink-0 max-w-[8rem] truncate rounded-full border border-sky/25 bg-sky/10 px-3 py-1 text-[11px] font-black uppercase tracking-wide text-sky">
+      <span className="shrink-0 max-w-[7rem] truncate rounded-full border border-sky/25 bg-sky/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-sky">
         {goal}
       </span>
     </section>
@@ -405,8 +500,8 @@ function RecentSessionRow({ session }: { session: CompletedSession }) {
 
   return (
     <div className="flex items-center gap-3 rounded-xl border border-white/8 bg-white/4 p-3">
-      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-sea/15 text-sm font-black text-sea">
-        ✓
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-sea/15">
+        <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="#24c07a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5 9-11" /></svg>
       </span>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-black text-white">{session.title}</p>
@@ -424,8 +519,8 @@ function RecentSessionRow({ session }: { session: CompletedSession }) {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-white/8 bg-white/4 p-3 text-center">
-      <p className="text-base font-black leading-tight text-white">{value}</p>
+    <div className="rounded-xl border border-white/8 bg-white/4 p-2.5 text-center">
+      <p className="truncate text-sm font-black leading-tight text-white">{value}</p>
       <p className="mt-1 text-[10px] font-black uppercase tracking-wide text-white/55">{label}</p>
     </div>
   );

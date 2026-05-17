@@ -674,6 +674,14 @@ function buildReason(
 
 const HOLD_DURATION_MS = 2500;
 
+const MOTIVATION_MESSAGES = [
+  { title: "C'est parti.", subtitle: "Ton programme est prêt. Place à l'action." },
+  { title: "Engagé.", subtitle: "Chaque séance compte. La première commence maintenant." },
+  { title: "Décollage.", subtitle: "Tu as fait le plus dur : commencer." },
+  { title: "Let's go.", subtitle: "Régularité > perfection. On y va." },
+  { title: "Objectif verrouillé.", subtitle: "Ton plan est calé. Reste plus qu'à exécuter." }
+];
+
 function EngagementScreen({
   athleteName,
   onCommit,
@@ -685,8 +693,13 @@ function EngagementScreen({
 }) {
   const [progress, setProgress] = useState(0);
   const [committed, setCommitted] = useState(false);
+  const [showMotivation, setShowMotivation] = useState(false);
   const startedAtRef = useRef<number | null>(null);
   const rafRef = useRef<number | null>(null);
+  const motivationMsg = useMemo(
+    () => MOTIVATION_MESSAGES[Math.floor(Math.random() * MOTIVATION_MESSAGES.length)],
+    []
+  );
 
   const stopHold = () => {
     if (rafRef.current !== null) {
@@ -700,6 +713,12 @@ function EngagementScreen({
   };
 
   useEffect(() => stopHold, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!showMotivation) return;
+    const timer = window.setTimeout(onCommit, 2800);
+    return () => window.clearTimeout(timer);
+  }, [showMotivation, onCommit]);
 
   const startHold = () => {
     if (committed) return;
@@ -718,13 +737,44 @@ function EngagementScreen({
         if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
           try { navigator.vibrate([60, 40, 120]); } catch {}
         }
-        window.setTimeout(onCommit, 600);
+        window.setTimeout(() => setShowMotivation(true), 600);
         return;
       }
       rafRef.current = requestAnimationFrame(tick);
     };
     rafRef.current = requestAnimationFrame(tick);
   };
+
+  if (showMotivation) {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#040506] px-6">
+        <div aria-hidden="true" className="absolute inset-0 flex items-center justify-center">
+          <div className="size-80 rounded-full bg-coral/20 motivation-glow" />
+          <div className="absolute size-60 rounded-full bg-sea/15 motivation-glow" style={{ animationDelay: "0.5s" }} />
+        </div>
+
+        <div className="relative flex flex-col items-center text-center">
+          <div className="motivation-emoji flex size-20 items-center justify-center rounded-full border-2 border-sea/30 bg-sea/15">
+            <svg className="size-10" fill="none" viewBox="0 0 24 24" stroke="#24c07a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5 9-11" /></svg>
+          </div>
+          <h1 className="motivation-title mt-6 text-4xl font-black leading-tight text-white sm:text-5xl">
+            {motivationMsg.title}
+          </h1>
+          <p className="motivation-subtitle mt-4 max-w-sm text-lg font-semibold leading-relaxed text-white/70">
+            {motivationMsg.subtitle}
+          </p>
+          <div className="motivation-progress-bar mt-8 h-1 w-48 overflow-hidden rounded-full bg-white/10">
+            <div
+              className="h-full rounded-full bg-coral"
+              style={{
+                animation: "motivation-bar-fill 2.4s ease-out forwards"
+              }}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Ring math
   const ringSize = 220;

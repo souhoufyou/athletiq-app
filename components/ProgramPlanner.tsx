@@ -298,7 +298,7 @@ function ProgramHeader({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[11px] font-black uppercase tracking-[0.28em] text-coral">Programme actif</p>
-          <h1 className="mt-2 text-2xl font-black leading-tight text-white sm:text-3xl">{name}</h1>
+          <h1 className="mt-2 text-xl font-black leading-tight text-white sm:text-2xl">{name}</h1>
         </div>
         <button
           className="shrink-0 rounded-full border border-white/10 bg-white/8 px-3 py-1.5 text-[11px] font-black uppercase tracking-wide text-white/70 transition hover:bg-white/12"
@@ -538,8 +538,9 @@ function ChangeProgramSheet({
       role="dialog"
     >
       <div
-        className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-t-3xl border border-white/10 bg-ink p-5 text-white shadow-soft sm:rounded-3xl"
+        className="max-h-[80vh] w-full max-w-md overflow-y-auto overscroll-contain rounded-t-3xl border border-white/10 bg-ink p-5 text-white shadow-soft sm:rounded-3xl"
         onClick={(event) => event.stopPropagation()}
+        style={{ WebkitOverflowScrolling: "touch" }}
       >
         <div className="flex items-start justify-between gap-3">
           <div>
