@@ -1,11 +1,14 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
+import { ServiceWorkerRegister } from "./service-worker-register";
 
 export const metadata: Metadata = {
   title: "AthletIQ",
   description: "Ton coach adaptatif intelligent. Progression personnalisee, guardrails de securite, analyse de seances.",
   applicationName: "AthletIQ",
+  metadataBase: new URL("https://athletiq.app"),
+  manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     title: "AthletIQ",
@@ -27,7 +30,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#ff5a00"
+  themeColor: "#ff5a00",
+  viewportFit: "cover"
 };
 
 export default function RootLayout({
@@ -37,7 +41,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="fr" className="dark">
-      <body>{children}</body>
+      <body>
+        {children}
+        <ServiceWorkerRegister />
+      </body>
     </html>
   );
 }
