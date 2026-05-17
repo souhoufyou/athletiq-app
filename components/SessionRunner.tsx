@@ -9,6 +9,7 @@ import { SessionStepAnnounce } from "@/components/session/SessionStepAnnounce";
 import { SessionStepFeedback } from "@/components/session/SessionStepFeedback";
 import { SessionStepRest } from "@/components/session/SessionStepRest";
 import { SessionStepSet } from "@/components/session/SessionStepSet";
+import { SessionStepWarmUp } from "@/components/session/SessionStepWarmUp";
 import { SessionStepWrapUp, type SessionWrapUp } from "@/components/session/SessionStepWrapUp";
 import { getActiveProgramTemplate } from "@/lib/activeProgram";
 import { getContextualAlternatives } from "@/lib/alternatives";
@@ -133,7 +134,7 @@ export function SessionRunner() {
       lastTrackedExerciseIdRef.current = null;
       return;
     }
-    if (step.type === "complete" || step.type === "wrap-up" || step.type === "celebration") return;
+    if (step.type === "complete" || step.type === "wrap-up" || step.type === "celebration" || step.type === "warm-up") return;
 
     const exercise = currentSession.exercises[step.exerciseIndex];
     if (!exercise) return;
@@ -346,6 +347,26 @@ export function SessionRunner() {
     setStep({ type: "set", exerciseIndex, setIndex: 1 });
   };
 
+  const handleWarmUpComplete = (exerciseIndex: number) => {
+    const exercise = currentSession.exercises[exerciseIndex];
+    if (!exercise) return;
+    updateExerciseLog(exercise.id, {
+      warmUpCompleted: true
+    });
+    setStep({ type: "announce", exerciseIndex });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleWarmUpSkipped = (exerciseIndex: number) => {
+    const exercise = currentSession.exercises[exerciseIndex];
+    if (!exercise) return;
+    updateExerciseLog(exercise.id, {
+      warmUpCompleted: true
+    });
+    setStep({ type: "announce", exerciseIndex });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   const handleSkipFromAnnounce = (exerciseIndex: number) => {
     const exercise = currentSession.exercises[exerciseIndex];
     if (!exercise) return;
@@ -465,6 +486,23 @@ export function SessionRunner() {
           <div className="h-full rounded-full bg-coral transition-all" style={{ width: `${progressPercent}%` }} />
         </div>
       </section>
+
+      {step.type === "warm-up" ? (
+        (() => {
+          const planned = currentSession.exercises[step.exerciseIndex];
+          const effective = effectiveExerciseAt(step.exerciseIndex);
+          if (!effective) return null;
+          return (
+            <SessionStepWarmUp
+              exercise={effective}
+              exerciseIndex={step.exerciseIndex}
+              exerciseTotal={currentSession.exercises.length}
+              onComplete={() => handleWarmUpComplete(step.exerciseIndex)}
+              onSkip={() => handleWarmUpSkipped(step.exerciseIndex)}
+            />
+          );
+        })()
+      ) : null}
 
       {step.type === "announce" ? (
         (() => {

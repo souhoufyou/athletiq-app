@@ -32,6 +32,19 @@ import type {
 
 const PROFILES_KEY = "coach-adaptatif:profiles";
 
+type SyncEntity = "settings" | "program" | "history" | "profile";
+
+function enqueueSyncIfAuthenticated(...entities: SyncEntity[]) {
+  import("@/lib/sync")
+    .then(({ syncManager, touchSyncMeta }) => {
+      const profilesState = readJson<ProfilesState | null>(PROFILES_KEY, null);
+      const profileId = profilesState?.activeProfileId ?? "default";
+      touchSyncMeta(profileId, ...entities);
+      syncManager.enqueue(...entities);
+    })
+    .catch(() => {});
+}
+
 type ProfilesState = {
   profiles: Profile[];
   activeProfileId: string;
@@ -360,6 +373,7 @@ function setSettingsStore(next: UserSettings) {
     document.documentElement.classList.toggle("dark", normalized.darkMode);
   }
   emit();
+  enqueueSyncIfAuthenticated("settings");
 }
 
 function startSessionAction(session: PlannedSession): ActiveSession {
@@ -637,6 +651,7 @@ function completeSessionAction(session: PlannedSession): CompletedSession | unde
   writeJson(programKeyFor(store.activeProfileId), nextProgram);
   removeStoredJson(activeSessionKeyFor(store.activeProfileId));
   emit();
+  enqueueSyncIfAuthenticated("history", "settings", "program");
 
   return completed;
 }
@@ -658,6 +673,7 @@ function completeOnboardingAction(next: UserSettings) {
     document.documentElement.classList.toggle("dark", normalizedSettings.darkMode);
   }
   emit();
+  enqueueSyncIfAuthenticated("settings", "program");
 }
 
 /**
@@ -673,6 +689,7 @@ function regenerateProgramAction() {
   writeJson(programKeyFor(store.activeProfileId), program);
   store = { ...store, currentProgram: program };
   emit();
+  enqueueSyncIfAuthenticated("program");
 }
 
 function setCurrentProgramAction(program: PlannedSession[]) {
@@ -684,6 +701,7 @@ function setCurrentProgramAction(program: PlannedSession[]) {
   writeJson(programKeyFor(store.activeProfileId), normalized);
   store = { ...store, currentProgram: normalized };
   emit();
+  enqueueSyncIfAuthenticated("program");
 }
 
 function attachAiCoachResponseAction(sessionId: string, aiCoach: CoachAiResponse) {
@@ -736,6 +754,7 @@ function createProfileAction(name: string, avatar: string = "🏋️"): Profile 
     isOnboardingDone: false
   };
   emit();
+  enqueueSyncIfAuthenticated("profile");
   return next;
 }
 
@@ -746,6 +765,7 @@ function renameProfileAction(profileId: string, name: string, avatar?: string) {
     p.id === profileId ? { ...p, name: trimmed, avatar: avatar ?? p.avatar } : p
   );
   persistProfilesAndUpdate(nextProfiles, store.activeProfileId);
+  enqueueSyncIfAuthenticated("profile");
 
   // If renaming the active profile, sync the athleteName on settings too
   if (profileId === store.activeProfileId && store.settings.athleteName !== trimmed) {
@@ -758,6 +778,7 @@ function setProfilePhotoAction(profileId: string, photoUrl: string | undefined) 
     p.id === profileId ? { ...p, photoUrl: photoUrl || undefined } : p
   );
   persistProfilesAndUpdate(nextProfiles, store.activeProfileId);
+  enqueueSyncIfAuthenticated("profile");
 }
 
 function deleteProfileAction(profileId: string) {
@@ -796,6 +817,36 @@ function resetAllAction() {
     isOnboardingDone: false
   };
   emit();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Cloud sync — called by SyncManager when pulling newer data from Supabase
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function loadCloudDataIntoStore(cloud: {
+  settings?: UserSettings;
+  program?: PlannedSession[];
+  history?: CompletedSession[];
+}) {
+  const patch: Partial<StoreState> = {};
+  if (cloud.settings) {
+    const normalized = normalizeUserSettings(cloud.settings, defaultSettings);
+    patch.settings = normalized;
+    writeJson(settingsKeyFor(store.activeProfileId), normalized);
+  }
+  if (cloud.program) {
+    const normalized = normalizeProgramV2(cloud.program);
+    patch.currentProgram = normalized;
+    writeJson(programKeyFor(store.activeProfileId), normalized);
+  }
+  if (cloud.history) {
+    patch.history = cloud.history;
+    writeJson(historyKeyFor(store.activeProfileId), cloud.history);
+  }
+  if (Object.keys(patch).length > 0) {
+    store = { ...store, ...patch };
+    emit();
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

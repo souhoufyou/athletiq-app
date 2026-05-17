@@ -9,6 +9,7 @@ import type { Exercise, ExerciseLog, SetLog } from "@/types/training";
  */
 export type SessionStep =
   | { type: "announce"; exerciseIndex: number }
+  | { type: "warm-up"; exerciseIndex: number }
   | { type: "set"; exerciseIndex: number; setIndex: number }
   | { type: "rest"; exerciseIndex: number; nextSetIndex: number; durationSec: number }
   | { type: "feedback"; exerciseIndex: number }
@@ -243,6 +244,16 @@ export function adjustReps(reps: string, delta: number): string {
  *   - if every set is logged but no status → feedback
  *   - if all exercises have a status → complete
  */
+export function shouldWarmUp(exercise: Exercise): boolean {
+  const load = parseLoadValue(exercise.plannedLoad ?? "");
+  const isHeavy = load && load.value >= 60;
+
+  const compoundPatterns = /\b(bench|squat|hinge|deadlift|press|pull-?up|row|curl|tricep|leg)\b/i;
+  const isCompound = compoundPatterns.test(exercise.name ?? "");
+
+  return Boolean((isHeavy && load) || isCompound);
+}
+
 export function computeInitialStep(
   exercises: Exercise[],
   logs: Record<string, ExerciseLog>
@@ -257,6 +268,14 @@ export function computeInitialStep(
 
     const setCount = getPlannedSetCount(exercise);
     const loggedSets = log?.sets ?? [];
+
+    // Show warm-up before first set of exercises that need it
+    if (loggedSets.length === 0 && shouldWarmUp(exercise)) {
+      const warmUpLogged = log?.warmUpCompleted;
+      if (!warmUpLogged) {
+        return { type: "warm-up", exerciseIndex: i };
+      }
+    }
 
     if (loggedSets.length === 0) {
       return { type: "announce", exerciseIndex: i };

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { formatDateTime } from "@/lib/date";
 import { useCoachStorage } from "@/lib/storage";
 import type { CalibrationEvent, CompletedSession, Exercise, ExerciseLog, PlannedSession } from "@/types/training";
 
@@ -47,6 +48,16 @@ type ExercisePerformance = {
   volume?: number;
 };
 
+type PersonalRecord = {
+  exerciseName: string;
+  prLoad: number;
+  prDate: string;
+  prReps?: number;
+  firstLoad: number;
+  progressionKg: number;
+  sessionsCount: number;
+};
+
 const performanceDefinitions: PerformanceDefinition[] = [
   { key: "bench", label: "1RM Développé couché", kind: "strength", match: /d[ée]velopp[ée] couch|developpe couche|bench/i },
   { key: "squat", label: "1RM Squat", kind: "strength", match: /squat/i },
@@ -63,6 +74,7 @@ export function PerformanceDashboard() {
     () => buildPerformanceDashboard(history, currentProgram),
     [currentProgram, history]
   );
+  const personalRecords = useMemo(() => buildPersonalRecords(history), [history]);
 
   if (!isReady) {
     return <div className="rounded-lg bg-white p-5 font-bold shadow-soft">Chargement...</div>;
@@ -136,6 +148,20 @@ export function PerformanceDashboard() {
       />
 
       <CalibrationJournalSection events={settings.calibrationEvents ?? []} />
+
+      {personalRecords.length > 0 ? (
+        <section className="space-y-3">
+          <div>
+            <p className="text-sm font-black uppercase text-sea">Records personnels</p>
+            <h2 className="mt-1 text-2xl font-black text-white">Tes meilleures performances</h2>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {personalRecords.map((pr) => (
+              <PersonalRecordCard key={pr.exerciseName} pr={pr} />
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section className="space-y-3">
         <div>
@@ -740,4 +766,82 @@ function formatKg(value: number) {
 
 function formatNumber(value: number) {
   return Number.isInteger(value) ? String(value) : value.toFixed(1).replace(".", ",");
+}
+
+function PersonalRecordCard({ pr }: { pr: PersonalRecord }) {
+  return (
+    <article className="relative overflow-hidden rounded-2xl border border-sea/30 bg-sea/10 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-black text-white/60">{pr.exerciseName}</p>
+          <p className="mt-2 text-2xl font-black text-white">
+            {pr.prLoad} kg {pr.prReps ? `× ${pr.prReps}` : ""}
+          </p>
+          <p className="mt-1 text-xs font-semibold text-white/55">
+            PR du {formatDateTime(pr.prDate)}
+          </p>
+        </div>
+        <div className="flex size-14 shrink-0 items-center justify-center rounded-xl border border-sea/40 bg-sea/20">
+          <svg className="size-8 text-sea" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+          </svg>
+        </div>
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <div className="rounded-lg bg-white/5 p-2">
+          <p className="text-[10px] font-black uppercase text-white/50">Progression</p>
+          <p className="mt-1 text-base font-black text-sea">+{pr.progressionKg} kg</p>
+        </div>
+        <div className="rounded-lg bg-white/5 p-2">
+          <p className="text-[10px] font-black uppercase text-white/50">Première perf</p>
+          <p className="mt-1 text-base font-black text-white">{pr.firstLoad} kg</p>
+        </div>
+      </div>
+      <p className="mt-3 text-xs font-semibold text-white/50">
+        {pr.sessionsCount} séance{pr.sessionsCount > 1 ? "s" : ""} enregistrée{pr.sessionsCount > 1 ? "s" : ""}
+      </p>
+    </article>
+  );
+}
+
+function buildPersonalRecords(history: CompletedSession[]): PersonalRecord[] {
+  const exerciseMap = new Map<string, Array<{ load: number; reps: number; date: string }>>();
+
+  for (const session of history) {
+    for (const [exerciseId, log] of Object.entries(session.logs)) {
+      const progression = session.progressions?.[exerciseId];
+      const exerciseName = progression?.exerciseName ?? exerciseId;
+      const load = parseKg(log.usedLoad);
+
+      if (load === undefined || load <= 0) continue;
+
+      const reps = parseReps(log.completedReps).total || 0;
+      if (!exerciseMap.has(exerciseName)) {
+        exerciseMap.set(exerciseName, []);
+      }
+      exerciseMap.get(exerciseName)!.push({ load, reps, date: session.completedAt });
+    }
+  }
+
+  const records: PersonalRecord[] = [];
+
+  for (const [exerciseName, entries] of exerciseMap) {
+    if (entries.length < 2) continue;
+
+    const sorted = entries.sort((a, b) => b.load - a.load || b.reps - a.reps);
+    const prEntry = sorted[0];
+    const firstEntry = entries.reduce((min, curr) => (curr.load < min.load ? curr : min));
+
+    records.push({
+      exerciseName,
+      prLoad: prEntry.load,
+      prDate: prEntry.date,
+      prReps: prEntry.reps > 0 ? prEntry.reps : undefined,
+      firstLoad: firstEntry.load,
+      progressionKg: Math.round((prEntry.load - firstEntry.load) * 10) / 10,
+      sessionsCount: entries.length
+    });
+  }
+
+  return records.sort((a, b) => b.progressionKg - a.progressionKg);
 }
