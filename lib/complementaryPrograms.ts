@@ -56,6 +56,14 @@ export const COMPLEMENTARY_PROGRAMS: ComplementaryProgram[] = [
     shortDescription: "Vélo, rameur, elliptique. Zone 2, souffle confortable.",
     weeklyTarget: "1 à 2 séances",
     defaultDurationMin: 30
+  },
+  {
+    id: "course-tapis",
+    name: "Course / Tapis de course",
+    category: "cardio",
+    shortDescription: "Course ou tapis, 20–40 min. Intervalles ou endurance.",
+    weeklyTarget: "2 à 3 séances",
+    defaultDurationMin: 30
   }
 ];
 

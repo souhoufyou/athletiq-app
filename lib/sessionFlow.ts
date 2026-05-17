@@ -52,8 +52,8 @@ export function getPlannedRepsLabel(exercise: Exercise): string {
   const prescription = exercise.prescription;
 
   if (prescription) {
-    if (prescription.repsMin && prescription.repsMax && prescription.repsMin !== prescription.repsMax) {
-      return `${prescription.repsMin}-${prescription.repsMax}`;
+    if (prescription.repsMax && prescription.repsMax === prescription.repsMin) {
+      return String(prescription.repsMax);
     }
     if (prescription.repsMin) {
       return String(prescription.repsMin);
@@ -68,6 +68,10 @@ export function getPlannedRepsLabel(exercise: Exercise): string {
 
   const target = (exercise.target ?? "").trim();
   const stripped = target.replace(/^\s*\d+\s*[x×]\s*/i, "").trim();
+  const range = stripped.match(/(\d+)\s*-\s*(\d+)/);
+  if (range) {
+    return range[1];
+  }
   return stripped || target || "—";
 }
 
@@ -78,11 +82,11 @@ export function getPlannedRepsLabel(exercise: Exercise): string {
 export function getDefaultRepsValue(exercise: Exercise): string {
   const prescription = exercise.prescription;
 
-  if (prescription?.repsMax) {
-    return String(prescription.repsMax);
-  }
   if (prescription?.repsMin) {
     return String(prescription.repsMin);
+  }
+  if (prescription?.repsMax) {
+    return String(prescription.repsMax);
   }
   if (prescription?.durationSec) {
     return `${prescription.durationSec}s`;
@@ -92,7 +96,7 @@ export function getDefaultRepsValue(exercise: Exercise): string {
   const stripped = target.replace(/^\s*\d+\s*[x×]\s*/i, "").trim();
   const range = stripped.match(/(\d+)\s*-\s*(\d+)/);
   if (range) {
-    return range[2];
+    return range[1];
   }
   const single = stripped.match(/^(\d+)/);
   if (single) {

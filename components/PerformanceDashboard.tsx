@@ -47,29 +47,13 @@ type ExercisePerformance = {
 };
 
 const performanceDefinitions: PerformanceDefinition[] = [
-  {
-    key: "bench",
-    label: "Développé couché",
-    kind: "strength",
-    match: /d[ée]velopp[ée] couch|developpe couche|bench/i,
-    referenceBest: "127 kg x 1"
-  },
-  { key: "leg-press", label: "Presse à cuisses", kind: "strength", match: /presse|leg press/i },
-  { key: "lat-pulldown", label: "Tirage vertical", kind: "strength", match: /tirage vertical|tractions? assist/i },
-  { key: "rowing", label: "Rowing", kind: "strength", match: /rowing/i },
-  { key: "shoulder-press", label: "Développé épaules", kind: "strength", match: /d[ée]velopp[ée] [ée]paules|shoulder press/i },
-  {
-    key: "hinge",
-    label: "Hip thrust / soulevé roumain",
-    kind: "strength",
-    match: /hip thrust|soulev[ée] de terre roumain|roumain|rdl|deadlift/i,
-    referenceBest: "170 kg"
-  },
-  { key: "leg-extension", label: "Leg extension", kind: "strength", match: /leg extension/i },
-  { key: "leg-curl", label: "Leg curl", kind: "strength", match: /leg curl/i },
-  { key: "incline-treadmill", label: "Tapis incliné", kind: "cardio", match: /tapis|marche|zone 2/i },
-  { key: "interval-cardio", label: "Rameur / intervalles", kind: "cardio", match: /rameur|intervalles|stairmaster|rounds?/i },
-  { key: "grip", label: "Grip / suspension", kind: "strength", match: /farmer|suspension|grip|hang/i }
+  { key: "bench", label: "1RM Développé couché", kind: "strength", match: /d[ée]velopp[ée] couch|developpe couche|bench/i },
+  { key: "squat", label: "1RM Squat", kind: "strength", match: /squat/i },
+  { key: "deadlift", label: "1RM Soulevé de terre", kind: "strength", match: /soulev[ée] de terre|deadlift/i },
+  { key: "max-pushups", label: "Max pompes", kind: "strength", match: /pompes|push.?ups?/i },
+  { key: "max-squats", label: "Max squats (poids du corps)", kind: "strength", match: /squats? poids|bodyweight squat/i },
+  { key: "5km", label: "Meilleur 5 km", kind: "cardio", match: /5\s?km|course 5/i },
+  { key: "10km", label: "Meilleur 10 km", kind: "cardio", match: /10\s?km|course 10/i }
 ];
 
 export function PerformanceDashboard() {
@@ -99,55 +83,32 @@ export function PerformanceDashboard() {
   }
 
   const bench = dashboard.performances.find((item) => item.definition.key === "bench");
+  const squat = dashboard.performances.find((item) => item.definition.key === "squat");
+  const deadlift = dashboard.performances.find((item) => item.definition.key === "deadlift");
 
   return (
     <div className="space-y-4">
       <section className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#11131a] p-5 text-white shadow-soft">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_90%_0%,rgba(255,91,0,0.32),transparent_34%),linear-gradient(135deg,rgba(255,255,255,0.08),transparent_46%)]" />
         <div className="relative">
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-coral">Vue athlete</p>
+          <p className="text-xs font-black uppercase tracking-[0.2em] text-coral">Mes performances</p>
           <div className="mt-2 flex items-end justify-between gap-3">
             <div>
-              <h2 className="text-3xl font-black leading-tight">
-                {bench?.trend === "progresse" ? "Progression visible" : "Command center"}
-              </h2>
+              <h2 className="text-3xl font-black leading-tight">Repères clés</h2>
               <p className="mt-2 text-sm font-semibold text-white/55">
-                {settings.athleteName} - {settings.mainGoal}
+                {settings.athleteName} · {dashboard.summary.sessions} séances
               </p>
             </div>
-            <div className="shrink-0 text-right">
-              <p className="text-4xl font-black leading-none text-coral">{dashboard.summary.sessions}</p>
-              <p className="text-[10px] font-black uppercase text-white/45">seances</p>
-            </div>
           </div>
-          <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <HeroMetric label="Bench" value={bench?.latest ?? "-"} />
-            <HeroMetric label="Record" value={bench?.best ?? "127 kg x 1"} />
-            <HeroMetric label="Volume total" value={formatCompactNumber(dashboard.summary.totalVolumeKg)} />
-            <HeroMetric label="Cardio" value={`${dashboard.summary.cardioSessions}`} />
+          <div className="mt-5 grid grid-cols-3 gap-2">
+            <HeroMetric label="DC" value={bench?.best ?? "-"} />
+            <HeroMetric label="Squat" value={squat?.best ?? "-"} />
+            <HeroMetric label="Soulevé" value={deadlift?.best ?? "-"} />
           </div>
-          <div className="mt-3 rounded-2xl border border-coral/20 bg-coral/10 p-3">
-            <p className="text-xs font-black uppercase text-coral">Prochaine cible</p>
-            <p className="mt-1 text-sm font-black text-white">{bench?.nextTarget ?? dashboard.nextTargets[0] ?? "Valider 2 seances pour calibrer les cibles."}</p>
-          </div>
-        </div>
-      </section>
-
-      <section className="hidden">
-        <p className="text-sm font-black uppercase text-sky">Vue athlète</p>
-        <h2 className="mt-1 text-3xl font-black leading-tight">
-          {bench?.trend === "progresse" ? "Tu avances" : "Repères principaux"}
-        </h2>
-        <div className="mt-5 grid grid-cols-3 gap-2">
-          <HeroMetric label="Bench" value={bench?.latest ?? "-"} />
-          <HeroMetric label="Record" value={bench?.best ?? "127 kg x 1"} />
-          <HeroMetric label="Cible" value={bench?.nextTarget ?? "-"} />
         </div>
       </section>
 
       <GoalsSection
-        benchOneRepMaxKg={settings.benchOneRepMaxKg}
-        judoDaysCount={settings.judoDays.length}
         mainGoal={settings.mainGoal}
         targetWeightKg={settings.targetWeightKg}
       />
@@ -215,29 +176,17 @@ function PerformanceCard({ performance }: { performance: ExercisePerformance }) 
 }
 
 function GoalsSection({
-  benchOneRepMaxKg,
-  judoDaysCount,
   mainGoal,
   targetWeightKg
 }: {
-  benchOneRepMaxKg: number;
-  judoDaysCount: number;
   mainGoal: string;
   targetWeightKg: number;
 }) {
-  const benchWorkTarget = Math.round(benchOneRepMaxKg * 0.79 / 2.5) * 2.5; // ~79% 1RM → 5x5 work weight
-  const benchNextMax = Math.round(benchOneRepMaxKg * 1.06 / 2.5) * 2.5; // +6% PR target
-
   const goals = [
     mainGoal,
     `Objectif poids : ~${targetWeightKg} kg`,
-    `Développé couché travail : ${benchWorkTarget} kg × 5 × 5 propre`,
-    `Prochain record bench visé : ${benchNextMax} kg × 1`,
-    "Objectif cardio : souffle et récupération en amélioration",
-    judoDaysCount > 0
-      ? `Sport externe ${judoDaysCount}×/semaine : améliorer souffle, grip et récupération`
-      : "Maintenir la mobilité et la santé articulaire"
-  ].filter(Boolean);
+    "Maintenir la mobilité et la santé articulaire"
+  ];
 
   return (
     <section className="rounded-xl border border-sky/20 bg-sky/10 p-4 shadow-soft">

@@ -402,23 +402,25 @@ export function SessionRunner() {
 
   return (
     <div className="space-y-4">
-      <section className="sticky top-0 z-20 -mx-4 border-b border-white/10 bg-[#0f111a]/95 px-4 py-2 backdrop-blur sm:-mx-6 sm:px-6">
-        <div className="flex items-center gap-3">
-          <button
-            aria-label="Quitter la séance"
-            className="flex size-9 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/5 text-sm font-black text-white/70 transition hover:bg-white/10"
-            onClick={() => setShowQuitConfirm(true)}
-            type="button"
-          >
-            ✕
-          </button>
-          <p className="shrink-0 text-xs font-black tabular-nums text-white/70">
-            {completedCount}/{currentSession.exercises.length}
-          </p>
-          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10">
-            <div className="h-full rounded-full bg-coral transition-all" style={{ width: `${progressPercent}%` }} />
+      <section className="z-20 -mx-4 border-b border-white/10 bg-[#0f111a]/95 px-4 py-3 sm:-mx-6 sm:px-6">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <button
+              aria-label="Quitter la séance"
+              className="flex size-9 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/5 text-sm font-black text-white/70 transition hover:bg-white/10"
+              onClick={() => setShowQuitConfirm(true)}
+              type="button"
+            >
+              ✕
+            </button>
+            <p className="text-xs font-black tabular-nums text-white/60">
+              {completedCount}/{currentSession.exercises.length}
+            </p>
           </div>
-          <SessionElapsedTime session={active} />
+          <div className="flex items-center gap-2 rounded-xl border border-coral/25 bg-coral/10 px-3 py-1.5">
+            <span className="size-2 animate-pulse rounded-full bg-coral" />
+            <SessionElapsedTime session={active} />
+          </div>
           <button
             aria-label={active.timer.isPaused ? "Reprendre" : "Pause"}
             className="flex size-9 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/5 text-sm font-black text-white/70 transition hover:bg-white/10"
@@ -427,6 +429,9 @@ export function SessionRunner() {
           >
             {active.timer.isPaused ? "▶" : "⏸"}
           </button>
+        </div>
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+          <div className="h-full rounded-full bg-coral transition-all" style={{ width: `${progressPercent}%` }} />
         </div>
       </section>
 
@@ -716,7 +721,7 @@ function SessionElapsedTime({ session }: { session: ActiveSession }) {
   }, [session.timer.isPaused, session.timer.pausedTotalMs, session.timer.startedAt]);
 
   return (
-    <p className="shrink-0 text-sm font-black tabular-nums text-white">
+    <p className="shrink-0 text-lg font-black tabular-nums leading-none text-coral">
       {formatDuration(getElapsedMs(session, nowMs))}
     </p>
   );

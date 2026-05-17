@@ -373,35 +373,27 @@ function RestDayCard({
 
 function RecentSessionsCard({ sessions }: { sessions: CompletedSession[] }) {
   if (sessions.length === 0) {
-    return (
-      <section className="rounded-2xl border border-white/8 bg-white/4 p-4">
-        <p className="text-[11px] font-black uppercase tracking-[0.22em] text-white/55">Dernières séances</p>
-        <p className="mt-2 text-sm font-semibold text-white/55">
-          Pas encore de séance enregistrée. Lance la première pour suivre tes progrès.
-        </p>
-      </section>
-    );
+    return null;
   }
 
   return (
-    <section className="rounded-2xl border border-white/8 bg-white/4 p-4">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-[11px] font-black uppercase tracking-[0.22em] text-white/55">Dernières séances</p>
-        <Link
-          className="text-[11px] font-black uppercase tracking-wide text-sky"
-          href="/historique"
-        >
-          Voir tout l&apos;historique
-        </Link>
-      </div>
-      <ul className="mt-3 space-y-2">
+    <details className="group rounded-2xl border border-white/8 bg-white/4">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4">
+        <p className="text-[11px] font-black uppercase tracking-[0.22em] text-white/55">
+          Historique ({sessions.length})
+        </p>
+        <span className="rounded-md bg-white/8 px-2.5 py-1 text-[10px] font-black text-white/45 group-open:bg-sky/10 group-open:text-sky">
+          {sessions.length} séance{sessions.length > 1 ? "s" : ""}
+        </span>
+      </summary>
+      <ul className="space-y-2 px-4 pb-4">
         {sessions.map((session) => (
           <li key={session.id}>
             <RecentSessionRow session={session} />
           </li>
         ))}
       </ul>
-    </section>
+    </details>
   );
 }
 

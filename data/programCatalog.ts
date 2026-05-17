@@ -651,6 +651,82 @@ export const PROGRAM_CATALOG: ProgramTemplate[] = [
       deloadEveryWeeks: 6,
       painRules: ["Signal cardio inquietant: arret de seance et avis medical."]
     }
+  },
+  {
+    id: "course-tapis-3j",
+    name: "Course / Tapis de course",
+    description: "Programme running progressif sur tapis ou en exterieur. Alternance endurance et intervalles pour ameliorer le souffle et bruler des calories.",
+    level: "debutant",
+    primaryObjective: "sante",
+    secondaryObjectives: ["perte-gras", "cardio-sante"],
+    frequency: 3,
+    averageDuration: "25-40 min",
+    requiredEquipment: ["salle-complete", "halteres-maison", "poids-corps"],
+    contraindications: ["douleur genou aigue", "douleur cheville non exploree"],
+    tags: ["cardio", "debutant", "perte-gras", "sante"],
+    weeklyStructure: ["Endurance zone 2", "Repos", "Intervalles", "Repos", "Endurance longue", "Repos", "Repos"],
+    sessions: [
+      {
+        id: "course-endurance",
+        weekday: "monday",
+        title: "Endurance zone 2",
+        focus: "Course facile, souffle confortable",
+        duration: "25-35 min",
+        intensity: "Légère",
+        exercises: [
+          ex("ct-warmup-1", "Marche rapide echauffement", "5 min", "Libre", "Monte progressivement le rythme."),
+          ex("ct-run-z2", "Course zone 2", "20-25 min", "Libre", "Rythme ou tu peux parler. Pas d'essoufflement."),
+          ex("ct-cooldown-1", "Marche retour au calme", "5 min", "Libre", "Respire calmement, baisse la vitesse.")
+        ]
+      },
+      {
+        id: "course-intervalles",
+        weekday: "wednesday",
+        title: "Intervalles",
+        focus: "Alternance rapide / lent pour progresser",
+        duration: "25-30 min",
+        intensity: "Soutenue",
+        exercises: [
+          ex("ct-warmup-2", "Marche + trot echauffement", "5 min", "Libre", "Monte progressivement."),
+          ex("ct-intervals", "Intervalles 30s rapide / 60s lent", "8 x 30/60", "Libre", "Sprint confortable 30s, recup trot 60s. Repete 8 fois."),
+          ex("ct-steady", "Trot regulier", "5-8 min", "Libre", "Recupere a rythme facile."),
+          ex("ct-cooldown-2", "Marche retour au calme", "3 min", "Libre", "Souffle, hydrate-toi.")
+        ]
+      },
+      {
+        id: "course-longue",
+        weekday: "friday",
+        title: "Endurance longue",
+        focus: "Duree progressive, fond cardio",
+        duration: "30-40 min",
+        intensity: "Modérée",
+        exercises: [
+          ex("ct-warmup-3", "Marche rapide", "5 min", "Libre", "Prepare les jambes."),
+          ex("ct-long-run", "Course continue", "25-35 min", "Libre", "Rythme regulier, pas de sprint. Objectif: tenir la duree."),
+          ex("ct-cooldown-3", "Marche + etirements legers", "5 min", "Libre", "Mollets, quadriceps, hanches.")
+        ]
+      }
+    ],
+    progressionRules: {
+      method: "technique-first",
+      loadStepKg: { compoundUpper: 0, compoundLower: 0, isolation: 0 },
+      notes: ["Ajouter 2-3 min par semaine quand le souffle reste facile.", "Augmenter la vitesse seulement apres 3 semaines stables."]
+    },
+    cardioRules: {
+      allowedModalities: ["course", "tapis", "marche inclinee"],
+      method: "duration-first",
+      maxSingleChange: "duration",
+      notes: ["Priorite a la regularite sur l'intensite."]
+    },
+    replacementRules: {
+      preferEquipment: ["salle-complete", "poids-corps"],
+      rules: ["Remplacer la course par la marche rapide inclinee si douleur articulaire."]
+    },
+    guardrails: {
+      contraindications: ["douleur genou persistante", "essoufflement anormal"],
+      deloadEveryWeeks: 4,
+      painRules: ["Douleur articulaire: remplacer par marche inclinee.", "Essoufflement anormal: reduire l'intensite."]
+    }
   }
 ];
 

@@ -17,7 +17,7 @@ import type {
   Weekday
 } from "@/types/training";
 
-const TOTAL_STEPS = 6;
+const TOTAL_STEPS = 5;
 
 const goalOptions: Array<{ value: PrimaryGoal; label: string; desc: string }> = [
   { value: "prise-masse", label: "Prise de muscle", desc: "Prioriser le gain musculaire" },
@@ -132,9 +132,6 @@ export function OnboardingFlow() {
         data.targetWeightKg > 0
       );
     }
-    if (step === 5 && data.hasPain) {
-      return data.painZones.length > 0;
-    }
     return true;
   };
 
@@ -202,8 +199,7 @@ export function OnboardingFlow() {
         {step === 2 && <Step2Goals data={data} patch={patch} />}
         {step === 3 && <Step3Level data={data} patch={patch} />}
         {step === 4 && <Step4Equipment data={data} patch={patch} />}
-        {step === 5 && <Step5Avoid data={data} patch={patch} />}
-        {step === 6 && <Step6Result data={data} recommendations={recommendations} />}
+        {step === 5 && <Step6Result data={data} recommendations={recommendations} />}
       </div>
 
       <div className="mt-6 grid grid-cols-2 gap-3">
@@ -606,8 +602,6 @@ function Step6Result({
 }) {
   const top = recommendations[0];
   const alternatives = recommendations.slice(1, 3);
-  const reason = buildReason(top, data);
-
   if (!top) {
     return (
       <StepWrapper subtitle="On finalise ton plan." title="Ton programme">
@@ -630,9 +624,6 @@ function Step6Result({
         <p className="mt-2 text-xs font-semibold text-white/65">
           {capitalize(top.program.level)} · {top.program.frequency} j/sem. ·{" "}
           {top.program.averageDuration}
-        </p>
-        <p className="mt-3 rounded-md bg-white/8 p-3 text-sm font-semibold leading-relaxed text-white/80">
-          {reason}
         </p>
       </article>
 
@@ -886,9 +877,6 @@ function buildSettings(data: OnboardingData, base: UserSettings): UserSettings {
     new Set([...(base.preferences ?? []), ...data.cardioPreferences])
   );
   const avoid = base.avoid ?? [];
-  const constraints = buildConstraints(data);
-  const watchPoints = buildWatchPoints(data);
-
   return {
     ...base,
     athleteName: data.athleteName.trim() || base.athleteName,
@@ -907,8 +895,8 @@ function buildSettings(data: OnboardingData, base: UserSettings): UserSettings {
     availableDays: base.availableDays?.length ? base.availableDays : ALL_WEEKDAYS,
     preferences,
     avoid,
-    watchPoints,
-    constraints,
+    watchPoints: [],
+    constraints: [],
     judoDays: [],
     externalSports: base.externalSports ?? [],
     strengthReferences: base.strengthReferences ?? [],
@@ -916,7 +904,7 @@ function buildSettings(data: OnboardingData, base: UserSettings): UserSettings {
     sleepQuality: base.sleepQuality || "Regulier",
     recoveryProfile: base.recoveryProfile ?? "regular",
     medicalNotes: base.medicalNotes ?? "",
-    cautionLevel: data.hasPain ? "prudent" : base.cautionLevel ?? "normal",
+    cautionLevel: base.cautionLevel ?? "normal",
     aiEnabled: base.aiEnabled ?? false,
     darkMode: base.darkMode ?? true
   };
