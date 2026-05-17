@@ -3,198 +3,84 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { BrandLogo } from "@/components/BrandLogo";
-import { signInWithEmail, signUpWithEmail, supabase } from "@/lib/supabaseClient";
-
-import { migrateLocalStorageToSupabase, ensureSupabaseProfile } from "@/lib/migrateToSupabase";
-import { isWelcomeSeen } from "@/lib/welcomeState";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [prenom, setPrenom] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
 
-  async function handlePostLogin(destination: string) {
-    const { data } = await supabase.auth.getSession();
-    if (data?.session?.user) {
-      const user = data.session.user;
-      await ensureSupabaseProfile(user.id, user.email || "");
-      await migrateLocalStorageToSupabase(user.id);
-    }
-    router.push(destination);
-  }
-
-  async function handleSignIn() {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setLoading(true);
     setError("");
-    setSuccess("");
-    const { error: err } = await signInWithEmail(email, password);
-    if (err) {
-      setError(err.message === "Invalid login credentials" ? "Email ou mot de passe incorrect" : err.message);
-    } else {
-      const destination = isWelcomeSeen() ? "/" : "/welcome";
-      await handlePostLogin(destination);
-    }
-    setLoading(false);
-  }
 
-  async function handleSignUp() {
-    setLoading(true);
-    setError("");
-    setSuccess("");
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
 
-    if (!prenom.trim()) {
-      setError("Le prénom est requis");
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.message || "Authentication failed");
+      }
+
+      router.push("/");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    const { data: signUpData, error: err } = await signUpWithEmail(email, password, prenom.trim());
-    if (err) {
-      setError(err.message);
-    } else if (signUpData?.session) {
-      // Save prénom in localStorage so onboarding pre-fills it
-      try {
-        const settingsKey = "coach-adaptatif:p:default:settings";
-        const existing = window.localStorage.getItem(settingsKey);
-        const settings = existing ? JSON.parse(existing) : {};
-        settings.athleteName = prenom.trim();
-        window.localStorage.setItem(settingsKey, JSON.stringify(settings));
-      } catch { /* ignore */ }
-
-      // Reset welcome flag so carousel shows
-      try {
-        window.localStorage.removeItem("coach-adaptatif:welcome-seen");
-      } catch { /* ignore */ }
-
-      await handlePostLogin("/welcome");
-    } else {
-      setSuccess("Un email de confirmation t'a été envoyé. Vérifie ta boîte mail.");
-    }
-    setLoading(false);
-  }
+  };
 
   return (
-    <div className="relative flex min-h-[100dvh] w-full flex-col items-center justify-center px-5 py-12">
-      {/* Logo */}
-      <div className="mb-8 flex flex-col items-center">
-        <div className="relative flex size-24 items-center justify-center">
-          <div className="absolute inset-0 rounded-full bg-coral/20 blur-3xl" />
-          <div className="relative flex size-20 items-center justify-center rounded-2xl border-2 border-coral/40 bg-gradient-to-br from-coral/30 to-coral/10 shadow-[0_18px_50px_rgba(255,90,0,0.4)]">
-            <BrandLogo className="size-12" variant="icon" />
-          </div>
+    <div className="min-h-screen flex items-center justify-center bg-gray-900 px-4">
+      <div className="w-full max-w-md">
+        <div className="flex justify-center mb-8">
+          <BrandLogo />
         </div>
-        <h1 className="mt-5 text-3xl font-black text-white">
-          {mode === "signin" ? "Content de te revoir." : "Bienvenue sur AthletIQ."}
-        </h1>
-        <p className="mt-2 text-center text-sm font-semibold text-white/55">
-          {mode === "signin"
-            ? "Connecte-toi pour retrouver tes données."
-            : "Crée ton compte pour commencer à t'entraîner."}
-        </p>
-      </div>
-
-      {/* Card */}
-      <div className="card-dark w-full max-w-md p-6">
-        <div className="space-y-4">
-          {/* Prénom (signup only) */}
-          {mode === "signup" && (
-            <label className="block">
-              <span className="text-xs font-black uppercase tracking-wide text-white/55">Prénom</span>
-              <input
-                type="text"
-                placeholder="Ton prénom"
-                value={prenom}
-                onChange={(e) => setPrenom(e.target.value)}
-                className="mt-1.5 h-12 w-full rounded-xl border border-white/10 bg-white/5 px-4 font-semibold text-white placeholder-white/30 outline-none focus:border-coral/50 focus:ring-2 focus:ring-coral/20"
-              />
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
+              Email
             </label>
-          )}
-
-          {/* Email */}
-          <label className="block">
-            <span className="text-xs font-black uppercase tracking-wide text-white/55">Email</span>
             <input
+              id="email"
               type="email"
-              placeholder="ton@email.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="mt-1.5 h-12 w-full rounded-xl border border-white/10 bg-white/5 px-4 font-semibold text-white placeholder-white/30 outline-none focus:border-coral/50 focus:ring-2 focus:ring-coral/20"
+              required
+              className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-orange-500"
+              placeholder="your@email.com"
             />
-          </label>
-
-          {/* Password */}
-          <label className="block">
-            <span className="text-xs font-black uppercase tracking-wide text-white/55">Mot de passe</span>
+          </div>
+          <div>
+            <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
+              Password
+            </label>
             <input
+              id="password"
               type="password"
-              placeholder={mode === "signup" ? "6 caractères minimum" : "••••••••"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="mt-1.5 h-12 w-full rounded-xl border border-white/10 bg-white/5 px-4 font-semibold text-white placeholder-white/30 outline-none focus:border-coral/50 focus:ring-2 focus:ring-coral/20"
+              required
+              className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-orange-500"
+              placeholder="••••••••"
             />
-          </label>
-
-          {/* Error */}
-          {error && (
-            <div className="rounded-lg border border-coral/20 bg-coral/10 px-4 py-2.5">
-              <p className="text-sm font-semibold text-coral">{error}</p>
-            </div>
-          )}
-
-          {/* Success */}
-          {success && (
-            <div className="rounded-lg border border-sea/20 bg-sea/10 px-4 py-2.5">
-              <p className="text-sm font-semibold text-sea">{success}</p>
-            </div>
-          )}
-
-          {/* Submit */}
+          </div>
+          {error && <div className="text-red-500 text-sm">{error}</div>}
           <button
-            onClick={mode === "signin" ? handleSignIn : handleSignUp}
-            disabled={loading || !email || !password || (mode === "signup" && !prenom.trim())}
-            className="session-cta-primary mt-2 w-full disabled:opacity-40"
-            type="button"
+            type="submit"
+            disabled={loading}
+            className="w-full py-2 bg-orange-500 text-white rounded-lg font-medium hover:bg-orange-600 disabled:opacity-50"
           >
-            {loading
-              ? "Chargement..."
-              : mode === "signin"
-                ? "Se connecter"
-                : "Créer mon compte"}
+            {loading ? "Logging in..." : "Log In"}
           </button>
-        </div>
+        </form>
       </div>
-
-      {/* Toggle mode */}
-      <p className="mt-6 text-center text-sm font-semibold text-white/55">
-        {mode === "signin" ? (
-          <>
-            Pas encore inscrit ?{" "}
-            <button
-              className="font-black text-coral transition hover:text-coral/80"
-              onClick={() => { setMode("signup"); setError(""); setSuccess(""); }}
-              type="button"
-            >
-              Créer un compte
-            </button>
-          </>
-        ) : (
-          <>
-            Déjà un compte ?{" "}
-            <button
-              className="font-black text-coral transition hover:text-coral/80"
-              onClick={() => { setMode("signin"); setError(""); setSuccess(""); }}
-              type="button"
-            >
-              Se connecter
-            </button>
-          </>
-        )}
-      </p>
     </div>
   );
 }

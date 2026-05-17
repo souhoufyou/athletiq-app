@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useRef, useState } from "react";
 import { fileToCompressedAvatar } from "@/lib/imageUpload";
-import { logout } from "@/lib/useAuth";
 import {
   appendCalibrationEvent,
   createReferenceDeletedCalibrationEvent,
@@ -1736,8 +1735,12 @@ function LogoutButton() {
 
   async function handleLogout() {
     setLoading(true);
-    await logout();
-    router.push("/auth/login");
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+      router.push("/auth/login");
+    } catch (error) {
+      setLoading(false);
+    }
   }
 
   return (
