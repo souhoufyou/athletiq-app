@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BrandLogo } from "@/components/BrandLogo";
 
@@ -122,6 +122,22 @@ export function Dashboard() {
         photoUrl={activeProfile?.photoUrl}
         programName={activeProgram?.name ?? "Programme personnalisé"}
       />
+
+      {(settings.primaryGoal === "perte-gras" || settings.primaryGoal === "prise-masse") && (
+        <WeightTrackingWidget
+          currentWeight={settings.currentWeightKg}
+          onWeightLog={(kg) => {
+            const today = new Date().toISOString().slice(0, 10);
+            const existing = settings.weightLog ?? [];
+            const sameDay = existing.find((e) => e.date === today);
+            const nextLog = sameDay
+              ? existing.map((e) => (e.date === today ? { date: today, kg } : e))
+              : [{ date: today, kg }, ...existing];
+            setSettings({ ...settings, weightLog: nextLog, currentWeightKg: kg });
+          }}
+          weightLog={settings.weightLog ?? []}
+        />
+      )}
 
       <DynamicHeroCard
         athleteName={settings.athleteName || "Athlète"}
@@ -589,4 +605,121 @@ function formatRelativeDate(iso: string): string {
   if (diffDays >= 7 && diffDays < 14) return "La semaine dernière";
 
   return new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "short" }).format(date);
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// WEIGHT TRACKING WIDGET
+// ─────────────────────────────────────────────────────────────────────────
+
+interface WeightEntry {
+  date: string;
+  kg: number;
+}
+
+function WeightTrackingWidget({
+  currentWeight,
+  onWeightLog,
+  weightLog
+}: {
+  currentWeight: number;
+  onWeightLog: (kg: number) => void;
+  weightLog: WeightEntry[];
+}) {
+  const [draftWeight, setDraftWeight] = useState(currentWeight);
+
+  const last7Days = useMemo(() => {
+    const sorted = [...weightLog].sort((a, b) => a.date.localeCompare(b.date));
+    return sorted.slice(-7).map((e) => e.kg);
+  }, [weightLog]);
+
+  const lastWeight = weightLog.length > 0 ? weightLog[0].kg : currentWeight;
+  const weekAgoWeight = weightLog.length >= 7 ? weightLog[6].kg : lastWeight;
+  const delta = lastWeight - weekAgoWeight;
+  const deltaLabel = delta === 0 ? "Stable" : delta > 0 ? `+${delta.toFixed(1)} kg` : `${delta.toFixed(1)} kg`;
+  const deltaColor = delta === 0 ? "text-white/55" : delta > 0 ? "text-coral" : "text-sea";
+
+  return (
+    <div className="rounded-2xl border border-white/8 bg-white/4 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-black uppercase tracking-[0.22em] text-white/55">Poids du jour</p>
+          <p className="mt-2 text-2xl font-black leading-tight text-white">{currentWeight.toFixed(1)} kg</p>
+          <p className={`mt-1 text-xs font-semibold ${deltaColor}`}>
+            7 jours : {deltaLabel}
+          </p>
+        </div>
+
+        {last7Days.length >= 2 && (
+          <div className="shrink-0">
+            <Sparkline data={last7Days} color={delta > 0 ? "#ff5a00" : "#24c07a"} height={40} width={80} />
+          </div>
+        )}
+      </div>
+
+      <div className="mt-4 flex gap-2">
+        <input
+          className="h-10 flex-1 rounded-lg border border-white/10 bg-white/5 px-3 text-sm font-semibold text-white outline-none placeholder-white/40 focus:border-sky focus:ring-2 focus:ring-sky/20"
+          inputMode="decimal"
+          onChange={(e) => setDraftWeight(Number(e.target.value))}
+          placeholder="kg"
+          step="0.1"
+          type="number"
+          value={draftWeight}
+        />
+        <button
+          className="shrink-0 rounded-lg bg-sky px-4 text-xs font-black text-white transition hover:bg-sky/80"
+          onClick={() => onWeightLog(draftWeight)}
+          type="button"
+        >
+          Enregistrer
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Sparkline({ data, color = "#ff5a00", height = 40, width = 120 }: { data: number[]; color?: string; height?: number; width?: number }) {
+  if (data.length < 2) return null;
+
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = max - min || 1;
+  const padding = 4;
+  const innerW = width - padding * 2;
+  const innerH = height - padding * 2;
+
+  const points = data.map((v, i) => ({
+    x: padding + (i / (data.length - 1)) * innerW,
+    y: padding + innerH - ((v - min) / range) * innerH
+  }));
+
+  const pathD = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(" ");
+  const areaD = `${pathD} L ${points[points.length - 1].x.toFixed(1)} ${height} L ${points[0].x.toFixed(1)} ${height} Z`;
+  const last = points[points.length - 1];
+  const pathLength = points.reduce((acc, p, i) => {
+    if (i === 0) return 0;
+    const prev = points[i - 1];
+    return acc + Math.sqrt((p.x - prev.x) ** 2 + (p.y - prev.y) ** 2);
+  }, 0);
+
+  return (
+    <svg className="overflow-visible" height={height} viewBox={`0 0 ${width} ${height}`} width={width}>
+      <defs>
+        <linearGradient id={`weight-spark-${color.replace("#", "")}`} x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.25" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={areaD} fill={`url(#weight-spark-${color.replace("#", "")})`} />
+      <path
+        d={pathD}
+        fill="none"
+        stroke={color}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2"
+      />
+      <circle cx={last.x} cy={last.y} fill={color} r="2.5" />
+    </svg>
+  );
 }
