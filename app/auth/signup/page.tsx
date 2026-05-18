@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BrandLogo } from "@/components/BrandLogo";
 
-export default function LoginPage() {
+export default function SignupPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -18,7 +18,7 @@ export default function LoginPage() {
     setError("");
 
     try {
-      const response = await fetch("/api/auth/login", {
+      const response = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -26,10 +26,10 @@ export default function LoginPage() {
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.message || "Authentication failed");
+        throw new Error(data.message || "Account creation failed");
       }
 
-      router.push("/");
+      router.push("/welcome");
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
@@ -68,6 +68,7 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              minLength={6}
               className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-orange-500"
               placeholder="••••••••"
             />
@@ -78,13 +79,13 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full py-2 bg-orange-500 text-white rounded-lg font-medium hover:bg-orange-600 disabled:opacity-50"
           >
-            {loading ? "Logging in..." : "Log In"}
+            {loading ? "Création..." : "Créer mon compte"}
           </button>
         </form>
         <p className="mt-4 text-center text-sm text-gray-400">
-          Pas encore de compte ?{" "}
-          <Link href="/auth/signup" className="font-medium text-orange-500 hover:text-orange-400">
-            Créer un compte
+          Déjà un compte ?{" "}
+          <Link href="/auth/login" className="font-medium text-orange-500 hover:text-orange-400">
+            Se connecter
           </Link>
         </p>
       </div>
