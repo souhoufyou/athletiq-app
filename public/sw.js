@@ -1,75 +1,58 @@
-const CACHE_NAME = "athletiq-v2";
-const STATIC_ASSETS = [
-  "/",
-  "/index.html",
-  "/brand/athletiq-icon.svg",
-  "/brand/athletiq-icon.png"
-];
+const CACHE_NAME = "athletiq-v3";
 
-// Installation: cache l'app shell
+// Minimal precache: just the app shell so the app opens offline.
+const PRECACHE_URLS = ["/"];
+
+// Installation: precache the app shell.
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS);
-    })
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS))
   );
   self.skipWaiting();
 });
 
-// Activation: nettoie les anciens caches
+// Activation: drop every old cache so a new deploy never serves stale files.
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames
-          .filter((name) => name !== CACHE_NAME)
-          .map((name) => caches.delete(name))
-      );
-    })
+    caches.keys().then((names) =>
+      Promise.all(
+        names.filter((name) => name !== CACHE_NAME).map((name) => caches.delete(name))
+      )
+    )
   );
   self.clients.claim();
 });
 
-// Fetch: stratégie Network First avec fallback au cache
+// Fetch strategy:
+// - Static media (brand assets, fonts, images): cache first — they don't change.
+// - Everything else (HTML, JS, CSS): network first, falling back to cache only
+//   when offline. This guarantees a new deploy is always picked up online.
 self.addEventListener("fetch", (event) => {
   const { request } = event;
 
-  // Skip les requêtes non-GET et les appels API
-  if (request.method !== "GET") {
+  if (request.method !== "GET") return;
+
+  const url = new URL(request.url);
+
+  // Never intercept API calls or cross-origin requests.
+  if (url.origin !== self.location.origin || url.pathname.startsWith("/api/")) {
     return;
   }
 
-  if (request.url.includes("/api/")) {
-    return;
-  }
-
-  // Pour les assets statiques et l'app shell: Cache First
-  if (
-    request.destination === "image" ||
+  const isStaticMedia =
+    url.pathname.startsWith("/brand/") ||
     request.destination === "font" ||
-    request.destination === "style" ||
-    request.destination === "script" ||
-    request.url.includes("/brand/") ||
-    request.url.endsWith("/") ||
-    request.url.endsWith(".html")
-  ) {
+    request.destination === "image";
+
+  if (isStaticMedia) {
     event.respondWith(
-      caches.match(request).then((response) => {
-        if (response) {
-          return response;
-        }
-
+      caches.match(request).then((cached) => {
+        if (cached) return cached;
         return fetch(request).then((response) => {
-          // Ne cache que les réponses valides
-          if (!response || response.status !== 200) {
-            return response;
+          if (response && response.status === 200) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
           }
-
-          const responseClone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(request, responseClone);
-          });
-
           return response;
         });
       })
@@ -77,32 +60,18 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Pour les autres requêtes: Network First avec fallback au cache
+  // Network first for app code and pages.
   event.respondWith(
     fetch(request)
       .then((response) => {
-        // Ne cache que les réponses valides
-        if (!response || response.status !== 200) {
-          return response;
+        if (response && response.status === 200) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
         }
-
-        const responseClone = response.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(request, responseClone);
-        });
-
         return response;
       })
-      .catch(() => {
-        // En cas d'erreur réseau, retourner le cache
-        return caches.match(request).then((response) => {
-          if (response) {
-            return response;
-          }
-
-          // Si aucun cache n'existe, retourner une page offline
-          return caches.match("/");
-        });
-      })
+      .catch(() =>
+        caches.match(request).then((cached) => cached || caches.match("/"))
+      )
   );
 });

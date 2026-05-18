@@ -12,6 +12,7 @@ import {
 } from "@/lib/calibrationEvents";
 import { getActiveProgramTemplate } from "@/lib/activeProgram";
 import { COMPLEMENTARY_PROGRAMS } from "@/lib/complementaryPrograms";
+import { supabaseAuth } from "@/lib/supabaseAuth";
 import { buildStrengthReferenceFromSet, estimateOneRepMaxFromSet, formatEstimatedOneRepMax } from "@/lib/strengthCalibration";
 import { useCoachStorage } from "@/lib/storage";
 import type {
@@ -1736,9 +1737,10 @@ function LogoutButton() {
   async function handleLogout() {
     setLoading(true);
     try {
+      await supabaseAuth.auth.signOut();
       await fetch("/api/auth/logout", { method: "POST" });
       router.push("/auth/login");
-    } catch (error) {
+    } catch {
       setLoading(false);
     }
   }

@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BrandLogo } from "@/components/BrandLogo";
+import { authErrorMessage, supabaseAuth } from "@/lib/supabaseAuth";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -11,27 +12,43 @@ export default function SignupPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
+    setNotice("");
 
     try {
-      const response = await fetch("/api/auth/signup", {
+      const { data, error: signUpError } = await supabaseAuth.auth.signUp({
+        email,
+        password,
+      });
+
+      if (signUpError) {
+        throw new Error(authErrorMessage(signUpError.message));
+      }
+
+      // Email confirmation still enabled on the Supabase project: no session yet.
+      if (!data.session) {
+        setNotice(
+          "Compte créé. Vérifie ton email pour confirmer ton inscription, puis connecte-toi."
+        );
+        setLoading(false);
+        return;
+      }
+
+      // Set the middleware session cookie, then start the onboarding flow.
+      await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || "Account creation failed");
-      }
-
       router.push("/welcome");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+      setError(err instanceof Error ? err.message : "Une erreur est survenue");
     } finally {
       setLoading(false);
     }
@@ -74,6 +91,7 @@ export default function SignupPage() {
             />
           </div>
           {error && <div className="text-red-500 text-sm">{error}</div>}
+          {notice && <div className="text-sm text-orange-400">{notice}</div>}
           <button
             type="submit"
             disabled={loading}
