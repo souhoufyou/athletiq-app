@@ -621,7 +621,12 @@ function ProgramOption({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate text-sm font-black text-white">{program.name}</p>
-          <p className="mt-0.5 truncate text-[11px] font-semibold text-white/55">
+          {program.description ? (
+            <p className="mt-1 line-clamp-2 text-xs font-semibold text-white/60">
+              {program.description}
+            </p>
+          ) : null}
+          <p className="mt-1 truncate text-[11px] font-semibold text-white/55">
             {capitalize(program.level)} · {program.frequency} j/sem. · {program.averageDuration}
           </p>
         </div>
