@@ -128,7 +128,7 @@ export function SessionCelebration({ durationLabel, exerciseCount, hasPersonalRe
         />
       </svg>
 
-      <p className="celebration-title mt-6 text-2xl font-black leading-tight text-white sm:text-3xl">
+      <p className="celebration-title text-gradient-hero mt-6 text-2xl font-bold leading-tight sm:text-3xl">
         Séance bouclée
       </p>
       <p className="celebration-message mt-3 max-w-xs text-base font-semibold leading-relaxed text-white/80">
@@ -137,18 +137,18 @@ export function SessionCelebration({ durationLabel, exerciseCount, hasPersonalRe
 
       <div className="celebration-stats mt-5 grid grid-cols-2 gap-3">
         <div className="rounded-xl border border-white/8 bg-white/4 px-4 py-3 text-center">
-          <p className="text-2xl font-black text-white">{exerciseCount}</p>
-          <p className="mt-0.5 text-[10px] font-black uppercase tracking-wide text-white/55">Exercices</p>
+          <p className="text-2xl font-bold text-white">{exerciseCount}</p>
+          <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wide text-white/55">Exercices</p>
         </div>
         {durationLabel ? (
           <div className="rounded-xl border border-white/8 bg-white/4 px-4 py-3 text-center">
-            <p className="text-2xl font-black text-white">{durationLabel}</p>
-            <p className="mt-0.5 text-[10px] font-black uppercase tracking-wide text-white/55">Durée</p>
+            <p className="text-2xl font-bold text-white">{durationLabel}</p>
+            <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wide text-white/55">Durée</p>
           </div>
         ) : (
           <div className="rounded-xl border border-white/8 bg-white/4 px-4 py-3 text-center">
-            <p className="text-2xl font-black text-white">✓</p>
-            <p className="mt-0.5 text-[10px] font-black uppercase tracking-wide text-white/55">Terminée</p>
+            <p className="text-2xl font-bold text-white">✓</p>
+            <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wide text-white/55">Terminée</p>
           </div>
         )}
       </div>

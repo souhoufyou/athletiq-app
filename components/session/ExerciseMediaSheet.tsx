@@ -70,12 +70,12 @@ export function ExerciseMediaSheet({ exercise, onClose }: Props) {
         {/* Sticky header */}
         <div className="flex shrink-0 items-start justify-between gap-3 border-b border-white/8 p-5">
           <div className="min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-[0.28em] text-coral">Démo</p>
-            <h2 className="mt-1 text-xl font-black leading-tight">{exercise.name}</h2>
+            <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-coral">Démo</p>
+            <h2 className="mt-1 text-xl font-bold leading-tight">{exercise.name}</h2>
           </div>
           <button
             aria-label="Fermer"
-            className="flex size-10 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/5 text-sm font-black text-white/70"
+            className="flex size-10 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/5 text-sm font-bold text-white/70"
             onClick={onClose}
             type="button"
           >
@@ -132,7 +132,7 @@ export function ExerciseMediaSheet({ exercise, onClose }: Props) {
             ) : null}
 
             {/* Counter overlay */}
-            <span className="absolute bottom-2 right-2 rounded-full bg-black/55 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-white/90 backdrop-blur">
+            <span className="absolute bottom-2 right-2 rounded-full bg-black/55 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white/90 backdrop-blur">
               {activeIndex + 1} / {photos.length}
             </span>
           </div>
@@ -157,7 +157,7 @@ export function ExerciseMediaSheet({ exercise, onClose }: Props) {
           {/* Cue */}
           {exercise.cue ? (
             <div className="mt-4 rounded-xl border border-white/8 bg-white/4 p-3">
-              <p className="text-[10px] font-black uppercase tracking-wide text-white/55">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-white/55">
                 Technique
               </p>
               <p className="mt-1 text-sm font-semibold leading-relaxed text-white/80">
@@ -199,8 +199,8 @@ export function ExerciseMediaSheet({ exercise, onClose }: Props) {
 function Mini({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-white/8 bg-white/4 p-3">
-      <p className="text-[10px] font-black uppercase tracking-wide text-white/55">{label}</p>
-      <p className="mt-0.5 text-sm font-black leading-tight text-white">{value}</p>
+      <p className="text-[10px] font-bold uppercase tracking-wide text-white/55">{label}</p>
+      <p className="mt-0.5 text-sm font-bold leading-tight text-white">{value}</p>
     </div>
   );
 }

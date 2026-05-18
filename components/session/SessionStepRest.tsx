@@ -92,14 +92,14 @@ export function SessionStepRest({
       <div className="session-step-accent" style={{ background: "linear-gradient(90deg, #ff9f1a, #ff5a00)" }} />
 
       <div className="flex items-center justify-between gap-3">
-        <p className="text-[11px] font-black uppercase tracking-[0.28em] text-amber">Repos</p>
-        <p className="text-[11px] font-black uppercase tracking-[0.22em] text-white/45">
+        <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-amber">Repos</p>
+        <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-white/45">
           Prochaine · Série {nextSetIndex} / {setCount}
         </p>
       </div>
 
       <div className="mt-2 flex items-baseline justify-between gap-3">
-        <h2 className="truncate text-base font-black text-white">{exercise.name}</h2>
+        <h2 className="truncate text-base font-bold text-white">{exercise.name}</h2>
         {lastSet ? (
           <p className="shrink-0 text-xs font-bold text-white/55">
             Série {setIndexJustFinished} : <span className="text-white">{formatLastSet(lastSet)}</span>
@@ -136,7 +136,7 @@ export function SessionStepRest({
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <p
-              className={`text-7xl font-black tabular-nums leading-none ${
+              className={`text-7xl font-bold tabular-nums leading-none ${
                 isFinalCountdown ? "text-coral" : "text-white"
               }`}
               style={{ letterSpacing: "-0.02em" }}
@@ -144,7 +144,7 @@ export function SessionStepRest({
               {formatDuration(secondsLeft * 1000)}
             </p>
             {done ? (
-              <p className="mt-2 text-xs font-black uppercase tracking-[0.25em] text-amber">
+              <p className="mt-2 text-xs font-bold uppercase tracking-[0.25em] text-amber">
                 Repos terminé
               </p>
             ) : (
@@ -191,7 +191,7 @@ function RestControl({
 }) {
   return (
     <button
-      className={`h-14 rounded-xl border px-3 text-sm font-black transition ${
+      className={`h-14 rounded-xl border px-3 text-sm font-bold transition ${
         highlight
           ? "border-amber bg-amber/20 text-amber"
           : "border-white/10 bg-white/8 text-white hover:bg-white/12"

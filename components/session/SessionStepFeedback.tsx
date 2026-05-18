@@ -88,7 +88,7 @@ export function SessionStepFeedback({
       <div className="session-step-accent" style={{ background: "linear-gradient(90deg, #ff7a18, #24c07a)" }} />
 
       <div className="flex items-center justify-between gap-3">
-        <p className="text-[11px] font-black uppercase tracking-[0.28em] text-sea">
+        <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-sea">
           Ressenti · {exerciseIndex + 1} / {exerciseTotal}
         </p>
       </div>
@@ -96,7 +96,7 @@ export function SessionStepFeedback({
       <div className="mt-3 flex items-center gap-3">
         <SessionExerciseIcon exercise={exercise} className="size-12 shrink-0" />
         <div className="min-w-0">
-          <h2 className="truncate text-xl font-black leading-tight text-white">{exercise.name}</h2>
+          <h2 className="truncate text-xl font-bold leading-tight text-white">{exercise.name}</h2>
           <p className="text-xs font-bold text-white/55">Comment s&apos;est passé cet exercice ?</p>
         </div>
       </div>
@@ -114,10 +114,10 @@ export function SessionStepFeedback({
               type="button"
             >
               <span className="min-w-0">
-                <span className="block text-base font-black leading-tight">{option.label}</span>
+                <span className="block text-base font-bold leading-tight">{option.label}</span>
                 <span className="mt-0.5 block text-[11px] font-semibold opacity-80">{option.description}</span>
               </span>
-              {isSelected ? <span className="text-lg font-black">✓</span> : null}
+              {isSelected ? <span className="text-lg font-bold">✓</span> : null}
             </button>
           );
         })}
@@ -125,7 +125,7 @@ export function SessionStepFeedback({
 
       {needsComment ? (
         <label className="mt-4 block">
-          <span className="text-xs font-black uppercase tracking-wide text-white/55">
+          <span className="text-xs font-bold uppercase tracking-wide text-white/55">
             Précise rapidement <span className="text-coral">(obligatoire)</span>
           </span>
           <textarea

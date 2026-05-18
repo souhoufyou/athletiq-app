@@ -65,17 +65,17 @@ export function ExerciseCard({
         <div className="min-w-0">
           <div className="mb-2 flex items-center gap-2">
             {isActive ? (
-              <span className="rounded-full bg-sky px-2.5 py-1 text-xs font-black uppercase text-white">Actuel</span>
+              <span className="rounded-full bg-sky px-2.5 py-1 text-xs font-bold uppercase text-white">Actuel</span>
             ) : null}
             {isCompleted ? (
-              <span className="rounded-full bg-sea/10 px-2.5 py-1 text-xs font-black uppercase text-sea">Renseigné</span>
+              <span className="rounded-full bg-sea/10 px-2.5 py-1 text-xs font-bold uppercase text-sea">Renseigné</span>
             ) : null}
           </div>
-          <h3 className="text-xl font-black leading-tight text-white">{exercise.name}</h3>
+          <h3 className="text-xl font-bold leading-tight text-white">{exercise.name}</h3>
           <p className="mt-2 text-sm font-semibold leading-relaxed text-white/55">{exercise.cue}</p>
         </div>
         <div className="shrink-0 rounded-md bg-sky/10 px-3 py-2 text-right text-sky">
-          <p className="text-base font-black">{exercise.target}</p>
+          <p className="text-base font-bold">{exercise.target}</p>
           <p className="text-xs font-semibold text-white/60">prévu</p>
         </div>
       </div>
@@ -83,15 +83,15 @@ export function ExerciseCard({
       <dl className="mt-5 grid grid-cols-2 gap-3 text-sm">
         <div className="rounded-md border border-sky/15 bg-sky/10 p-3">
           <dt className="font-bold text-sky">Charge prévue</dt>
-          <dd className="mt-1 text-xl font-black">{exercise.plannedLoad ?? "À définir"}</dd>
+          <dd className="mt-1 text-xl font-bold">{exercise.plannedLoad ?? "À définir"}</dd>
         </div>
         <div className="rounded-md border border-amber/20 bg-amber/10 p-3">
           <dt className="font-bold text-amber">Repos</dt>
-          <dd className="mt-1 text-xl font-black">{exercise.rest}</dd>
+          <dd className="mt-1 text-xl font-bold">{exercise.rest}</dd>
         </div>
         <div className="col-span-2 rounded-md border border-white/10 bg-white/8 p-3">
           <dt className="font-bold text-white/55">Dernière charge réalisée</dt>
-          <dd className="mt-1 text-lg font-black text-white">{lastLoad ?? "Aucune donnée"}</dd>
+          <dd className="mt-1 text-lg font-bold text-white">{lastLoad ?? "Aucune donnée"}</dd>
         </div>
       </dl>
 
@@ -101,7 +101,7 @@ export function ExerciseCard({
 
           return (
             <button
-              className={`min-h-14 rounded-md border px-3 text-base font-black transition ${
+              className={`min-h-14 rounded-md border px-3 text-base font-bold transition ${
                 isActive ? status.active : status.idle
               } ${status.value === "skipped" ? "col-span-2" : ""}`}
               key={status.value}

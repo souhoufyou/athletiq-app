@@ -144,6 +144,20 @@ export function SessionRunner() {
     setActiveExercise(exercise.id);
   }, [active, step, currentSession.exercises, setActiveExercise]);
 
+  // Pulse the top progress bar each time an exercise is completed.
+  const completedCountForBar = active ? getCompletedCount(active.logs) : 0;
+  const [progressPulse, setProgressPulse] = useState(false);
+  const prevCompletedRef = useRef(0);
+  useEffect(() => {
+    if (completedCountForBar > prevCompletedRef.current) {
+      setProgressPulse(true);
+      const timeout = window.setTimeout(() => setProgressPulse(false), 650);
+      prevCompletedRef.current = completedCountForBar;
+      return () => window.clearTimeout(timeout);
+    }
+    prevCompletedRef.current = completedCountForBar;
+  }, [completedCountForBar]);
+
   if (!isReady) {
     return <div className="rounded-lg bg-white p-5 font-bold shadow-soft">Chargement...</div>;
   }
@@ -172,13 +186,13 @@ export function SessionRunner() {
 
     return (
       <div className="space-y-5">
-        <section className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#11131a] p-5 text-white shadow-soft">
+        <section className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#11131a] p-5 text-white shadow-soft [view-transition-name:session-card]">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_5%,rgba(255,91,0,0.34),transparent_34%),linear-gradient(135deg,rgba(255,255,255,0.08),transparent_44%)]" />
           <div className="relative">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-xs font-black uppercase tracking-[0.22em] text-coral">Mode séance</p>
-                <h1 className="mt-2 text-3xl font-black leading-[0.95] text-white">{todaySession.title}</h1>
+                <h1 className="text-gradient-hero mt-2 text-3xl font-black leading-[0.95] [view-transition-name:session-title]">{todaySession.title}</h1>
                 <p className="mt-2 text-sm font-semibold leading-relaxed text-white/60">
                   {activeProgram?.name ?? "Programme actif"} - {todaySession.focus}
                 </p>
@@ -220,7 +234,7 @@ export function SessionRunner() {
 
         {todaysCompletedSession ? (
           <button
-            className="h-12 w-full rounded-md border border-white/10 bg-white/8 text-sm font-black text-white/70 transition hover:bg-white/12"
+            className="tap-feedback h-12 w-full rounded-md border border-white/10 bg-white/8 text-sm font-black text-white/70 transition hover:bg-white/12"
             onClick={() => {
               if (typeof window !== "undefined") {
                 const ok = window.confirm(
@@ -238,7 +252,7 @@ export function SessionRunner() {
           </button>
         ) : (
           <button
-            className="h-16 w-full rounded-2xl bg-coral px-4 text-lg font-black text-white shadow-[0_18px_45px_rgba(255,91,0,0.32)] transition hover:bg-coral/90"
+            className="tap-feedback h-16 w-full rounded-2xl bg-coral px-4 text-lg font-black text-white shadow-[0_18px_45px_rgba(255,91,0,0.32)] transition hover:bg-coral/90"
             onClick={() => {
               setLastSummary(null);
               setAiStatus("");
@@ -454,7 +468,7 @@ export function SessionRunner() {
 
   return (
     <div className="space-y-4">
-      <section className="z-20 -mx-4 border-b border-white/10 bg-[#0f111a]/95 px-4 py-3 sm:-mx-6 sm:px-6">
+      <section className="z-20 -mx-4 border-b border-white/10 bg-[#0f111a]/95 px-4 py-3 sm:-mx-6 sm:px-6 [view-transition-name:session-card]">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <button
@@ -482,8 +496,12 @@ export function SessionRunner() {
             {active.timer.isPaused ? "▶" : "⏸"}
           </button>
         </div>
-        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
-          <div className="h-full rounded-full bg-coral transition-all" style={{ width: `${progressPercent}%` }} />
+        <div
+          className={`mt-2 h-1.5 overflow-hidden rounded-full bg-white/10 [view-transition-name:session-progress] ${
+            progressPulse ? "progress-step-complete" : ""
+          }`}
+        >
+          <div className="progress-fill h-full rounded-full bg-coral" style={{ width: `${progressPercent}%` }} />
         </div>
       </section>
 
@@ -771,8 +789,8 @@ function AlternativesSheet({
 
 function LaunchMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/10 p-3 text-center">
-      <p className="text-lg font-black leading-tight text-white">{value}</p>
+    <div className="rounded-2xl border border-electric/15 bg-electric/[0.07] p-3 text-center">
+      <p className="text-lg font-black leading-tight text-electric">{value}</p>
       <p className="mt-1 text-[10px] font-black uppercase text-white/55">{label}</p>
     </div>
   );
@@ -842,7 +860,7 @@ function GuidedSessionReport({
     <section className="space-y-4">
       <div className="overflow-hidden rounded-2xl border border-white/10 premium-gradient p-5 text-white shadow-soft">
         <p className="text-sm font-black uppercase text-sky">Bilan séance</p>
-        <h2 className="mt-2 text-3xl font-black leading-tight">{session.title}</h2>
+        <h2 className="text-gradient-hero mt-2 text-3xl font-black leading-tight">{session.title}</h2>
         <p className="mt-2 text-sm font-semibold text-white/70">
           Séance terminée en {formatDurationLong(session.totalDurationMs)}
         </p>

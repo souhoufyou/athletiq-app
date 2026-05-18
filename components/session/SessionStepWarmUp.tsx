@@ -50,12 +50,12 @@ export function SessionStepWarmUp({
 
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <p className="text-xs font-black uppercase tracking-[0.22em] text-amber">Échauffement</p>
-          <h2 className="mt-2 text-2xl font-black text-white">
+          <p className="text-xs font-bold uppercase tracking-[0.22em] text-amber">Échauffement</p>
+          <h2 className="mt-2 text-2xl font-bold text-white">
             {exercise.name}
           </h2>
         </div>
-        <p className="shrink-0 rounded-full bg-amber/15 px-3 py-1 text-[10px] font-black uppercase text-amber">
+        <p className="shrink-0 rounded-full bg-amber/15 px-3 py-1 text-[10px] font-bold uppercase text-amber">
           Exercice {exerciseIndex + 1} / {exerciseTotal}
         </p>
       </div>
@@ -78,7 +78,7 @@ export function SessionStepWarmUp({
             <div className="px-4 py-3">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex-1">
-                  <p className="text-sm font-black text-white">
+                  <p className="text-sm font-bold text-white">
                     {ramp.percent}% × {ramp.reps} reps
                   </p>
                   <p className="mt-1 text-xs font-semibold text-white/55">
@@ -89,7 +89,7 @@ export function SessionStepWarmUp({
                   <span className="text-lg">✓</span>
                 )}
                 {idx === currentRampIndex && (
-                  <span className="inline-flex animate-pulse items-center justify-center rounded-full bg-amber text-white text-xs font-black w-6 h-6">
+                  <span className="inline-flex animate-pulse items-center justify-center rounded-full bg-amber text-white text-xs font-bold w-6 h-6">
                     {currentRampIndex + 1}
                   </span>
                 )}
@@ -102,8 +102,8 @@ export function SessionStepWarmUp({
       {/* Current ramp info */}
       {currentRampIndex < warmupRamps.length && (
         <div className="mt-6 rounded-2xl border border-sea/30 bg-sea/10 p-4">
-          <p className="text-sm font-black text-sea">Série {currentRampIndex + 1} en cours</p>
-          <p className="mt-2 text-2xl font-black text-white">
+          <p className="text-sm font-bold text-sea">Série {currentRampIndex + 1} en cours</p>
+          <p className="mt-2 text-2xl font-bold text-white">
             {currentLoad} {unit}
           </p>
           <p className="mt-1 text-xs font-semibold text-white/65">
@@ -115,7 +115,7 @@ export function SessionStepWarmUp({
       {/* Ready message */}
       {isLastRamp && (
         <div className="mt-6 rounded-2xl border border-sea/40 bg-sea/15 p-4 text-center">
-          <p className="text-xl font-black text-sea">Prêt pour ta série de travail ! 🔥</p>
+          <p className="text-xl font-bold text-sea">Prêt pour ta série de travail ! 🔥</p>
           <p className="mt-2 text-xs font-semibold text-white/65">
             Tu as bien échauffé tes articulations et muscles.
           </p>

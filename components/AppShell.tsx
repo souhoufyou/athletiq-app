@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
+import { RouteSkeleton } from "@/components/ui/PageSkeletons";
 import { useCoachStorage } from "@/lib/storage";
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -15,7 +16,6 @@ export function AppShell({ children }: { children: ReactNode }) {
   // AppHeader is hidden everywhere: Dashboard has its own integrated header,
   // other pages have their own internal headers.
   const showHeader = false;
-  void pathname;
 
   useEffect(() => {
     if (isReady && !isOnboardingDone) {
@@ -25,14 +25,10 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   if (!isReady) {
     return (
-      <div className="app-shell mx-auto flex min-h-screen w-full max-w-[96rem] items-center justify-center px-4 safe-bottom sm:px-6 lg:px-8">
-        <div className="card-dark w-full max-w-md p-6 text-center">
-          <p className="text-sm font-black uppercase text-sky">Chargement</p>
-          <h1 className="mt-3 text-2xl font-black text-white">On remet ton espace en place</h1>
-          <p className="mt-3 text-sm font-semibold leading-relaxed text-white/65">
-            L&apos;application recharge ton profil et ton programme.
-          </p>
-        </div>
+      <div className="app-shell mx-auto min-h-screen w-full max-w-[96rem] px-4 safe-bottom safe-top sm:px-6 lg:px-8">
+        <main className="app-content">
+          <RouteSkeleton pathname={pathname} />
+        </main>
       </div>
     );
   }

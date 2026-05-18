@@ -54,19 +54,19 @@ export function AppHeader() {
 
       <div className="mt-4 flex items-end justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-[0.28em] text-white/35">
+          <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-white/35">
             Entraine. Progresse. Depasse-toi.
           </p>
           {pageTitle ? (
-            <p className="mt-0.5 text-xl font-black leading-tight text-white">{pageTitle}</p>
+            <p className="mt-0.5 text-xl font-bold leading-tight text-white">{pageTitle}</p>
           ) : (
-            <p className="mt-0.5 text-xl font-black leading-tight text-white">
+            <p className="mt-0.5 text-xl font-bold leading-tight text-white">
               {athleteName ? `${getGreeting()}, ${athleteName}` : "Dashboard"}
             </p>
           )}
         </div>
         <div className="shrink-0 text-right">
-          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-coral">
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-coral">
             {activeDays} jours actifs
           </p>
           <p className="mt-1 max-w-[8.8rem] truncate text-[11px] font-semibold capitalize leading-tight text-white/45">

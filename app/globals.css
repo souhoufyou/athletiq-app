@@ -2,9 +2,118 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   DESIGN TOKENS - Light Mode (default)
+   ───────────────────────────────────────────────────────────────────────────── */
 :root {
+  color-scheme: light;
+  background: #ffffff;
+
+  /* Surfaces */
+  --surface-primary: #ffffff;
+  --surface-secondary: #f4f5f7;
+  --surface-card: #f8f9fa;
+  --surface-elevated: #ffffff;
+
+  /* Text */
+  --text-primary: #0b0d12;
+  --text-secondary: rgba(11, 13, 18, 0.64);
+  --text-muted: rgba(11, 13, 18, 0.42);
+
+  /* Borders */
+  --border-subtle: rgba(15, 20, 35, 0.08);
+  --border-strong: rgba(15, 20, 35, 0.14);
+
+  /* Accents */
+  --accent-primary: #ff5a00;
+  --accent-primary-soft: rgba(255, 90, 0, 0.12);
+  --accent-secondary: #ff7a18;
+  /* Cold data accent — metrics, stats, trends, passive information */
+  --accent-data: #4f6eff;
+  --accent-data-rgb: 79 110 255;
+  --accent-data-soft: rgba(79, 110, 255, 0.12);
+  --accent-data-border: rgba(79, 110, 255, 0.24);
+  --accent-success: #24c07a;
+  --accent-success-soft: rgba(36, 192, 122, 0.12);
+  --accent-warning: #f59e0b;
+  --accent-warning-soft: rgba(245, 158, 11, 0.12);
+
+  /* Shadows */
+  --shadow-card: 0 10px 28px rgba(15, 20, 35, 0.08), 0 2px 6px rgba(15, 20, 35, 0.04);
+  --shadow-soft: 0 22px 68px rgba(15, 20, 35, 0.12);
+  --shadow-elevated: 0 12px 30px rgba(15, 20, 35, 0.08);
+
+  /* Semantic colors for UI */
+  --input-bg: #ffffff;
+  --input-border: rgba(15, 20, 35, 0.12);
+  --input-text: #0b0d12;
+  --button-secondary-bg: rgba(15, 20, 35, 0.05);
+  --button-secondary-border: rgba(15, 20, 35, 0.10);
+  --button-secondary-text: rgba(11, 13, 18, 0.78);
+  --nav-bg: rgba(17, 20, 28, 0.96);
+  --nav-text: #f6f7f8;
+  --selection-bg: rgba(255, 90, 0, 0.2);
+
+  /* Skeleton loaders */
+  --skeleton-base: rgba(15, 20, 35, 0.07);
+  --skeleton-sheen: rgba(255, 255, 255, 0.55);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   DESIGN TOKENS - Dark Mode
+   ───────────────────────────────────────────────────────────────────────────── */
+.dark {
   color-scheme: dark;
   background: #040506;
+
+  /* Surfaces */
+  --surface-primary: #08090b;
+  --surface-secondary: #101216;
+  --surface-card: #14161b;
+  --surface-elevated: #191c22;
+
+  /* Text */
+  --text-primary: #f6f7f8;
+  --text-secondary: rgba(246, 247, 248, 0.64);
+  --text-muted: rgba(246, 247, 248, 0.42);
+
+  /* Borders */
+  --border-subtle: rgba(255, 255, 255, 0.10);
+  --border-strong: rgba(255, 255, 255, 0.16);
+
+  /* Accents */
+  --accent-primary: #ff5a00;
+  --accent-primary-soft: rgba(255, 90, 0, 0.18);
+  --accent-secondary: #ff7a18;
+  /* Cold data accent — slightly lighter on dark surfaces for contrast */
+  --accent-data: #6f87ff;
+  --accent-data-rgb: 111 135 255;
+  --accent-data-soft: rgba(111, 135, 255, 0.16);
+  --accent-data-border: rgba(111, 135, 255, 0.30);
+  --accent-success: #24c07a;
+  --accent-success-soft: rgba(36, 192, 122, 0.15);
+  --accent-warning: #f59e0b;
+  --accent-warning-soft: rgba(245, 158, 11, 0.12);
+
+  /* Shadows */
+  --shadow-card: 0 16px 40px rgba(0, 0, 0, 0.28);
+  --shadow-soft: 0 22px 68px rgba(0, 0, 0, 0.48);
+  --shadow-elevated: 0 12px 30px rgba(0, 0, 0, 0.3);
+
+  /* Semantic colors for UI */
+  --input-bg: #101216;
+  --input-border: rgba(255, 255, 255, 0.1);
+  --input-text: #f6f7f8;
+  --button-secondary-bg: rgba(255, 255, 255, 0.06);
+  --button-secondary-border: rgba(255, 255, 255, 0.1);
+  --button-secondary-text: rgba(255, 255, 255, 0.78);
+  --nav-bg: rgba(9, 10, 13, 0.94);
+  --nav-text: #f6f7f8;
+  --selection-bg: rgba(255, 90, 0, 0.35);
+
+  /* Skeleton loaders */
+  --skeleton-base: rgba(255, 255, 255, 0.05);
+  --skeleton-sheen: rgba(255, 255, 255, 0.09);
 }
 
 * {
@@ -22,16 +131,20 @@ html {
 body {
   min-height: 100%;
   margin: 0;
+  background: var(--surface-primary);
+  color: var(--text-primary);
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.dark body {
   background:
     radial-gradient(42rem 26rem at 105% -4%, rgba(255, 91, 0, 0.22), transparent 60%),
     radial-gradient(32rem 22rem at 92% 104%, rgba(255, 106, 0, 0.14), transparent 64%),
     linear-gradient(180deg, transparent 0%, rgba(5, 6, 7, 0.4) 60%, rgba(2, 3, 4, 0.7) 100%);
   background-attachment: fixed;
-  color: #f6f7f8;
-  font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
 }
 
 body::before {
@@ -58,6 +171,11 @@ body::after {
   opacity: 0.82;
 }
 
+:root body::before,
+:root body::after {
+  display: none;
+}
+
 body > * {
   position: relative;
   z-index: 1;
@@ -82,8 +200,8 @@ select {
 }
 
 ::selection {
-  background: rgba(255, 90, 0, 0.35);
-  color: #fff;
+  background: var(--selection-bg);
+  color: var(--text-primary);
 }
 
   .safe-bottom {
@@ -220,7 +338,7 @@ select {
   .brand-wordmark-text {
     line-height: 1;
     font-size: 1.42rem;
-    font-weight: 900;
+    font-weight: 800;
     font-style: italic;
     letter-spacing: 0;
     text-transform: uppercase;
@@ -229,7 +347,7 @@ select {
   .brand-wordmark-tagline {
     color: rgba(255, 255, 255, 0.38);
     font-size: 0.56rem;
-    font-weight: 900;
+    font-weight: 700;
     letter-spacing: 0.16em;
     line-height: 1;
     text-transform: uppercase;
@@ -274,94 +392,96 @@ select {
   .bg-white\/80,
   .bg-white\/90,
   .bg-white\/95 {
-    background:
-      linear-gradient(180deg, rgba(32, 35, 41, 0.98), rgba(20, 22, 27, 0.98)) !important;
+    background: var(--surface-card);
   }
 
   .bg-mist {
-    background-color: #1a1d22 !important;
+    background-color: var(--surface-secondary);
   }
 
   .bg-ink {
-    background:
-      linear-gradient(180deg, rgba(26, 28, 34, 0.98), rgba(9, 10, 13, 0.98)) !important;
+    background: var(--surface-primary);
   }
 
   .text-ink {
-    color: #f6f7f8 !important;
+    color: var(--text-primary);
   }
 
   .text-ink\/50 {
-    color: rgba(246, 247, 248, 0.5) !important;
+    color: rgba(246, 247, 248, 0.5);
   }
 
   .text-ink\/60 {
-    color: rgba(246, 247, 248, 0.62) !important;
+    color: rgba(246, 247, 248, 0.62);
   }
 
   .text-ink\/65 {
-    color: rgba(246, 247, 248, 0.65) !important;
+    color: rgba(246, 247, 248, 0.65);
   }
 
   .text-ink\/70 {
-    color: rgba(246, 247, 248, 0.72) !important;
+    color: rgba(246, 247, 248, 0.72);
   }
 
-.text-moss {
-    color: #aab2bc !important;
+  .text-moss {
+    color: #aab2bc;
   }
 
   .text-sky {
-    color: #ff7a18 !important;
+    color: var(--accent-secondary);
   }
 
   .bg-sky\/10 {
-    background-color: rgba(255, 122, 24, 0.1) !important;
+    background-color: rgba(255, 122, 24, 0.1);
   }
 
   .bg-sky\/20 {
-    background-color: rgba(255, 122, 24, 0.2) !important;
+    background-color: rgba(255, 122, 24, 0.2);
   }
 
   .border-sky\/20 {
-    border-color: rgba(255, 122, 24, 0.22) !important;
+    border-color: rgba(255, 122, 24, 0.22);
   }
 
   .focus\:border-sky:focus {
-    border-color: #ff7a18 !important;
+    border-color: var(--accent-secondary);
   }
 
   .border-black\/10 {
-    border-color: rgba(255, 255, 255, 0.1) !important;
+    border-color: var(--border-subtle);
   }
 
   .border-white\/15 {
-    border-color: rgba(255, 255, 255, 0.14) !important;
+    border-color: var(--border-strong);
   }
 
   .hover\:bg-black\/5:hover {
-    background-color: rgba(255, 255, 255, 0.06) !important;
+    background-color: rgba(255, 255, 255, 0.06);
   }
 
   input,
   textarea,
   select {
-    border-color: rgba(255, 255, 255, 0.1) !important;
-    background-color: #101216 !important;
-    color: #f6f7f8 !important;
+    border-color: var(--input-border);
+    background-color: var(--input-bg);
+    color: var(--input-text);
   }
 
   input::placeholder,
   textarea::placeholder {
-    color: rgba(246, 247, 248, 0.42);
+    color: var(--text-muted);
   }
 
   section,
   article {
-    border-color: rgba(255, 255, 255, 0.1);
+    border-color: var(--border-subtle);
   }
 
   .premium-gradient {
+    background: var(--surface-card);
+  }
+
+  .dark .premium-gradient {
     background:
       radial-gradient(28rem 18rem at 108% -6%, rgba(255, 90, 0, 0.48), transparent 64%),
       radial-gradient(20rem 12rem at 0% 0%, rgba(255, 255, 255, 0.12), transparent 70%),
@@ -370,12 +490,18 @@ select {
   }
 
   .premium-action {
-    background: linear-gradient(180deg, #ff7a18, #ff4d00);
+    background: linear-gradient(180deg, var(--accent-secondary), var(--accent-primary));
     color: #fff;
     box-shadow: 0 16px 42px rgba(255, 90, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.22);
   }
 
   .premium-card {
+    border: 1px solid var(--border-subtle);
+    background: var(--surface-card);
+    box-shadow: var(--shadow-card);
+  }
+
+  .dark .premium-card {
     border: 1px solid rgba(255, 255, 255, 0.1);
     background:
       linear-gradient(180deg, rgba(24, 27, 31, 0.96), rgba(12, 14, 17, 0.96));
@@ -385,94 +511,111 @@ select {
   /* ---- Card variants used across pages ---- */
 
   .card-dark {
+    border: 1px solid var(--border-subtle);
+    background: var(--surface-card);
+    border-radius: 1.45rem;
+    box-shadow: var(--shadow-card);
+  }
+
+  .dark .card-dark {
     border: 1px solid rgba(255, 255, 255, 0.1);
     background:
       radial-gradient(18rem 10rem at 112% -10%, rgba(255, 90, 0, 0.12), transparent 68%),
       linear-gradient(135deg, rgba(255, 255, 255, 0.055), transparent 38%),
       linear-gradient(180deg, rgba(20, 23, 28, 0.98), rgba(8, 9, 12, 0.98));
-    border-radius: 1.45rem;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055), 0 22px 58px rgba(0, 0, 0, 0.44);
   }
 
   .card-metric {
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border-subtle);
     background: rgba(255, 255, 255, 0.04);
     border-radius: 0.9rem;
   }
 
+  .dark .card-metric {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
+  }
+
   /* Override Tailwind opacity utilities that appear transparent on dark bg */
   .bg-white\/8 {
-    background-color: rgba(255, 255, 255, 0.08) !important;
+    background-color: rgba(255, 255, 255, 0.08);
   }
   .bg-white\/12 {
-    background-color: rgba(255, 255, 255, 0.12) !important;
+    background-color: rgba(255, 255, 255, 0.12);
   }
 
   /* Sea / success colour palette */
   .bg-sea {
-    background-color: #24c07a !important;
+    background-color: var(--accent-success);
   }
   .text-sea {
-    color: #24c07a !important;
+    color: var(--accent-success);
   }
   .bg-sea\/10 {
-    background-color: rgba(36, 192, 122, 0.1) !important;
+    background-color: var(--accent-success-soft);
   }
   .bg-sea\/15 {
-    background-color: rgba(36, 192, 122, 0.15) !important;
+    background-color: rgba(36, 192, 122, 0.15);
   }
   .border-sea\/20 {
-    border-color: rgba(36, 192, 122, 0.2) !important;
+    border-color: rgba(36, 192, 122, 0.2);
   }
 
   /* Amber colour palette */
   .text-amber {
-    color: #f59e0b !important;
+    color: var(--accent-warning);
   }
   .bg-amber\/10 {
-    background-color: rgba(245, 158, 11, 0.1) !important;
+    background-color: var(--accent-warning-soft);
   }
   .bg-amber\/15 {
-    background-color: rgba(245, 158, 11, 0.15) !important;
+    background-color: rgba(245, 158, 11, 0.15);
   }
   .bg-amber\/20 {
-    background-color: rgba(245, 158, 11, 0.2) !important;
+    background-color: rgba(245, 158, 11, 0.2);
   }
   .border-amber\/20 {
-    border-color: rgba(245, 158, 11, 0.2) !important;
+    border-color: rgba(245, 158, 11, 0.2);
   }
   .bg-amber {
-    background-color: #f59e0b !important;
+    background-color: var(--accent-warning);
   }
   .text-amber {
-    color: #f59e0b !important;
+    color: var(--accent-warning);
   }
 
   /* Coral colour palette */
   .text-coral {
-    color: #ff5a00 !important;
+    color: var(--accent-primary);
   }
   .bg-coral {
-    background-color: #ff5a00 !important;
+    background-color: var(--accent-primary);
   }
   .bg-coral\/10 {
-    background-color: rgba(255, 90, 0, 0.1) !important;
+    background-color: var(--accent-primary-soft);
   }
   .bg-coral\/15 {
-    background-color: rgba(255, 90, 0, 0.15) !important;
+    background-color: rgba(255, 90, 0, 0.15);
   }
   .border-coral\/20 {
-    border-color: rgba(255, 90, 0, 0.2) !important;
+    border-color: rgba(255, 90, 0, 0.2);
   }
 
   /* Stronger section separation */
   .section-card {
+    border: 1px solid var(--border-subtle);
+    background: var(--surface-card);
+    border-radius: 1.25rem;
+    padding: 1.25rem;
+    box-shadow: var(--shadow-card);
+  }
+
+  .dark .section-card {
     border: 1px solid rgba(255, 255, 255, 0.1);
     background:
       linear-gradient(135deg, rgba(255, 255, 255, 0.045), transparent 38%),
       linear-gradient(180deg, rgba(22, 25, 29, 0.95), rgba(10, 12, 15, 0.95));
-    border-radius: 1.25rem;
-    padding: 1.25rem;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   }
 
@@ -676,9 +819,9 @@ select {
     width: 100%;
     border-radius: 1.25rem;
     font-size: 1.125rem;
-    font-weight: 900;
+    font-weight: 700;
     color: #fff;
-    background: linear-gradient(180deg, #ff7a18, #ff4d00);
+    background: linear-gradient(180deg, var(--accent-secondary), var(--accent-primary));
     box-shadow:
       0 18px 45px rgba(255, 90, 0, 0.4),
       inset 0 1px 0 rgba(255, 255, 255, 0.22);
@@ -700,13 +843,17 @@ select {
     width: 100%;
     border-radius: 1rem;
     font-size: 0.95rem;
-    font-weight: 800;
-    color: rgba(255, 255, 255, 0.78);
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    font-weight: 700;
+    color: var(--button-secondary-text);
+    background: var(--button-secondary-bg);
+    border: 1px solid var(--button-secondary-border);
     transition: background-color 120ms ease;
   }
   .session-cta-secondary:active {
+    background: rgba(255, 255, 255, 0.12);
+  }
+
+  .dark .session-cta-secondary:active {
     background: rgba(255, 255, 255, 0.12);
   }
 
@@ -715,10 +862,10 @@ select {
     width: 3.5rem;
     border-radius: 1rem;
     font-size: 1.5rem;
-    font-weight: 900;
-    color: #fff;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    font-weight: 700;
+    color: var(--text-primary);
+    background: var(--button-secondary-bg);
+    border: 1px solid var(--button-secondary-border);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -738,17 +885,142 @@ select {
     text-align: center;
     font-size: 2.5rem;
     line-height: 1;
-    font-weight: 900;
-    color: #fff;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    font-weight: 500;
+    color: var(--input-text);
+    background: var(--input-bg);
+    border: 1px solid var(--input-border);
     border-radius: 1rem;
     outline: none;
     transition: border-color 120ms ease, background-color 120ms ease;
   }
   .session-number-input:focus {
-    border-color: #ff7a18;
+    border-color: var(--accent-secondary);
     background: rgba(255, 90, 0, 0.06);
+  }
+
+  /* ── NumberStepper (stepper réutilisable charge / reps) ──────────────────
+     Layout horizontal pleine largeur : [ − ] [ valeur ] [ + ].
+     Le scale au tap vient de .tap-feedback, le pulse de .value-pulse — les
+     deux sont déjà neutralisés sous prefers-reduced-motion (fin de fichier).
+     Couleurs via design tokens : adaptation light/dark automatique. */
+  .number-stepper {
+    border-radius: 1rem;
+    border: 1px solid var(--border-subtle);
+    background: var(--surface-card);
+    padding: 0.75rem;
+  }
+  .number-stepper-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    min-height: 0.9rem;
+  }
+  .number-stepper-label {
+    font-size: 0.625rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+  }
+  .number-stepper-hint {
+    font-size: 0.625rem;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+  .number-stepper-compare {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    font-size: 0.625rem;
+    font-weight: 700;
+  }
+  .number-stepper-compare-up {
+    color: var(--accent-success);
+  }
+  .number-stepper-compare-down {
+    color: var(--accent-warning);
+  }
+  .number-stepper-control {
+    margin-top: 0.5rem;
+    display: flex;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+  .number-stepper-btn {
+    flex: 0 0 3.5rem;
+    height: 3.75rem;
+    border-radius: 0.875rem;
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    background: var(--button-secondary-bg);
+    border: 1px solid var(--button-secondary-border);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: manipulation;
+    transition: background-color 120ms ease;
+  }
+  .number-stepper-btn:active {
+    background: var(--accent-primary-soft);
+  }
+  .number-stepper-btn:disabled {
+    opacity: 0.35;
+  }
+  .number-stepper-value {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 3.75rem;
+    border-radius: 0.875rem;
+    background: var(--input-bg);
+    border: 1px solid var(--input-border);
+    display: inline-flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 0.25rem;
+    color: var(--input-text);
+    touch-action: manipulation;
+    transition: border-color 120ms ease, background-color 120ms ease;
+  }
+  .number-stepper-value:active {
+    border-color: var(--accent-secondary);
+  }
+  .number-stepper-value-num {
+    font-size: 2rem;
+    font-weight: 600;
+    line-height: 1;
+    display: inline-block;
+  }
+  .number-stepper-value-unit {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text-muted);
+  }
+  .number-stepper-value-placeholder {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-muted);
+  }
+  .number-stepper-input {
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+    height: 3.75rem;
+    text-align: center;
+    font-size: 2rem;
+    font-weight: 600;
+    color: var(--input-text);
+    background: rgba(255, 90, 0, 0.06);
+    border: 1px solid var(--accent-secondary);
+    border-radius: 0.875rem;
+    outline: none;
+  }
+  .number-stepper-btn:focus-visible,
+  .number-stepper-value:focus-visible,
+  .number-stepper-input:focus-visible {
+    outline: 2px solid var(--accent-secondary);
+    outline-offset: 2px;
   }
 
   .session-rest-ring {
@@ -766,6 +1038,111 @@ select {
   }
   .session-rest-final-warning {
     animation: session-pulse-amber 1.05s ease-out infinite;
+  }
+
+  /* ── Session floating pill (compact session header) ──────────────────── */
+
+  .session-pill-wrap {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 0.5rem);
+    left: 50%;
+    z-index: 40;
+    width: min(calc(100vw - 1.5rem), 30rem);
+    transform: translateX(-50%);
+  }
+
+  .session-pill {
+    overflow: hidden;
+    border-radius: 1.4rem;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(16, 18, 24, 0.78);
+    -webkit-backdrop-filter: blur(16px) saturate(150%);
+    backdrop-filter: blur(16px) saturate(150%);
+    box-shadow:
+      0 14px 36px rgba(0, 0, 0, 0.5),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    transition: box-shadow 220ms ease;
+  }
+
+  .session-pill-expanded {
+    box-shadow:
+      0 24px 60px rgba(0, 0, 0, 0.6),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  html:not(.dark) .session-pill {
+    border-color: rgba(15, 20, 35, 0.1);
+    background: rgba(255, 255, 255, 0.82);
+    box-shadow: 0 14px 32px rgba(15, 20, 35, 0.18);
+  }
+
+  /* Fallback when backdrop-filter is unsupported: use a near-opaque surface */
+  @supports not ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) {
+    .session-pill {
+      background: rgba(16, 18, 24, 0.97);
+    }
+    html:not(.dark) .session-pill {
+      background: rgba(255, 255, 255, 0.98);
+    }
+  }
+
+  .session-pill-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    flex-shrink: 0;
+    border-radius: 9999px;
+    background: var(--accent-primary);
+    animation: session-pill-blink 2s ease-in-out infinite;
+  }
+
+  .session-pill-dot-paused {
+    background: var(--accent-warning);
+    animation: none;
+  }
+
+  @keyframes session-pill-blink {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.35;
+    }
+  }
+
+  .session-pill-chevron {
+    flex-shrink: 0;
+    transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .session-pill-chevron-up {
+    transform: rotate(180deg);
+  }
+
+  /* grid-template-rows 0fr→1fr animates height without measuring the DOM */
+  .session-pill-panel {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 260ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .session-pill-panel-open {
+    grid-template-rows: 1fr;
+  }
+
+  .session-pill-panel > div {
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .session-pill,
+    .session-pill-chevron,
+    .session-pill-panel {
+      transition: none;
+    }
+    .session-pill-dot {
+      animation: none;
+    }
   }
 
   /* ── Celebration (post-session) ──────────────────────────────────────── */
@@ -825,6 +1202,82 @@ select {
     filter: blur(20px);
   }
 
+  /* ── Micro-interactions réutilisables ────────────────────────────────
+     Classes sobres et rapides pour un feedback tactile immédiat.
+     Toutes désactivées proprement via prefers-reduced-motion (fin de fichier). */
+
+  /* Léger scale au tap — pour boutons et éléments cliquables. */
+  .tap-feedback {
+    transition: transform 120ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .tap-feedback:active {
+    transform: scale(0.96);
+  }
+
+  /* Carte cliquable — translateY + ombre/bordure renforcées au survol/tap. */
+  .card-interactive {
+    transition:
+      transform 140ms cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 140ms ease,
+      border-color 140ms ease;
+  }
+  .card-interactive:hover {
+    border-color: rgba(255, 90, 0, 0.28);
+    box-shadow: 0 18px 44px rgba(0, 0, 0, 0.34);
+  }
+  .card-interactive:active {
+    transform: translateY(1px) scale(0.99);
+  }
+
+  /* Remplissage de barre de progression fluide. */
+  .progress-fill {
+    transition: width 360ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  /* Pulse léger d'une valeur (ex: stepper charge/reps). */
+  @keyframes value-pulse {
+    0% { transform: scale(1); }
+    45% { transform: scale(1.07); }
+    100% { transform: scale(1); }
+  }
+  .value-pulse {
+    animation: value-pulse 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  /* Pulse discret quand une étape de progression est complétée. */
+  @keyframes progress-step-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255, 90, 0, 0); }
+    40% { box-shadow: 0 0 0 4px rgba(255, 90, 0, 0.3); }
+  }
+  .progress-step-complete {
+    animation: progress-step-pulse 600ms ease-out;
+  }
+
+  /* ── Premium hero text gradient ───────────────────────────────────────
+     Réservé à quelques titres hero clés. Pas d'animation (rendu premium,
+     sobre). Fallback en couleur pleine si background-clip: text n'est pas
+     supporté. */
+  .text-gradient-hero {
+    color: var(--text-primary);
+  }
+
+  @supports ((-webkit-background-clip: text) or (background-clip: text)) {
+    .text-gradient-hero {
+      /* Light mode : texte sombre qui se réchauffe vers le coral en fin
+         de course — la majorité du titre reste foncée et lisible. */
+      background-image: linear-gradient(118deg, #14161c 0%, #14161c 42%, #ff5a00 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent;
+    }
+
+    .dark .text-gradient-hero {
+      /* Dark mode : blanc → orange chaud → coral. */
+      background-image: linear-gradient(118deg, #ffffff 0%, #ffb486 55%, #ff6a1a 100%);
+    }
+  }
+
   /* ── LIGHT MODE (when .dark is NOT on <html>) ───────────────────────── */
 
   html:not(.dark) {
@@ -834,8 +1287,8 @@ select {
   html:not(.dark) body {
     background:
       radial-gradient(42rem 26rem at 105% -4%, rgba(255, 91, 0, 0.16), transparent 60%),
-      linear-gradient(180deg, #f6f7fb 0%, #ffffff 60%, #f1f3f7 100%) !important;
-    color: #0b0d12 !important;
+      linear-gradient(180deg, #f6f7fb 0%, #ffffff 60%, #f1f3f7 100%);
+    color: var(--text-primary);
   }
 
   html:not(.dark) body::before,
@@ -846,7 +1299,7 @@ select {
   html:not(.dark) .app-shell::before {
     background:
       linear-gradient(180deg, rgba(255, 255, 255, 0.8), transparent 50%),
-      radial-gradient(23rem 15rem at 86% 5%, rgba(255, 90, 0, 0.20), transparent 70%) !important;
+      radial-gradient(23rem 15rem at 86% 5%, rgba(255, 90, 0, 0.20), transparent 70%);
     opacity: 0.6;
   }
 
@@ -856,17 +1309,17 @@ select {
   html:not(.dark) .premium-gradient,
   html:not(.dark) .premium-card,
   html:not(.dark) .section-card {
-    background: #ffffff !important;
-    border-color: rgba(0, 0, 0, 0.08) !important;
-    box-shadow: 0 10px 28px rgba(15, 20, 35, 0.08), 0 2px 6px rgba(15, 20, 35, 0.04) !important;
-    color: #0b0d12;
+    background: var(--surface-primary);
+    border-color: var(--border-subtle);
+    box-shadow: var(--shadow-card);
+    color: var(--text-primary);
   }
   html:not(.dark) .session-step-accent {
     height: 4px;
   }
 
-  html:not(.dark) .bg-ink { background-color: #ffffff !important; }
-  html:not(.dark) .bg-mist { background-color: #f3f4f6 !important; }
+  html:not(.dark) .bg-ink { background-color: var(--surface-primary); }
+  html:not(.dark) .bg-mist { background-color: var(--surface-secondary); }
 
   /* Hex inline backgrounds used in the dark design */
   html:not(.dark) .bg-\[\#11131a\],
@@ -878,90 +1331,90 @@ select {
   html:not(.dark) .bg-\[\#040506\],
   html:not(.dark) .bg-\[\#050607\],
   html:not(.dark) .bg-\[\#0a0c12\] {
-    background: #ffffff !important;
-    color: #0b0d12;
+    background: var(--surface-primary);
+    color: var(--text-primary);
   }
 
   /* Bottom nav: keep dark-looking pill in light mode for contrast with light background */
   html:not(.dark) .bg-\[\#090a0d\]\/94 {
-    background-color: rgba(17, 20, 28, 0.96) !important;
-    color: #f6f7f8;
+    background-color: var(--nav-bg);
+    color: var(--nav-text);
   }
-  html:not(.dark) nav.fixed .text-white\/45 { color: rgba(255, 255, 255, 0.5) !important; }
-  html:not(.dark) nav.fixed .text-white\/75 { color: rgba(255, 255, 255, 0.85) !important; }
-  html:not(.dark) nav.fixed .text-white\/50 { color: rgba(255, 255, 255, 0.6) !important; }
-  html:not(.dark) nav.fixed .bg-white\/8 { background-color: rgba(255, 255, 255, 0.10) !important; }
-  html:not(.dark) nav.fixed .bg-white\/5 { background-color: rgba(255, 255, 255, 0.08) !important; }
+  html:not(.dark) nav.fixed .text-white\/45 { color: var(--nav-text); opacity: 0.5; }
+  html:not(.dark) nav.fixed .text-white\/75 { color: var(--nav-text); }
+  html:not(.dark) nav.fixed .text-white\/50 { color: var(--nav-text); opacity: 0.6; }
+  html:not(.dark) nav.fixed .bg-white\/8 { background-color: rgba(255, 255, 255, 0.10); }
+  html:not(.dark) nav.fixed .bg-white\/5 { background-color: rgba(255, 255, 255, 0.08); }
 
   /* Hero overlays on image cards: keep text white in BOTH themes */
   .hero-overlay,
   .hero-overlay * {
-    color: #fff !important;
+    color: #fff;
   }
 
   /* Text on light mode (override "text-white/*" utilities) */
-  html:not(.dark) .text-white { color: #0b0d12 !important; }
-  html:not(.dark) .text-white\/80 { color: rgba(11, 13, 18, 0.85) !important; }
-  html:not(.dark) .text-white\/70 { color: rgba(11, 13, 18, 0.75) !important; }
-  html:not(.dark) .text-white\/68 { color: rgba(11, 13, 18, 0.72) !important; }
-  html:not(.dark) .text-white\/65 { color: rgba(11, 13, 18, 0.7) !important; }
-  html:not(.dark) .text-white\/60 { color: rgba(11, 13, 18, 0.65) !important; }
-  html:not(.dark) .text-white\/55 { color: rgba(11, 13, 18, 0.6) !important; }
-  html:not(.dark) .text-white\/50 { color: rgba(11, 13, 18, 0.55) !important; }
-  html:not(.dark) .text-white\/45 { color: rgba(11, 13, 18, 0.5) !important; }
-  html:not(.dark) .text-white\/40 { color: rgba(11, 13, 18, 0.45) !important; }
-  html:not(.dark) .text-white\/35 { color: rgba(11, 13, 18, 0.4) !important; }
-  html:not(.dark) .text-white\/30 { color: rgba(11, 13, 18, 0.35) !important; }
-  html:not(.dark) .text-white\/25 { color: rgba(11, 13, 18, 0.3) !important; }
+  html:not(.dark) .text-white { color: var(--text-primary); }
+  html:not(.dark) .text-white\/80 { color: rgba(11, 13, 18, 0.85); }
+  html:not(.dark) .text-white\/70 { color: rgba(11, 13, 18, 0.75); }
+  html:not(.dark) .text-white\/68 { color: rgba(11, 13, 18, 0.72); }
+  html:not(.dark) .text-white\/65 { color: rgba(11, 13, 18, 0.7); }
+  html:not(.dark) .text-white\/60 { color: rgba(11, 13, 18, 0.65); }
+  html:not(.dark) .text-white\/55 { color: rgba(11, 13, 18, 0.6); }
+  html:not(.dark) .text-white\/50 { color: rgba(11, 13, 18, 0.55); }
+  html:not(.dark) .text-white\/45 { color: rgba(11, 13, 18, 0.5); }
+  html:not(.dark) .text-white\/40 { color: rgba(11, 13, 18, 0.45); }
+  html:not(.dark) .text-white\/35 { color: rgba(11, 13, 18, 0.4); }
+  html:not(.dark) .text-white\/30 { color: rgba(11, 13, 18, 0.35); }
+  html:not(.dark) .text-white\/25 { color: rgba(11, 13, 18, 0.3); }
 
   /* Layered surfaces: invert white-alpha to black-alpha */
-  html:not(.dark) .bg-white\/4 { background-color: rgba(15, 20, 35, 0.04) !important; }
-  html:not(.dark) .bg-white\/5 { background-color: rgba(15, 20, 35, 0.05) !important; }
-  html:not(.dark) .bg-white\/6 { background-color: rgba(15, 20, 35, 0.06) !important; }
-  html:not(.dark) .bg-white\/8 { background-color: rgba(15, 20, 35, 0.07) !important; }
-  html:not(.dark) .bg-white\/10 { background-color: rgba(15, 20, 35, 0.08) !important; }
-  html:not(.dark) .bg-white\/12 { background-color: rgba(15, 20, 35, 0.10) !important; }
-  html:not(.dark) .bg-white\/15 { background-color: rgba(15, 20, 35, 0.12) !important; }
-  html:not(.dark) .bg-white\/20 { background-color: rgba(15, 20, 35, 0.16) !important; }
-  html:not(.dark) .bg-white\/\[0\.04\] { background-color: rgba(15, 20, 35, 0.04) !important; }
-  html:not(.dark) .bg-black\/15 { background-color: rgba(15, 20, 35, 0.05) !important; }
-  html:not(.dark) .bg-black\/35 { background-color: rgba(15, 20, 35, 0.06) !important; }
-  html:not(.dark) .bg-black\/70 { background-color: rgba(15, 20, 35, 0.55) !important; }
+  html:not(.dark) .bg-white\/4 { background-color: rgba(15, 20, 35, 0.04); }
+  html:not(.dark) .bg-white\/5 { background-color: rgba(15, 20, 35, 0.05); }
+  html:not(.dark) .bg-white\/6 { background-color: rgba(15, 20, 35, 0.06); }
+  html:not(.dark) .bg-white\/8 { background-color: rgba(15, 20, 35, 0.07); }
+  html:not(.dark) .bg-white\/10 { background-color: rgba(15, 20, 35, 0.08); }
+  html:not(.dark) .bg-white\/12 { background-color: rgba(15, 20, 35, 0.10); }
+  html:not(.dark) .bg-white\/15 { background-color: rgba(15, 20, 35, 0.12); }
+  html:not(.dark) .bg-white\/20 { background-color: rgba(15, 20, 35, 0.16); }
+  html:not(.dark) .bg-white\/\[0\.04\] { background-color: rgba(15, 20, 35, 0.04); }
+  html:not(.dark) .bg-black\/15 { background-color: rgba(15, 20, 35, 0.05); }
+  html:not(.dark) .bg-black\/35 { background-color: rgba(15, 20, 35, 0.06); }
+  html:not(.dark) .bg-black\/70 { background-color: rgba(15, 20, 35, 0.55); }
 
   /* Borders */
-  html:not(.dark) .border-white\/6 { border-color: rgba(15, 20, 35, 0.06) !important; }
-  html:not(.dark) .border-white\/8 { border-color: rgba(15, 20, 35, 0.08) !important; }
-  html:not(.dark) .border-white\/10 { border-color: rgba(15, 20, 35, 0.10) !important; }
-  html:not(.dark) .border-white\/12 { border-color: rgba(15, 20, 35, 0.12) !important; }
-  html:not(.dark) .border-white\/15 { border-color: rgba(15, 20, 35, 0.14) !important; }
+  html:not(.dark) .border-white\/6 { border-color: rgba(15, 20, 35, 0.06); }
+  html:not(.dark) .border-white\/8 { border-color: rgba(15, 20, 35, 0.08); }
+  html:not(.dark) .border-white\/10 { border-color: rgba(15, 20, 35, 0.10); }
+  html:not(.dark) .border-white\/12 { border-color: rgba(15, 20, 35, 0.12); }
+  html:not(.dark) .border-white\/15 { border-color: rgba(15, 20, 35, 0.14); }
 
   /* Inputs / focus */
   html:not(.dark) input,
   html:not(.dark) textarea,
   html:not(.dark) select {
-    color: #0b0d12;
+    color: var(--input-text);
   }
   html:not(.dark) input::placeholder,
   html:not(.dark) textarea::placeholder {
-    color: rgba(11, 13, 18, 0.4);
+    color: var(--text-muted);
   }
 
   /* Session number input adapts to light surface */
   html:not(.dark) .session-number-input {
-    background: rgba(15, 20, 35, 0.04);
-    border-color: rgba(15, 20, 35, 0.12);
-    color: #0b0d12;
+    background: var(--input-bg);
+    border-color: var(--input-border);
+    color: var(--input-text);
   }
   html:not(.dark) .session-number-input:focus {
-    border-color: #ff7a18;
+    border-color: var(--accent-secondary);
     background: rgba(255, 90, 0, 0.06);
   }
 
   /* Adjust buttons (-/+) on light bg */
   html:not(.dark) .session-adjust-btn {
-    background: rgba(15, 20, 35, 0.06);
-    border-color: rgba(15, 20, 35, 0.12);
-    color: #0b0d12;
+    background: var(--button-secondary-bg);
+    border-color: var(--button-secondary-border);
+    color: var(--text-primary);
   }
   html:not(.dark) .session-adjust-btn:active {
     background: rgba(255, 90, 0, 0.15);
@@ -969,21 +1422,21 @@ select {
 
   /* CTA secondary on light bg */
   html:not(.dark) .session-cta-secondary {
-    background: rgba(15, 20, 35, 0.05);
-    border-color: rgba(15, 20, 35, 0.10);
-    color: rgba(11, 13, 18, 0.78);
+    background: var(--button-secondary-bg);
+    border-color: var(--button-secondary-border);
+    color: var(--button-secondary-text);
   }
 
   /* Bottom nav background swap */
-  html:not(.dark) .app-header { color: #0b0d12; }
+  html:not(.dark) .app-header { color: var(--text-primary); }
   html:not(.dark) .brand-wordmark-icon {
     background:
       radial-gradient(circle at 75% 15%, rgba(255, 122, 24, 0.32), transparent 44%),
-      linear-gradient(180deg, #ffffff, #f1f3f7) !important;
+      linear-gradient(180deg, #ffffff, #f1f3f7);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 8px 18px rgba(255, 90, 0, 0.18);
   }
   html:not(.dark) .brand-wordmark-text {
-    color: #0b0d12 !important;
+    color: var(--text-primary);
     text-shadow: none;
   }
 
@@ -993,20 +1446,141 @@ select {
   }
 
   /* Coral / sea / sky accent BG transparency stay readable */
-  html:not(.dark) .bg-coral\/10 { background-color: rgba(255, 90, 0, 0.10) !important; }
-  html:not(.dark) .bg-coral\/12 { background-color: rgba(255, 90, 0, 0.12) !important; }
-  html:not(.dark) .bg-coral\/15 { background-color: rgba(255, 90, 0, 0.14) !important; }
-  html:not(.dark) .bg-coral\/20 { background-color: rgba(255, 90, 0, 0.16) !important; }
-  html:not(.dark) .bg-sea\/10 { background-color: rgba(36, 192, 122, 0.12) !important; }
-  html:not(.dark) .bg-sea\/15 { background-color: rgba(36, 192, 122, 0.16) !important; }
-  html:not(.dark) .bg-sky\/10 { background-color: rgba(255, 122, 24, 0.10) !important; }
-  html:not(.dark) .bg-sky\/15 { background-color: rgba(255, 122, 24, 0.14) !important; }
-  html:not(.dark) .bg-amber\/10 { background-color: rgba(245, 158, 11, 0.14) !important; }
-  html:not(.dark) .bg-amber\/15 { background-color: rgba(245, 158, 11, 0.18) !important; }
+  html:not(.dark) .bg-coral\/10 { background-color: rgba(255, 90, 0, 0.10); }
+  html:not(.dark) .bg-coral\/12 { background-color: rgba(255, 90, 0, 0.12); }
+  html:not(.dark) .bg-coral\/15 { background-color: rgba(255, 90, 0, 0.14); }
+  html:not(.dark) .bg-coral\/20 { background-color: rgba(255, 90, 0, 0.16); }
+  html:not(.dark) .bg-sea\/10 { background-color: rgba(36, 192, 122, 0.12); }
+  html:not(.dark) .bg-sea\/15 { background-color: rgba(36, 192, 122, 0.16); }
+  html:not(.dark) .bg-sky\/10 { background-color: rgba(255, 122, 24, 0.10); }
+  html:not(.dark) .bg-sky\/15 { background-color: rgba(255, 122, 24, 0.14); }
+  html:not(.dark) .bg-amber\/10 { background-color: rgba(245, 158, 11, 0.14); }
+  html:not(.dark) .bg-amber\/15 { background-color: rgba(245, 158, 11, 0.18); }
 
   /* Quit confirm / dialogs */
   html:not(.dark) [role="dialog"] > div {
-    background: #ffffff !important;
-    color: #0b0d12;
-    border-color: rgba(15, 20, 35, 0.12) !important;
+    background: var(--surface-primary);
+    color: var(--text-primary);
+    border-color: var(--border-subtle);
   }
+
+  /* Carte cliquable — ombre adaptée à la surface claire */
+  html:not(.dark) .card-interactive:hover {
+    border-color: rgba(255, 90, 0, 0.32);
+    box-shadow: 0 16px 36px rgba(15, 20, 35, 0.14);
+  }
+
+  /* ── Skeleton loaders ────────────────────────────────────────────────── */
+
+  @keyframes skeleton-shimmer {
+    from { background-position: 160% 0; }
+    to { background-position: -160% 0; }
+  }
+
+  .skeleton {
+    background-color: var(--skeleton-base);
+    background-image: linear-gradient(
+      90deg,
+      transparent 0%,
+      var(--skeleton-sheen) 50%,
+      transparent 100%
+    );
+    background-repeat: no-repeat;
+    background-size: 200% 100%;
+    background-position: 160% 0;
+    animation: skeleton-shimmer 1.6s ease-in-out infinite;
+  }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   ACCESSIBILITÉ — prefers-reduced-motion
+   Désactive les micro-interactions et les animations décoratives pour les
+   utilisateurs qui demandent à réduire les mouvements. Les transitions ne sont
+   pas mises à 0 brutalement : une durée minimale évite tout flash.
+   ───────────────────────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .tap-feedback:active,
+  .card-interactive:active {
+    transform: none !important;
+  }
+
+  /* Skeletons: pas de shimmer, on garde la teinte de base comme repère visuel */
+  .skeleton {
+    animation: none !important;
+    background-image: none !important;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   VIEW TRANSITIONS — Dashboard ↔ Séance
+   Amélioration progressive. Pilotée par startSafeViewTransition() ; si l'API
+   View Transitions est absente ou si l'utilisateur demande à réduire les
+   mouvements, la navigation se fait instantanément (aucune dépendance).
+   ───────────────────────────────────────────────────────────────────────────── */
+
+@keyframes vt-fade-scale-out {
+  to {
+    opacity: 0;
+    transform: scale(0.985) translateY(-6px);
+  }
+}
+
+@keyframes vt-fade-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(1.015) translateY(8px);
+  }
+}
+
+/* Fond de page : fondu court et discret. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 240ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Éléments partagés : carte, titre, barre de progression. */
+::view-transition-group(session-card),
+::view-transition-group(session-title),
+::view-transition-group(session-progress) {
+  animation-duration: 300ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+::view-transition-old(session-card),
+::view-transition-old(session-title),
+::view-transition-old(session-progress) {
+  animation: vt-fade-scale-out 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+::view-transition-new(session-card),
+::view-transition-new(session-title),
+::view-transition-new(session-progress) {
+  animation: vt-fade-scale-in 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Sécurité : même si une transition démarre, on coupe l'animation. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(root),
+  ::view-transition-old(root),
+  ::view-transition-new(root),
+  ::view-transition-group(session-card),
+  ::view-transition-group(session-title),
+  ::view-transition-group(session-progress),
+  ::view-transition-old(session-card),
+  ::view-transition-new(session-card),
+  ::view-transition-old(session-title),
+  ::view-transition-new(session-title),
+  ::view-transition-old(session-progress),
+  ::view-transition-new(session-progress) {
+    animation: none !important;
+  }
+}

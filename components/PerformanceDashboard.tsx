@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { PerformanceSkeleton } from "@/components/ui/PageSkeletons";
 import { formatDateTime } from "@/lib/date";
 import { useCoachStorage } from "@/lib/storage";
 import type { CalibrationEvent, CompletedSession, Exercise, ExerciseLog, PlannedSession } from "@/types/training";
@@ -77,7 +78,7 @@ export function PerformanceDashboard() {
   const personalRecords = useMemo(() => buildPersonalRecords(history), [history]);
 
   if (!isReady) {
-    return <div className="rounded-lg bg-white p-5 font-bold shadow-soft">Chargement...</div>;
+    return <PerformanceSkeleton />;
   }
 
   if (history.length === 0) {
@@ -85,8 +86,8 @@ export function PerformanceDashboard() {
       <section className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#11131a] p-5 text-white shadow-soft">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_90%_0%,rgba(255,91,0,0.28),transparent_32%)]" />
         <div className="relative">
-        <p className="text-sm font-black uppercase text-sky">Mes performances</p>
-        <h2 className="mt-1 text-2xl font-black text-white">Fais ta première séance pour générer tes performances.</h2>
+        <p className="text-sm font-bold uppercase text-sky">Mes performances</p>
+        <h2 className="mt-1 text-2xl font-bold text-white">Fais ta première séance pour générer tes performances.</h2>
         <p className="mt-2 text-sm font-semibold text-white/55">
           Les records, volumes, tendances et prochaines cibles seront calculés depuis ton historique local.
         </p>
@@ -104,10 +105,10 @@ export function PerformanceDashboard() {
       <section className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#11131a] p-5 text-white shadow-soft">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_90%_0%,rgba(255,91,0,0.32),transparent_34%),linear-gradient(135deg,rgba(255,255,255,0.08),transparent_46%)]" />
         <div className="relative">
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-coral">Mes performances</p>
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-coral">Mes performances</p>
           <div className="mt-2 flex items-end justify-between gap-3">
             <div>
-              <h2 className="text-3xl font-black leading-tight">Repères clés</h2>
+              <h2 className="text-3xl font-bold leading-tight">Repères clés</h2>
               <p className="mt-2 text-sm font-semibold text-white/55">
                 {settings.athleteName} · {dashboard.summary.sessions} séances
               </p>
@@ -176,8 +177,10 @@ export function PerformanceDashboard() {
   );
 }
 
-function Sparkline({ data, color = "#ff5a00", height = 40, width = 120 }: { data: number[]; color?: string; height?: number; width?: number }) {
+function Sparkline({ data, color = "var(--accent-data)", height = 40, width = 120 }: { data: number[]; color?: string; height?: number; width?: number }) {
   if (data.length < 2) return null;
+
+  const gradientId = `spark-fill-${color.replace(/[^a-zA-Z0-9]/g, "")}`;
 
   const min = Math.min(...data);
   const max = Math.max(...data);
@@ -203,12 +206,12 @@ function Sparkline({ data, color = "#ff5a00", height = 40, width = 120 }: { data
   return (
     <svg className="overflow-visible" height={height} viewBox={`0 0 ${width} ${height}`} width={width}>
       <defs>
-        <linearGradient id={`spark-fill-${color.replace("#", "")}`} x1="0" x2="0" y1="0" y2="1">
+        <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
           <stop offset="0%" stopColor={color} stopOpacity="0.25" />
           <stop offset="100%" stopColor={color} stopOpacity="0" />
         </linearGradient>
       </defs>
-      <path d={areaD} fill={`url(#spark-fill-${color.replace("#", "")})`} />
+      <path d={areaD} fill={`url(#${gradientId})`} />
       <path
         className="sparkline-path"
         d={pathD}
@@ -244,7 +247,7 @@ function PerformanceCard({ performance }: { performance: ExercisePerformance }) 
         <div className="mt-3 rounded-xl border border-white/6 bg-white/4 px-3 py-2">
           <p className="mb-1 text-[10px] font-black uppercase tracking-wide text-white/40">Tendance charges</p>
           <Sparkline
-            color={performance.trend === "progresse" ? "#24c07a" : performance.trend === "régresse" ? "#ff5a00" : "#f59e0b"}
+            color={performance.trend === "progresse" ? "#24c07a" : performance.trend === "régresse" ? "#ff5a00" : "var(--accent-data)"}
             data={performance.sparkline}
           />
         </div>
@@ -367,12 +370,12 @@ function CalibrationJournalSection({ events }: { events: CalibrationEvent[] }) {
 
 function HeroMetric({ label, sparkline, value }: { label: string; sparkline?: number[]; value: string }) {
   return (
-    <div className="rounded-md bg-white/10 p-3 text-center">
-      <p className="text-lg font-black leading-tight">{value}</p>
+    <div className="rounded-md border border-electric/15 bg-electric/[0.08] p-3 text-center">
+      <p className="text-lg font-black leading-tight text-electric">{value}</p>
       <p className="mt-1 text-[11px] font-black uppercase text-white/60">{label}</p>
       {sparkline && sparkline.length >= 2 ? (
         <div className="mt-1.5 flex justify-center">
-          <Sparkline color="#ff9f1a" data={sparkline} height={24} width={80} />
+          <Sparkline color="var(--accent-data)" data={sparkline} height={24} width={80} />
         </div>
       ) : null}
     </div>
@@ -381,7 +384,7 @@ function HeroMetric({ label, sparkline, value }: { label: string; sparkline?: nu
 
 function JournalToneBadge({ tone }: { tone: CalibrationEvent["tone"] }) {
   const toneClass = {
-    info: "bg-sky/10 text-sky",
+    info: "bg-electric/10 text-electric",
     progress: "bg-sea/10 text-sea",
     warn: "bg-amber/10 text-amber"
   }[tone];
@@ -413,7 +416,7 @@ function TrendBadge({ trend }: { trend: ExercisePerformance["trend"] }) {
     "pas assez de données": "bg-white/10 text-white/50",
     progresse: "bg-sea/10 text-sea",
     régresse: "bg-coral/10 text-coral",
-    stable: "bg-sky/10 text-sky"
+    stable: "bg-electric/10 text-electric"
   }[trend];
 
   return <span className={`shrink-0 rounded-md px-3 py-2 text-xs font-black uppercase ${classes}`}>{trend}</span>;

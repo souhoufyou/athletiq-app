@@ -41,20 +41,20 @@ export function SessionStepWrapUp({ exerciseCount, completedCount, onValidate }:
     <section className="session-step-card session-step-enter p-5">
       <div className="session-step-accent" style={{ background: "linear-gradient(90deg, #24c07a, #ff7a18)" }} />
 
-      <p className="text-[11px] font-black uppercase tracking-[0.28em] text-sea">Bilan</p>
-      <h2 className="mt-2 text-2xl font-black leading-tight text-white">Comment était la séance&nbsp;?</h2>
+      <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-sea">Bilan</p>
+      <h2 className="mt-2 text-2xl font-bold leading-tight text-white">Comment était la séance&nbsp;?</h2>
       <p className="mt-1 text-sm font-semibold text-white/55">
         {completedCount} / {exerciseCount} exercices · ton ressenti général aide à ajuster la suite.
       </p>
 
       <div className="mt-5">
-        <p className="text-xs font-black uppercase tracking-wide text-white/55">Effort global</p>
+        <p className="text-xs font-bold uppercase tracking-wide text-white/55">Effort global</p>
         <div className="mt-2 grid grid-cols-2 gap-2">
           {difficultyOptions.map((option) => {
             const isSelected = option.key === difficultyKey;
             return (
               <button
-                className={`min-h-14 rounded-2xl border px-3 text-base font-black transition ${
+                className={`min-h-14 rounded-2xl border px-3 text-base font-bold transition ${
                   isSelected
                     ? "border-coral bg-coral text-white"
                     : "border-white/10 bg-white/6 text-white/80 hover:bg-white/10"
@@ -71,10 +71,10 @@ export function SessionStepWrapUp({ exerciseCount, completedCount, onValidate }:
       </div>
 
       <div className="mt-5">
-        <p className="text-xs font-black uppercase tracking-wide text-white/55">Une douleur particulière&nbsp;?</p>
+        <p className="text-xs font-bold uppercase tracking-wide text-white/55">Une douleur particulière&nbsp;?</p>
         <div className="mt-2 grid grid-cols-2 gap-2">
           <button
-            className={`min-h-14 rounded-2xl border px-3 text-base font-black transition ${
+            className={`min-h-14 rounded-2xl border px-3 text-base font-bold transition ${
               hasPain === false
                 ? "border-sea bg-sea text-white"
                 : "border-white/10 bg-white/6 text-white/80 hover:bg-white/10"
@@ -85,7 +85,7 @@ export function SessionStepWrapUp({ exerciseCount, completedCount, onValidate }:
             Non
           </button>
           <button
-            className={`min-h-14 rounded-2xl border px-3 text-base font-black transition ${
+            className={`min-h-14 rounded-2xl border px-3 text-base font-bold transition ${
               hasPain === true
                 ? "border-coral bg-coral text-white"
                 : "border-white/10 bg-white/6 text-white/80 hover:bg-white/10"

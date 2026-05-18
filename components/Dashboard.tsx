@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { BrandLogo } from "@/components/BrandLogo";
 
 import { SessionExerciseIcon } from "@/components/session/SessionExerciseIcon";
+import { DashboardSkeleton } from "@/components/ui/PageSkeletons";
 import { WeekTimelineCompact } from "@/components/WeekTimeline";
 import { getActiveProgramTemplate } from "@/lib/activeProgram";
 import { estimateCalories } from "@/lib/calories";
@@ -14,6 +15,7 @@ import { getSessionImage } from "@/lib/session-images";
 import { getSessionCategory, getSessionTypeLabel, parseDurationToMs } from "@/lib/sessionMeta";
 import { useCoachStorage } from "@/lib/storage";
 import { formatDurationLong } from "@/lib/time";
+import { startSafeViewTransition } from "@/lib/viewTransition";
 import { buildWeekTimeline, getCompletedThisWeek } from "@/lib/weekTimeline";
 import type { CompletedSession, PlannedSession, Weekday } from "@/types/training";
 
@@ -58,6 +60,8 @@ export function Dashboard() {
   const weeklySessions = useMemo(() => getCompletedThisWeek(history), [history]);
   const nextSession = useMemo(() => findNextSession(currentProgram, todayWeekday), [currentProgram, todayWeekday]);
   const recentSessions = useMemo(() => history.slice(0, 3), [history]);
+  const historyPreview = useMemo(() => history.slice(0, 4), [history]);
+  const currentStreak = useMemo(() => getStreak(history), [history]);
   const activeToday =
     activeSession?.dateKey === dateKey && activeSession.sessionId === todaySession.id;
   const timelineDays = useMemo(
@@ -72,7 +76,7 @@ export function Dashboard() {
   );
 
   if (!isReady) {
-    return <div className="rounded-lg bg-white p-5 font-bold shadow-soft">Chargement...</div>;
+    return <DashboardSkeleton />;
   }
 
   const mainGoal = formatGoal(settings.primaryGoal, settings.mainGoal);
@@ -85,7 +89,7 @@ export function Dashboard() {
         </Link>
         <button
           aria-label={settings.darkMode ? "Passer en mode clair" : "Passer en mode sombre"}
-          className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/80 transition hover:bg-white/10"
+          className="tap-feedback flex size-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/80 transition hover:bg-white/10"
           onClick={() => setSettings({ ...settings, darkMode: !settings.darkMode })}
           title={settings.darkMode ? "Mode clair" : "Mode sombre"}
           type="button"
@@ -140,19 +144,30 @@ export function Dashboard() {
           activeToday={activeToday}
           isCompleted={Boolean(todaysCompletedSession)}
           onStart={() => {
-            if (!activeToday && !todaysCompletedSession) {
-              startSession(todaySession);
-            }
-            router.push("/seance");
+            startSafeViewTransition(() => {
+              if (!activeToday && !todaysCompletedSession) {
+                startSession(todaySession);
+              }
+              router.push("/seance");
+            });
           }}
           session={todaySession}
           weightKg={settings.currentWeightKg}
         />
       )}
 
+      <MetricsGrid
+        completedThisWeek={weeklySessions.length}
+        frequency={settings.weeklyFrequency ?? 4}
+        nextSession={nextSession}
+        streak={currentStreak}
+        targetWeightKg={settings.targetWeightKg}
+        weightKg={settings.currentWeightKg}
+      />
+
       <WeekTimelineCompact days={timelineDays} validatedCount={weeklySessions.length} />
 
-      <RecentSessionsCard sessions={recentSessions} />
+      <RecentHistoryCard sessions={historyPreview} totalCount={history.length} />
     </div>
   );
 }
@@ -259,7 +274,7 @@ function DynamicHeroCard({
         <HeroIcon name={insight.icon} color={iconColor} />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-black leading-tight text-white">{insight.title}</p>
+        <p className="text-sm font-bold leading-tight text-white">{insight.title}</p>
         <p className="mt-0.5 text-xs font-semibold leading-relaxed text-white/60">{insight.subtitle}</p>
       </div>
     </div>
@@ -305,14 +320,14 @@ function ProfileHeader({
           // eslint-disable-next-line @next/next/no-img-element
           <img alt={name} className="size-full object-cover" src={photoUrl} />
         ) : (
-          <span className="text-lg font-black text-coral">{initials}</span>
+          <span className="text-lg font-bold text-coral">{initials}</span>
         )}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-lg font-black leading-tight text-white">{name}</p>
+        <p className="truncate text-lg font-bold leading-tight text-white">{name}</p>
         <p className="mt-0.5 truncate text-xs font-semibold text-white/55">{programName}</p>
       </div>
-      <span className="shrink-0 max-w-[7rem] truncate rounded-full border border-sky/25 bg-sky/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-sky">
+      <span className="shrink-0 max-w-[7rem] truncate rounded-full border border-sky/25 bg-sky/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-sky">
         {goal}
       </span>
     </section>
@@ -368,7 +383,7 @@ function TodaySessionCard({
   }[status];
 
   return (
-    <section className="session-step-card overflow-hidden p-0">
+    <section className="session-step-card overflow-hidden p-0 [view-transition-name:session-card]">
       <div className="session-step-accent" />
 
       {/* Hero image */}
@@ -379,17 +394,17 @@ function TodaySessionCard({
         <div className="absolute inset-0 bg-gradient-to-t from-[#04050d] via-[#04050d]/65 to-transparent" />
         <div className="hero-overlay absolute inset-0 flex flex-col justify-between p-4">
           <div className="flex items-start justify-between gap-3">
-            <p className="rounded-full bg-black/35 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-coral backdrop-blur">
+            <p className="rounded-full bg-black/35 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-coral backdrop-blur">
               Séance du jour · {typeLabel}
             </p>
-            <span className={`shrink-0 rounded-full border bg-black/35 px-3 py-1 text-[10px] font-black uppercase tracking-wide backdrop-blur ${statusTone}`}>
+            <span className={`shrink-0 rounded-full border bg-black/35 px-3 py-1 text-[10px] font-bold uppercase tracking-wide backdrop-blur ${statusTone}`}>
               {statusLabel}
             </span>
           </div>
           <div className="flex items-end gap-3">
             <SessionExerciseIcon category={category} className="size-14 shrink-0 backdrop-blur" />
             <div className="min-w-0 flex-1">
-              <h1 className="text-2xl font-black leading-tight text-white sm:text-3xl drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]">
+              <h1 className="text-2xl font-bold leading-tight text-white sm:text-3xl drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)] [view-transition-name:session-title]">
                 {session.title}
               </h1>
               {session.focus ? (
@@ -436,16 +451,16 @@ function RestDayCard({
     <section className="session-step-card p-5">
       <div className="session-step-accent" style={{ background: "linear-gradient(90deg, #24c07a, #ff9f1a)" }} />
 
-      <p className="text-[11px] font-black uppercase tracking-[0.28em] text-sea">Aujourd&apos;hui</p>
-      <h1 className="mt-2 text-3xl font-black leading-tight text-white">Jour de repos</h1>
+      <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-sea">Aujourd&apos;hui</p>
+      <h1 className="mt-2 text-3xl font-bold leading-tight text-white">Jour de repos</h1>
       <p className="mt-2 text-sm font-semibold leading-relaxed text-white/65">
         Pas de séance prévue aujourd&apos;hui. Hydrate-toi, mange bien, dors.
       </p>
 
       {nextSession ? (
         <div className="mt-5 rounded-2xl border border-white/8 bg-white/4 p-4">
-          <p className="text-[10px] font-black uppercase tracking-wide text-white/55">Prochaine séance</p>
-          <p className="mt-1 text-lg font-black text-white">{nextSession.session.title}</p>
+          <p className="text-[10px] font-bold uppercase tracking-wide text-white/55">Prochaine séance</p>
+          <p className="mt-1 text-lg font-bold text-white">{nextSession.session.title}</p>
           <p className="mt-1 text-xs font-semibold text-white/55">
             {nextSession.weekdayLabel} · {nextSession.session.duration}
           </p>
@@ -463,32 +478,150 @@ function RestDayCard({
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// RECENT SESSIONS
+// METRICS GRID (Bento — compact data cards)
 // ─────────────────────────────────────────────────────────────────────────
 
-function RecentSessionsCard({ sessions }: { sessions: CompletedSession[] }) {
+function MetricsGrid({
+  completedThisWeek,
+  frequency,
+  nextSession,
+  streak,
+  targetWeightKg,
+  weightKg
+}: {
+  completedThisWeek: number;
+  frequency: number;
+  nextSession?: { session: PlannedSession; weekdayLabel: string };
+  streak: number;
+  targetWeightKg: number;
+  weightKg: number;
+}) {
+  return (
+    <section className="grid grid-cols-1 gap-2.5 min-[360px]:grid-cols-2">
+      <MetricCard
+        icon="weight"
+        label="Poids"
+        sub={targetWeightKg > 0 ? `Objectif ${targetWeightKg} kg` : "Poids actuel"}
+        tone="data"
+        value={weightKg > 0 ? `${weightKg} kg` : "—"}
+      />
+      <MetricCard
+        icon="flame"
+        label="Série"
+        sub={`séance${streak > 1 ? "s" : ""} d'affilée`}
+        tone="coral"
+        value={String(streak)}
+      />
+      <MetricCard
+        icon="calendar"
+        label="Cette semaine"
+        sub="séances validées"
+        tone="sea"
+        value={`${completedThisWeek}/${frequency}`}
+      />
+      <MetricCard
+        icon="next"
+        label="Prochaine séance"
+        sub={nextSession ? nextSession.weekdayLabel : "Aucune planifiée"}
+        tone="amber"
+        value={nextSession ? nextSession.session.title : "—"}
+      />
+    </section>
+  );
+}
+
+function MetricCard({
+  icon,
+  label,
+  sub,
+  tone,
+  value
+}: {
+  icon: "calendar" | "flame" | "next" | "weight";
+  label: string;
+  sub: string;
+  tone: "amber" | "coral" | "data" | "sea";
+  value: string;
+}) {
+  const iconTone = {
+    data: "bg-electric/10 text-electric",
+    coral: "bg-coral/15 text-coral",
+    sea: "bg-sea/15 text-sea",
+    amber: "bg-amber/15 text-amber"
+  }[tone];
+
+  return (
+    <div className="flex min-w-0 flex-col gap-2.5 rounded-xl border border-white/8 bg-white/4 p-3.5">
+      <div className="flex items-center gap-2">
+        <span className={`flex size-7 shrink-0 items-center justify-center rounded-lg ${iconTone}`}>
+          <MetricIcon name={icon} />
+        </span>
+        <p className="min-w-0 truncate text-[10px] font-bold uppercase tracking-wide text-white/55">
+          {label}
+        </p>
+      </div>
+      <div className="min-w-0">
+        <p className="truncate text-[1.35rem] font-bold leading-none text-white">{value}</p>
+        <p className="mt-1 truncate text-[11px] font-semibold text-white/50">{sub}</p>
+      </div>
+    </div>
+  );
+}
+
+function MetricIcon({ name }: { name: "calendar" | "flame" | "next" | "weight" }) {
+  const props = {
+    className: "size-4",
+    fill: "none",
+    viewBox: "0 0 24 24",
+    stroke: "currentColor",
+    strokeWidth: 2,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const
+  };
+  switch (name) {
+    case "weight":
+      return <svg {...props}><path d="M6.5 6.5v11M17.5 6.5v11M3 9.5v5M21 9.5v5M6.5 12h11" /></svg>;
+    case "flame":
+      return <svg {...props} fill="currentColor" stroke="none"><path d="M12 2c.5 2.5-.5 4.5-1.5 6C9.5 10 9 12 10 14c.5-1.5 1.5-2.5 3-3 1-.5 2-2 2-4 1 1 2.5 3.5 2.5 6.5a6.5 6.5 0 1 1-13 0C4.5 9 8 5 12 2z" /></svg>;
+    case "calendar":
+      return <svg {...props}><rect height="16" rx="2" width="18" x="3" y="5" /><path d="M3 10h18M8 3v4M16 3v4" /></svg>;
+    case "next":
+      return <svg {...props}><path d="M5 12h13M12 5l7 7-7 7" /></svg>;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// RECENT HISTORY
+// ─────────────────────────────────────────────────────────────────────────
+
+function RecentHistoryCard({ sessions, totalCount }: { sessions: CompletedSession[]; totalCount: number }) {
   if (sessions.length === 0) {
     return null;
   }
 
   return (
-    <details className="group rounded-2xl border border-white/8 bg-white/4">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4">
-        <p className="text-[11px] font-black uppercase tracking-[0.22em] text-white/55">
-          Historique ({sessions.length})
+    <section className="rounded-2xl border border-white/8 bg-white/4 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-white/55">
+          Historique récent
         </p>
-        <span className="rounded-md bg-white/8 px-2.5 py-1 text-[10px] font-black text-white/45 group-open:bg-sky/10 group-open:text-sky">
-          {sessions.length} séance{sessions.length > 1 ? "s" : ""}
-        </span>
-      </summary>
-      <ul className="space-y-2 px-4 pb-4">
+        {totalCount > sessions.length ? (
+          <Link
+            className="tap-feedback rounded-md bg-white/8 px-2.5 py-1 text-[10px] font-bold text-white/55 transition hover:bg-sky/10 hover:text-sky"
+            href="/historique"
+          >
+            Voir tout ({totalCount})
+          </Link>
+        ) : null}
+      </div>
+      <ul className="mt-3 space-y-2">
         {sessions.map((session) => (
           <li key={session.id}>
             <RecentSessionRow session={session} />
           </li>
         ))}
       </ul>
-    </details>
+    </section>
   );
 }
 
@@ -504,7 +637,7 @@ function RecentSessionRow({ session }: { session: CompletedSession }) {
         <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="#24c07a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5 9-11" /></svg>
       </span>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-black text-white">{session.title}</p>
+        <p className="truncate text-sm font-bold text-white">{session.title}</p>
         <p className="mt-0.5 text-[11px] font-semibold text-white/55">
           {dateLabel} · {duration} · {validatedCount}/{totalCount} ex.
         </p>
@@ -519,9 +652,9 @@ function RecentSessionRow({ session }: { session: CompletedSession }) {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-white/8 bg-white/4 p-2.5 text-center">
-      <p className="truncate text-sm font-black leading-tight text-white">{value}</p>
-      <p className="mt-1 text-[10px] font-black uppercase tracking-wide text-white/55">{label}</p>
+    <div className="rounded-xl border border-electric/15 bg-electric/[0.06] p-2.5 text-center">
+      <p className="truncate text-sm font-bold leading-tight text-electric">{value}</p>
+      <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-white/55">{label}</p>
     </div>
   );
 }

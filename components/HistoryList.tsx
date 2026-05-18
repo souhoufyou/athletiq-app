@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { AdaptationExplanationCard } from "@/components/AdaptationExplanation";
+import { HistorySkeleton } from "@/components/ui/PageSkeletons";
 import { estimateCalories } from "@/lib/calories";
 import { formatDateTime } from "@/lib/date";
 import { useCoachStorage } from "@/lib/storage";
@@ -57,7 +58,7 @@ export function HistoryList() {
   const historyStats = useMemo(() => buildHistoryStats(history), [history]);
 
   if (!isReady) {
-    return <div className="rounded-lg bg-white p-5 font-bold shadow-soft">Chargement...</div>;
+    return <HistorySkeleton />;
   }
 
   if (history.length === 0) {

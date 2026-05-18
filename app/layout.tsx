@@ -1,7 +1,14 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import { ServiceWorkerRegister } from "./service-worker-register";
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap"
+});
 
 export const metadata: Metadata = {
   title: "AthletIQ",
@@ -40,7 +47,7 @@ export default function RootLayout({
   children: ReactNode;
 }>) {
   return (
-    <html lang="fr" className="dark">
+    <html lang="fr" className={`${inter.variable} dark`}>
       <body>
         {children}
         <ServiceWorkerRegister />

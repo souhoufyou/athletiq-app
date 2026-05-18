@@ -60,11 +60,11 @@ export function SessionStepAnnounce({
         <div className="absolute inset-0 bg-gradient-to-t from-[#04050d] via-[#04050d]/55 to-transparent" />
         <div className="hero-overlay absolute inset-0 flex flex-col justify-between p-4">
           <div className="flex items-center justify-between gap-3">
-            <p className="rounded-full bg-black/35 px-3 py-1 text-[10px] font-black uppercase tracking-[0.28em] text-white/85 backdrop-blur">
+            <p className="rounded-full bg-black/35 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.28em] text-white/85 backdrop-blur">
               Exercice {exerciseIndex + 1} / {exerciseTotal}
             </p>
             {isReplaced ? (
-              <span className="rounded-full border border-amber/30 bg-amber/30 px-2.5 py-1 text-[10px] font-black uppercase text-amber backdrop-blur">
+              <span className="rounded-full border border-amber/30 bg-amber/30 px-2.5 py-1 text-[10px] font-bold uppercase text-amber backdrop-blur">
                 Remplacé
               </span>
             ) : null}
@@ -72,7 +72,7 @@ export function SessionStepAnnounce({
           <div className="flex items-end gap-3">
             <SessionExerciseIcon category={category} className="size-12 shrink-0 backdrop-blur" />
             <button
-              className="flex-1 text-left text-2xl font-black leading-tight text-white sm:text-3xl drop-shadow-[0_2px_8px_rgba(0,0,0,0.7)]"
+              className="flex-1 text-left text-2xl font-bold leading-tight text-white sm:text-3xl drop-shadow-[0_2px_8px_rgba(0,0,0,0.7)]"
               onClick={() => setShowMedia(true)}
               type="button"
             >
@@ -97,7 +97,7 @@ export function SessionStepAnnounce({
           <div className="flex flex-wrap gap-1.5">
             {muscles.map((muscle) => (
               <span
-                className="rounded-full border border-white/10 bg-white/8 px-3 py-1 text-[11px] font-black uppercase tracking-wide text-white/70"
+                className="rounded-full border border-white/10 bg-white/8 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-white/70"
                 key={muscle}
               >
                 {muscleLabels[muscle] ?? muscle}
@@ -159,8 +159,8 @@ function Stat({ label, value, accent = false }: { label: string; value: string; 
           : "border-white/8 bg-white/4 text-white"
       }`}
     >
-      <dt className="text-[10px] font-black uppercase tracking-wide opacity-70">{label}</dt>
-      <dd className={`mt-1 text-2xl font-black leading-tight ${accent ? "text-coral" : "text-white"}`}>{value}</dd>
+      <dt className="text-[10px] font-bold uppercase tracking-wide opacity-70">{label}</dt>
+      <dd className={`mt-1 text-2xl font-bold leading-tight ${accent ? "text-coral" : "text-white"}`}>{value}</dd>
     </div>
   );
 }
