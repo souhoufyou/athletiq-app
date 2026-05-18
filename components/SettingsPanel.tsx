@@ -13,6 +13,7 @@ import {
 import { getActiveProgramTemplate } from "@/lib/activeProgram";
 import { COMPLEMENTARY_PROGRAMS } from "@/lib/complementaryPrograms";
 import { getSupabaseAuth } from "@/lib/supabaseAuth";
+import { getUniqueSessions } from "@/lib/sessionMeta";
 import { buildStrengthReferenceFromSet, estimateOneRepMaxFromSet, formatEstimatedOneRepMax } from "@/lib/strengthCalibration";
 import { useCoachStorage } from "@/lib/storage";
 import type {
@@ -92,6 +93,8 @@ function LegacySettingsPanel() {
   const {
     activeProfileId,
     createProfile,
+    currentFlexibleConfig,
+    currentProgram,
     deleteProfile,
     history,
     isReady,
@@ -99,6 +102,7 @@ function LegacySettingsPanel() {
     regenerateProgram,
     renameProfile,
     resetAll,
+    setFlexibleConfig,
     setSettings,
     settings,
     switchProfile
@@ -246,6 +250,40 @@ function LegacySettingsPanel() {
             );
           })}
         </div>
+
+        {currentProgram && currentProgram.length > 0 && (
+          <div className="mt-5">
+            <p className="text-sm font-semibold text-white/55">Jour de démarrage de ton programme</p>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              {getUniqueSessions(currentProgram).map(({ title, index }) => {
+                const isSelected = currentFlexibleConfig?.startingSessionIndex === index;
+                return (
+                  <label
+                    className={`flex min-h-12 items-center gap-2 rounded-md border px-3 font-bold cursor-pointer transition ${
+                      isSelected
+                        ? "border-sea/40 bg-sea/10 text-sea"
+                        : "border-white/8 bg-white/5 text-white/60 hover:border-sea/40 hover:bg-sea/10 hover:text-sea"
+                    }`}
+                    key={`${title}-${index}`}
+                  >
+                    <input
+                      type="radio"
+                      name="starting-session"
+                      checked={isSelected}
+                      onChange={() => {
+                        setFlexibleConfig({
+                          availableWeekdays: settings.availableDays,
+                          startingSessionIndex: index
+                        });
+                      }}
+                    />
+                    {title}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         <label className="mt-4 block">
           <span className="text-sm font-bold text-white/60">Durée préférée des séances</span>
@@ -486,6 +524,7 @@ export function SettingsPanel() {
   const {
     activeProfileId,
     createProfile,
+    currentFlexibleConfig,
     currentProgram,
     deleteProfile,
     history,
@@ -494,6 +533,7 @@ export function SettingsPanel() {
     regenerateProgram,
     renameProfile,
     resetAll,
+    setFlexibleConfig,
     setProfilePhoto,
     setSettings,
     settings,
@@ -648,6 +688,31 @@ export function SettingsPanel() {
             </PillButton>
           ))}
         </div>
+
+        {currentProgram && currentProgram.length > 0 && (
+          <>
+            <p className="mt-5 text-[11px] font-black uppercase tracking-wide text-white/55">Jour de démarrage</p>
+            <div className="mt-2 grid grid-cols-1 gap-2">
+              {getUniqueSessions(currentProgram).map(({ title, index }) => {
+                const isSelected = currentFlexibleConfig?.startingSessionIndex === index;
+                return (
+                  <PillButton
+                    key={`${title}-${index}`}
+                    onClick={() => {
+                      setFlexibleConfig({
+                        availableWeekdays: settings.availableDays,
+                        startingSessionIndex: index
+                      });
+                    }}
+                    selected={isSelected}
+                  >
+                    {title}
+                  </PillButton>
+                );
+              })}
+            </div>
+          </>
+        )}
       </SectionCard>
 
       {/* ── PROGRAMME ────────────────────────────────────────────── */}

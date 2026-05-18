@@ -60,6 +60,26 @@ export function getSessionTypeLabel(category: SessionExerciseCategory): string {
 }
 
 /**
+ * Extract unique sessions from a program with their first index.
+ * Example: ["Push A", "Pull A", "Legs A", "Push B", ...] → [Push (0), Pull (1), Legs (2)]
+ * Returns tuples of [title, firstIndexInProgram] to allow "Start with Push", "Start with Pull", etc.
+ */
+export function getUniqueSessions(program: PlannedSession[]): Array<{ title: string; index: number }> {
+  const seen = new Set<string>();
+  const result: Array<{ title: string; index: number }> = [];
+
+  for (let i = 0; i < program.length; i++) {
+    const title = program[i].title;
+    if (!seen.has(title)) {
+      seen.add(title);
+      result.push({ title, index: i });
+    }
+  }
+
+  return result;
+}
+
+/**
  * Best-effort upper bound of a session duration string in milliseconds.
  * Accepts "45-55 min", "45 min", "1h", "1h30", etc. Falls back to 45 min.
  */

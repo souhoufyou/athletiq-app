@@ -1,14 +1,31 @@
+import { scheduleSessionsFlexibly } from "@/lib/programScheduling";
 import { normalizeProgramV2 } from "@/lib/programSchema";
-import type { PlannedSession, ProgramTemplate, UserSettings, Weekday } from "@/types/training";
+import type { ActiveProgramConfig, PlannedSession, ProgramTemplate, UserSettings, Weekday } from "@/types/training";
 
 const DEFAULT_WEEKDAYS: Weekday[] = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
 
 export function instantiateProgramTemplate(
   template: ProgramTemplate,
-  settings?: Pick<UserSettings, "availableDays">
+  settings?: Pick<UserSettings, "availableDays">,
+  config?: ActiveProgramConfig
 ): PlannedSession[] {
   const availableDays = normalizeWeekdays(settings?.availableDays);
 
+  // If flexible config provided, use smart rotation scheduling
+  if (config) {
+    return normalizeProgramV2(
+      scheduleSessionsFlexibly(
+        template.sessions.map((session) => ({
+          ...session,
+          id: `${template.id}:${session.id}`
+        })),
+        config.availableWeekdays,
+        config.startingSessionIndex
+      )
+    );
+  }
+
+  // Fallback: default positional mapping (backward compatible)
   return normalizeProgramV2(
     template.sessions.map((session, index) => {
       const weekday = session.weekday ?? availableDays[index % availableDays.length] ?? DEFAULT_WEEKDAYS[index % DEFAULT_WEEKDAYS.length];

@@ -395,18 +395,23 @@ export type ProgramObjective =
 
 export type ProgramTag =
   | "cardio"
+  | "combat"
   | "debutant"
   | "fessiers"
   | "force"
   | "femme"
   | "homme"
+  | "intermediaire"
   | "judo"
   | "machines"
+  | "performance"
   | "perte-gras"
   | "post-partum"
   | "prise-masse"
   | "recomposition"
-  | "sante";
+  | "reprise"
+  | "sante"
+  | "seche";
 
 export type ProgramProgressionRules = {
   loadStepKg?: {
@@ -485,6 +490,11 @@ export type ProgramRecommendation = {
   warnings: string[];
 };
 
+export type ActiveProgramConfig = {
+  availableWeekdays: Weekday[];
+  startingSessionIndex: number;
+};
+
 export type ActiveProgramMeta = {
   programId: string;
   programName: string;
@@ -492,6 +502,7 @@ export type ActiveProgramMeta = {
   source: "manual" | "onboarding" | "preset" | "recommended";
   profileId?: string;
   templateVersion?: number;
+  flexibleConfig?: ActiveProgramConfig;
 };
 
 export type Profile = {

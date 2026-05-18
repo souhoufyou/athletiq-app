@@ -8,10 +8,13 @@ import { adaptProgramAfterSession } from "@/lib/programAdaptation";
 import { adaptSettingsAfterSession } from "@/lib/profileAdaptation";
 import { buildProgram } from "@/lib/programBuilder";
 import { normalizeExerciseV2, normalizeProgramV2 } from "@/lib/programSchema";
+import { scheduleSessionsFlexibly } from "@/lib/programScheduling";
+import { getUniqueSessions } from "@/lib/sessionMeta";
 import { calculateProgression, type ProgressionSessionContext } from "@/lib/progression";
 import { CURRENT_SETTINGS_SCHEMA_VERSION, normalizeUserSettings } from "@/lib/settingsSchema";
 import { createEmptyLogs, defaultSessionFeedback, getNextSession, getTodaySession } from "@/lib/session";
 import type {
+  ActiveProgramConfig,
   ActiveSession,
   CoachAiResponse,
   CompletedSession,
@@ -25,6 +28,7 @@ import type {
   MuscleGroup,
   PlannedSession,
   Profile,
+  ProgramSessionTemplate,
   SessionFeedback,
   UserSettings,
   Weekday
@@ -74,6 +78,10 @@ function settingsKeyFor(profileId: string) {
 
 function onboardingKeyFor(profileId: string) {
   return profileKey(profileId, "onboarding-done");
+}
+
+function programConfigKeyFor(profileId: string) {
+  return profileKey(profileId, "program-config");
 }
 
 const LEGACY_ACTIVE_SESSION_KEY = "coach-adaptatif:active-session";
@@ -679,9 +687,41 @@ function completeOnboardingAction(next: UserSettings) {
 /**
  * Regenerate the active profile's program from current settings.
  * Useful when the user changes their goal, frequency, or equipment after onboarding.
+ * Also applies flexible scheduling config if present.
  */
 function regenerateProgramAction() {
-  const program = normalizeProgramV2(buildProgram(store.settings));
+  let program = normalizeProgramV2(buildProgram(store.settings));
+
+  // Apply flexible scheduling config if it exists
+  const config = readJson<ActiveProgramConfig | null>(
+    programConfigKeyFor(store.activeProfileId),
+    null
+  );
+
+  if (config && program.length > 0) {
+    // Convert PlannedSession[] to ProgramSessionTemplate[] (keeping structure, removing weekday)
+    const templates: ProgramSessionTemplate[] = program.map(session => ({
+      id: session.id,
+      scheduleLabel: session.scheduleLabel,
+      title: session.title,
+      focus: session.focus,
+      duration: session.duration,
+      intensity: session.intensity,
+      phase: session.phase,
+      notes: session.notes,
+      exercises: session.exercises
+    }));
+
+    // Re-schedule with flexible config
+    program = normalizeProgramV2(
+      scheduleSessionsFlexibly(
+        templates,
+        config.availableWeekdays,
+        config.startingSessionIndex
+      )
+    );
+  }
+
   if (JSON.stringify(program) === JSON.stringify(store.currentProgram)) {
     return;
   }
@@ -701,6 +741,22 @@ function setCurrentProgramAction(program: PlannedSession[]) {
   writeJson(programKeyFor(store.activeProfileId), normalized);
   store = { ...store, currentProgram: normalized };
   emit();
+  enqueueSyncIfAuthenticated("program");
+}
+
+function setFlexibleConfigAction(config: ActiveProgramConfig) {
+  const current = readJson<ActiveProgramConfig | null>(
+    programConfigKeyFor(store.activeProfileId),
+    null
+  );
+
+  if (JSON.stringify(current) === JSON.stringify(config)) {
+    return; // No change
+  }
+
+  writeJson(programConfigKeyFor(store.activeProfileId), config);
+  // Regenerate program with new config
+  regenerateProgramAction();
   enqueueSyncIfAuthenticated("program");
 }
 
@@ -892,6 +948,14 @@ export function useCoachStorage() {
     [dateKey, history, todaySession.id]
   );
 
+  const currentFlexibleConfig = useMemo(
+    () => readJson<ActiveProgramConfig | null>(
+      programConfigKeyFor(activeProfileId),
+      null
+    ),
+    [activeProfileId]
+  );
+
   const startSession = useCallback(
     (session: PlannedSession = todaySession) => startSessionAction(session),
     [todaySession]
@@ -910,6 +974,7 @@ export function useCoachStorage() {
     completeOnboarding: completeOnboardingAction,
     completeSession,
     createProfile: createProfileAction,
+    currentFlexibleConfig,
     currentProgram,
     dateKey,
     deleteProfile: deleteProfileAction,
@@ -920,6 +985,7 @@ export function useCoachStorage() {
     pauseSessionTimer: pauseSessionTimerAction,
     profiles,
     regenerateProgram: regenerateProgramAction,
+    setFlexibleConfig: setFlexibleConfigAction,
     renameProfile: renameProfileAction,
     setProfilePhoto: setProfilePhotoAction,
     replaceExercise: replaceExerciseAction,
