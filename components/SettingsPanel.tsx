@@ -755,10 +755,10 @@ export function SettingsPanel() {
       <SectionCard subtitle="Thème de l'application." title="Apparence">
         <div className="grid grid-cols-2 gap-2">
           <PillButton onClick={() => setSettings({ ...settings, darkMode: true })} selected={settings.darkMode}>
-            🌙 Sombre
+            Sombre
           </PillButton>
           <PillButton onClick={() => setSettings({ ...settings, darkMode: false })} selected={!settings.darkMode}>
-            ☀️ Clair
+            Clair
           </PillButton>
         </div>
         {!settings.darkMode ? (

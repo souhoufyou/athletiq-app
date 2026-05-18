@@ -124,7 +124,10 @@ export function getDefaultLoadForSet(
       }
     }
   }
-  return exercise.plannedLoad ?? "";
+  const load = exercise.plannedLoad ?? "";
+  const parsed = parseLoadValue(load);
+  if (parsed && parsed.value === 0) return "";
+  return load;
 }
 
 /**

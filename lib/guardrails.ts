@@ -536,10 +536,10 @@ export function applyGuardrails(input: GuardrailInput): GuardrailResult {
   // -------------------------------------------------------------------------
   // RÈGLE 9 — Stagnation prolongée (warn)
   // -------------------------------------------------------------------------
-  if (input.weeksSinceLastChange >= 6 && input.proposedDecision === "maintenir") {
+  if (Number.isFinite(input.weeksSinceLastChange) && input.weeksSinceLastChange >= 6 && input.proposedDecision === "maintenir") {
     violations.push({
       rule: "stagnation",
-      reason: `Stagnation de ${input.weeksSinceLastChange} semaines — envisager une variation de stimulus`,
+      reason: `Stagnation de ${Math.round(input.weeksSinceLastChange)} semaines — envisager une variation de stimulus`,
       severity: "warn",
     });
     if (!explanation.impact) {

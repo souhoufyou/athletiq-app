@@ -32,7 +32,8 @@ export function SessionStepWarmUp({
   ];
 
   const currentRamp = warmupRamps[currentRampIndex];
-  const currentLoad = Math.round((baseLoad * currentRamp.percent) / 10) * 10;
+  const getRampLoad = (percent: number) => Math.round((baseLoad * percent / 100) / 2.5) * 2.5;
+  const currentLoad = getRampLoad(currentRamp.percent);
 
   const handleRampComplete = () => {
     if (currentRampIndex < warmupRamps.length - 1) {
@@ -82,7 +83,7 @@ export function SessionStepWarmUp({
                     {ramp.percent}% × {ramp.reps} reps
                   </p>
                   <p className="mt-1 text-xs font-semibold text-white/55">
-                    {currentLoad} {unit}
+                    {getRampLoad(ramp.percent)} {unit}
                   </p>
                 </div>
                 {idx < currentRampIndex && (
