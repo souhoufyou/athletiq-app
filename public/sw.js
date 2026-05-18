@@ -1,4 +1,4 @@
-const CACHE_NAME = "athletiq-v1";
+const CACHE_NAME = "athletiq-v2";
 const STATIC_ASSETS = [
   "/",
   "/index.html",
@@ -34,8 +34,12 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const { request } = event;
 
-  // Skip les requêtes non-GET
+  // Skip les requêtes non-GET et les appels API
   if (request.method !== "GET") {
+    return;
+  }
+
+  if (request.url.includes("/api/")) {
     return;
   }
 
