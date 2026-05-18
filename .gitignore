@@ -10,3 +10,5 @@ package/
 .npm-cache/
 .qa-dist/
 .test-build/
+
+.vercel

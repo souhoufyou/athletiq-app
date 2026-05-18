@@ -964,11 +964,29 @@ function getExerciseContext(exercise: Exercise, session?: PlannedSession): Exerc
 }
 
 function getExerciseKind(exercise: Exercise): ExerciseKind {
+  // Priority 1: taxonomy.pattern (structured classification)
   const taxonomyKind = exercise.taxonomy?.pattern ? patternToExerciseKind(exercise.taxonomy.pattern) : undefined;
   if (taxonomyKind) {
     return taxonomyKind;
   }
 
+  // Priority 2: classification (structured metadata)
+  if (exercise.classification) {
+    const classificationKind = classificationToExerciseKind(exercise.classification);
+    if (classificationKind) {
+      return classificationKind;
+    }
+  }
+
+  // Priority 3: muscleGroups (structured metadata)
+  if (exercise.muscleGroups && exercise.muscleGroups.length > 0) {
+    const muscleGroupKind = muscleGroupsToExerciseKind(exercise.muscleGroups);
+    if (muscleGroupKind) {
+      return muscleGroupKind;
+    }
+  }
+
+  // Priority 4: text matching (fallback)
   const text = normalize(`${exercise.id} ${exercise.name} ${exercise.cue}`);
 
   if (includesAny(text, ["cardio", "tapis", "marche", "rameur", "stairmaster", "intervalles", "zone 2"])) {
@@ -1037,6 +1055,36 @@ function patternToExerciseKind(pattern: NonNullable<Exercise["taxonomy"]>["patte
   ) {
     return "upper-machine";
   }
+  return undefined;
+}
+
+function classificationToExerciseKind(classification: NonNullable<Exercise["classification"]>): ExerciseKind | undefined {
+  if (classification === "cardio") return "cardio";
+  if (classification === "hypertrophie") return "upper-machine";
+  if (classification === "force") return "bench";
+  if (classification === "mobilite" || classification === "technique") return "other";
+  return undefined;
+}
+
+function muscleGroupsToExerciseKind(muscleGroups: NonNullable<Exercise["muscleGroups"]>): ExerciseKind | undefined {
+  if (muscleGroups.length === 0) return undefined;
+
+  if (muscleGroups.includes("cardio")) return "cardio";
+
+  const hasPectoraux = muscleGroups.includes("pectoraux");
+  const hasJambes = muscleGroups.includes("jambes");
+  const hasUpperAndLower = muscleGroups.some(g => ["pectoraux", "dos", "epaules", "biceps", "triceps"].includes(g)) &&
+                            muscleGroups.includes("jambes");
+
+  if (hasPectoraux && muscleGroups.length === 1) return "bench";
+  if (hasJambes && muscleGroups.length === 1) return "leg-machine";
+
+  if (muscleGroups.some(g => ["biceps", "triceps"].includes(g)) && muscleGroups.length === 1) return "isolation";
+
+  if (muscleGroups.includes("dos") || muscleGroups.includes("epaules")) return "upper-machine";
+
+  if (hasJambes) return "leg-machine";
+
   return undefined;
 }
 
