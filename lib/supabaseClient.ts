@@ -11,6 +11,7 @@ const createQuery = (): any => {
     single: () => createQuery(),
     order: () => createQuery(),
     upsert: () => createQuery(),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     then: (onfulfilled?: (value: any) => any, onrejected?: (reason: any) => any) =>
       Promise.resolve({ data: [], error: null }).then(onfulfilled, onrejected),
   };
@@ -18,5 +19,6 @@ const createQuery = (): any => {
 };
 
 export const supabase = {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   from: (table: string) => createQuery(),
 };

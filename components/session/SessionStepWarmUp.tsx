@@ -129,7 +129,7 @@ export function SessionStepWarmUp({
           onClick={onSkip}
           type="button"
         >
-          Passer l'échauffement
+          Passer l&apos;échauffement
         </button>
         <button
           className="session-cta-primary"
