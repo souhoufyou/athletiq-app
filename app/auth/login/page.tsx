@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BrandLogo } from "@/components/BrandLogo";
-import { authErrorMessage, supabaseAuth } from "@/lib/supabaseAuth";
+import { authErrorMessage, getSupabaseAuth } from "@/lib/supabaseAuth";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -19,7 +19,7 @@ export default function LoginPage() {
     setError("");
 
     try {
-      const { error: signInError } = await supabaseAuth.auth.signInWithPassword({
+      const { error: signInError } = await getSupabaseAuth().auth.signInWithPassword({
         email,
         password,
       });

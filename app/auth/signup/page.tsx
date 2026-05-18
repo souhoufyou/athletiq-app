@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BrandLogo } from "@/components/BrandLogo";
-import { authErrorMessage, supabaseAuth } from "@/lib/supabaseAuth";
+import { authErrorMessage, getSupabaseAuth } from "@/lib/supabaseAuth";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -21,7 +21,7 @@ export default function SignupPage() {
     setNotice("");
 
     try {
-      const { data, error: signUpError } = await supabaseAuth.auth.signUp({
+      const { data, error: signUpError } = await getSupabaseAuth().auth.signUp({
         email,
         password,
       });

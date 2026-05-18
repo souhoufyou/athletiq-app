@@ -1,11 +1,29 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 // Real Supabase client, used only for authentication (sign up / sign in).
 // Data sync still goes through the disabled stub in supabaseClient.ts.
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+//
+// The URL and the anon ("publishable") key are public by design — they ship
+// in every client bundle. They are kept here as a fallback so the app builds
+// and runs even when the environment variables are not set on the host.
+const SUPABASE_URL =
+  process.env.NEXT_PUBLIC_SUPABASE_URL || "https://bbcmipssznlgarbpfaif.supabase.co";
+const SUPABASE_ANON_KEY =
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  "sb_publishable_0eyoOxJQX37Jf45dD55u8g_pDMQKLwb";
 
-export const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey);
+let client: SupabaseClient | null = null;
+
+/**
+ * Lazily creates the auth client. Created on first use (in the browser) rather
+ * than at module load, so it never runs during the build/prerender step.
+ */
+export function getSupabaseAuth(): SupabaseClient {
+  if (!client) {
+    client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  }
+  return client;
+}
 
 /** Translates common Supabase auth errors into user-facing French messages. */
 export function authErrorMessage(message: string): string {
