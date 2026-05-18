@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AdaptationExplanationCard } from "@/components/AdaptationExplanation";
 import { SessionSummary } from "@/components/SessionSummary";
 import { SessionCelebration } from "@/components/session/SessionCelebration";
+import { SessionPill } from "@/components/session/SessionPill";
 import { SessionStepAnnounce } from "@/components/session/SessionStepAnnounce";
 import { SessionStepFeedback } from "@/components/session/SessionStepFeedback";
 import { SessionStepRest } from "@/components/session/SessionStepRest";
@@ -27,7 +28,7 @@ import {
   type SessionStep
 } from "@/lib/sessionFlow";
 import { useCoachStorage } from "@/lib/storage";
-import { formatDuration, formatDurationLong, parseRestSeconds } from "@/lib/time";
+import { formatDurationLong, parseRestSeconds } from "@/lib/time";
 import type {
   ActiveSession,
   CoachAiResponse,
@@ -466,44 +467,71 @@ export function SessionRunner() {
     stepInitializedRef.current = null;
   };
 
+  // Derive pill view from current step
+  const pillSetCountAt = (index: number): number => {
+    const exercise = effectiveExerciseAt(index);
+    return exercise ? getPlannedSetCount(exercise) : 0;
+  };
+
+  const pillView: { phase: string; title: string; detail?: string; exerciseIndex: number } = (() => {
+    switch (step.type) {
+      case "warm-up": {
+        const exercise = effectiveExerciseAt(step.exerciseIndex);
+        return { phase: "Échauffement", title: exercise?.name ?? "Exercice", exerciseIndex: step.exerciseIndex };
+      }
+      case "announce": {
+        const exercise = effectiveExerciseAt(step.exerciseIndex);
+        return {
+          phase: "À suivre",
+          title: exercise?.name ?? "Exercice",
+          detail: exercise?.plannedLoad || exercise?.target || undefined,
+          exerciseIndex: step.exerciseIndex
+        };
+      }
+      case "set": {
+        const exercise = effectiveExerciseAt(step.exerciseIndex);
+        return {
+          phase: `Série ${step.setIndex}/${pillSetCountAt(step.exerciseIndex)}`,
+          title: exercise?.name ?? "Exercice",
+          detail: exercise?.plannedLoad || undefined,
+          exerciseIndex: step.exerciseIndex
+        };
+      }
+      case "rest": {
+        const exercise = effectiveExerciseAt(step.exerciseIndex);
+        return {
+          phase: "Repos",
+          title: exercise?.name ?? "Exercice",
+          detail: `Série ${step.nextSetIndex}/${pillSetCountAt(step.exerciseIndex)} à suivre`,
+          exerciseIndex: step.exerciseIndex
+        };
+      }
+      case "feedback": {
+        const exercise = effectiveExerciseAt(step.exerciseIndex);
+        return { phase: "Ressenti", title: exercise?.name ?? "Exercice", exerciseIndex: step.exerciseIndex };
+      }
+      case "wrap-up":
+        return { phase: "Bilan", title: "Séance presque terminée", exerciseIndex: currentSession.exercises.length - 1 };
+      default:
+        return { phase: "Terminé", title: "Séance terminée", exerciseIndex: currentSession.exercises.length - 1 };
+    }
+  })();
+
   return (
-    <div className="space-y-4">
-      <section className="z-20 -mx-4 border-b border-white/10 bg-[#0f111a]/95 px-4 py-3 sm:-mx-6 sm:px-6 [view-transition-name:session-card]">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <button
-              aria-label="Quitter la séance"
-              className="flex size-9 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/5 text-sm font-black text-white/70 transition hover:bg-white/10"
-              onClick={() => setShowQuitConfirm(true)}
-              type="button"
-            >
-              ✕
-            </button>
-            <p className="text-xs font-black tabular-nums text-white/60">
-              {completedCount}/{currentSession.exercises.length}
-            </p>
-          </div>
-          <div className="flex items-center gap-2 rounded-xl border border-coral/25 bg-coral/10 px-3 py-1.5">
-            <span className="size-2 animate-pulse rounded-full bg-coral" />
-            <SessionElapsedTime session={active} />
-          </div>
-          <button
-            aria-label={active.timer.isPaused ? "Reprendre" : "Pause"}
-            className="flex size-9 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/5 text-sm font-black text-white/70 transition hover:bg-white/10"
-            onClick={() => (active.timer.isPaused ? resumeSessionTimer() : pauseSessionTimer())}
-            type="button"
-          >
-            {active.timer.isPaused ? "▶" : "⏸"}
-          </button>
-        </div>
-        <div
-          className={`mt-2 h-1.5 overflow-hidden rounded-full bg-white/10 [view-transition-name:session-progress] ${
-            progressPulse ? "progress-step-complete" : ""
-          }`}
-        >
-          <div className="progress-fill h-full rounded-full bg-coral" style={{ width: `${progressPercent}%` }} />
-        </div>
-      </section>
+    <div className="space-y-4 pt-16">
+      <SessionPill
+        completedCount={completedCount}
+        detail={pillView.detail}
+        exerciseIndex={pillView.exerciseIndex}
+        exerciseTotal={currentSession.exercises.length}
+        isPaused={active.timer.isPaused}
+        onQuit={() => setShowQuitConfirm(true)}
+        onTogglePause={() => (active.timer.isPaused ? resumeSessionTimer() : pauseSessionTimer())}
+        phase={pillView.phase}
+        progressPercent={progressPercent}
+        session={active}
+        title={pillView.title}
+      />
 
       {step.type === "warm-up" ? (
         (() => {
@@ -794,37 +822,6 @@ function LaunchMetric({ label, value }: { label: string; value: string }) {
       <p className="mt-1 text-[10px] font-black uppercase text-white/55">{label}</p>
     </div>
   );
-}
-
-function SessionElapsedTime({ session }: { session: ActiveSession }) {
-  const [nowMs, setNowMs] = useState(() => Date.now());
-
-  useEffect(() => {
-    if (session.timer.isPaused) {
-      return;
-    }
-
-    const interval = window.setInterval(() => setNowMs(Date.now()), 1000);
-    return () => window.clearInterval(interval);
-  }, [session.timer.isPaused, session.timer.pausedTotalMs, session.timer.startedAt]);
-
-  return (
-    <p className="shrink-0 text-lg font-black tabular-nums leading-none text-coral">
-      {formatDuration(getElapsedMs(session, nowMs))}
-    </p>
-  );
-}
-
-function getElapsedMs(session: ActiveSession, nowMs: number): number {
-  const timer = session.timer ?? {
-    startedAt: session.startedAt,
-    isPaused: false,
-    pausedTotalMs: 0
-  };
-  const startedAt = new Date(timer.startedAt).getTime();
-  const stoppedAt = timer.isPaused && timer.pausedAt ? new Date(timer.pausedAt).getTime() : nowMs;
-
-  return Math.max(0, stoppedAt - startedAt - timer.pausedTotalMs);
 }
 
 // ─────────────────────────────────────────────────────────────────────────
