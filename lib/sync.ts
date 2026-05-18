@@ -364,8 +364,9 @@ class SyncManager {
 
     if (cloudSessions) {
       const orphanIds = cloudSessions
-        .map((r) => r.session_id as string)
-        .filter((id) => !localIds.has(id));
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .map((r: any) => r.session_id as string)
+        .filter((id: string) => !localIds.has(id));
 
       if (orphanIds.length > 0) {
         await supabase
@@ -492,7 +493,8 @@ class SyncManager {
 
     if (!cloudRows || cloudRows.length === 0) return;
 
-    const cloudMaxTime = Math.max(...cloudRows.map((r) => new Date(r.updated_at ?? 0).getTime()));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cloudMaxTime = Math.max(...cloudRows.map((r: any) => new Date(r.updated_at ?? 0).getTime()));
     const localTime = new Date(meta.programUpdatedAt ?? 0).getTime();
 
     if (cloudMaxTime > localTime) {
@@ -541,7 +543,8 @@ class SyncManager {
     }
 
     // Local sessions not in cloud → push
-    const cloudIds = new Set((cloudRows ?? []).map((r) => r.completion_id as string));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cloudIds = new Set((cloudRows ?? []).map((r: any) => r.completion_id as string));
     const localOnly = localHistory.filter((s) => !cloudIds.has(s.id));
     if (localOnly.length > 0) {
       await this.pushCompletedSessions(userId, localOnly);
