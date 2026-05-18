@@ -538,57 +538,61 @@ function ChangeProgramSheet({
       role="dialog"
     >
       <div
-        className="max-h-[85vh] w-full max-w-md overflow-y-auto overscroll-contain rounded-t-3xl border border-white/10 bg-ink p-5 text-white shadow-soft sm:rounded-3xl"
+        className="flex h-[85vh] w-full max-w-md flex-col rounded-t-3xl border border-white/10 bg-ink text-white shadow-soft sm:h-auto sm:max-h-[85vh] sm:rounded-3xl"
         onClick={(event) => event.stopPropagation()}
         style={{ WebkitOverflowScrolling: "touch" }}
       >
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.28em] text-coral">Programme</p>
-            <h2 className="mt-1 text-lg font-black leading-tight">Changer de programme</h2>
-            <p className="mt-1 text-xs font-semibold text-white/55">
-              Tes données et ton historique restent intacts.
-            </p>
-          </div>
-          <button
-            aria-label="Fermer"
-            className="flex size-9 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/5 text-sm font-black text-white/70"
-            onClick={onClose}
-            type="button"
-          >
-            ✕
-          </button>
-        </div>
-
-        <p className="mt-4 text-[10px] font-black uppercase tracking-wide text-sky">Recommandés</p>
-        <div className="mt-2 space-y-2">
-          {recommendations.map(({ program }) => (
-            <ProgramOption
-              isActive={program.id === activeTemplateId}
-              key={program.id}
-              onSelect={() => onSelect(program)}
-              program={program}
-            />
-          ))}
-        </div>
-
-        {otherPrograms.length > 0 ? (
-          <details className="mt-4 rounded-xl border border-white/8 bg-white/4 p-3">
-            <summary className="cursor-pointer list-none text-xs font-black uppercase tracking-wide text-white/55">
-              Voir tout le catalogue ({otherPrograms.length})
-            </summary>
-            <div className="mt-3 space-y-2">
-              {otherPrograms.map((program) => (
-                <ProgramOption
-                  isActive={program.id === activeTemplateId}
-                  key={program.id}
-                  onSelect={() => onSelect(program)}
-                  program={program}
-                />
-              ))}
+        <div className="shrink-0 border-b border-white/8 px-5 py-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-black uppercase tracking-[0.28em] text-coral">Programme</p>
+              <h2 className="mt-1 text-lg font-black leading-tight">Changer de programme</h2>
+              <p className="mt-1 text-xs font-semibold text-white/55">
+                Tes données et ton historique restent intacts.
+              </p>
             </div>
-          </details>
-        ) : null}
+            <button
+              aria-label="Fermer"
+              className="shrink-0 flex size-9 items-center justify-center rounded-md border border-white/10 bg-white/5 text-sm font-black text-white/70"
+              onClick={onClose}
+              type="button"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+
+        <div className="overflow-y-auto overscroll-contain flex-1 px-5 py-4">
+          <p className="text-[10px] font-black uppercase tracking-wide text-sky">Recommandés</p>
+          <div className="mt-2 space-y-2">
+            {recommendations.map(({ program }) => (
+              <ProgramOption
+                isActive={program.id === activeTemplateId}
+                key={program.id}
+                onSelect={() => onSelect(program)}
+                program={program}
+              />
+            ))}
+          </div>
+
+          {otherPrograms.length > 0 ? (
+            <details className="mt-4 rounded-xl border border-white/8 bg-white/4 p-3">
+              <summary className="cursor-pointer list-none text-xs font-black uppercase tracking-wide text-white/55">
+                Voir tout le catalogue ({otherPrograms.length})
+              </summary>
+              <div className="mt-3 space-y-2">
+                {otherPrograms.map((program) => (
+                  <ProgramOption
+                    isActive={program.id === activeTemplateId}
+                    key={program.id}
+                    onSelect={() => onSelect(program)}
+                    program={program}
+                  />
+                ))}
+              </div>
+            </details>
+          ) : null}
+        </div>
       </div>
     </div>
   );
